@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fff7f4;
+  --foreground: #1c1418;
+  --muted: #6b5a60;
+  --accent: #c45b7a;
+  --accent-deep: #8f3d58;
+  --surface: #ffffff;
+  --line: #ead9df;
+  --ink: #1c1418;
+  --sand: #f3e4dc;
+  --mint: #2f6f66;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-sand: var(--sand);
+  --color-mint: var(--mint);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #ffd9e4 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #f3e4dc 0%, transparent 50%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.7s ease both;
+}
+
+.animate-rise-delay {
+  animation: rise 0.8s ease 0.12s both;
+}
+
+.animate-pulse-soft {
+  animation: soft-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-rise-delay,
+  .animate-pulse-soft {
+    animation: none;
+  }
+}
