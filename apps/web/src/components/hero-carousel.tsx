@@ -16,8 +16,8 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     id: "under-99",
-    eyebrow: "Everyday finds",
-    title: "Clothes under 99 AED",
+    eyebrow: "Budget picks",
+    title: "Under 99 DHS",
     subtitle: "Looks that don’t break the budget",
     href: "/categories",
     image:
@@ -25,34 +25,64 @@ const SLIDES: Slide[] = [
     accent: "#f5d76e",
   },
   {
-    id: "ethnic",
-    eyebrow: "Festive edit",
-    title: "Indian ethnic wear",
-    subtitle: "Lehengas, kurtis & occasion looks",
+    id: "flat-50",
+    eyebrow: "Hot deal",
+    title: "Flat 50%",
+    subtitle: "Half off select styles today",
+    href: "/categories/party-wear",
+    image:
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1400&q=80",
+    accent: "#ff8fab",
+  },
+  {
+    id: "bogo",
+    eyebrow: "Limited offer",
+    title: "Buy 1 get 1",
+    subtitle: "Double the looks, same checkout",
+    href: "/categories/kurtis",
+    image:
+      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1400&q=80",
+    accent: "#ffb4a2",
+  },
+  {
+    id: "clearance",
+    eyebrow: "Last chance",
+    title: "Clearance sale",
+    subtitle: "Final markdowns before they’re gone",
+    href: "/categories",
+    image:
+      "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1400&q=80",
+    accent: "#f4a261",
+  },
+  {
+    id: "premium",
+    eyebrow: "Elevated edit",
+    title: "Premium collection",
+    subtitle: "Statement pieces worth the keep",
     href: "/categories/lehengas",
     image:
       "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=1400&q=80",
-    accent: "#f4a5bd",
-  },
-  {
-    id: "modern",
-    eyebrow: "City ready",
-    title: "Modern wear",
-    subtitle: "Clean silhouettes for now",
-    href: "/categories/indo-western",
-    image:
-      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=1400&q=80",
-    accent: "#9fd4c8",
+    accent: "#c9a87c",
   },
 ];
 
-const AUTOPLAY_MS = 5200;
+const AUTOPLAY_MS = 4000;
+const RESUME_AFTER_INTERACT_MS = 6000;
 
 export function HeroCarousel() {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const activeRef = useRef(0);
+  const interactingRef = useRef(false);
+  const resumeTimerRef = useRef<number | null>(null);
   const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [inView, setInView] = useState(true);
   const reduceMotion = usePrefersReducedMotion();
+
+  const setActiveIndex = useCallback((index: number) => {
+    activeRef.current = index;
+    setActive(index);
+  }, []);
 
   const scrollToIndex = useCallback(
     (index: number, behavior: ScrollBehavior = "smooth") => {
@@ -65,9 +95,30 @@ export function HeroCarousel() {
       const left =
         slide.offsetLeft - (scroller.clientWidth - slide.clientWidth) / 2;
       scroller.scrollTo({ left: Math.max(0, left), behavior });
+      setActiveIndex(index);
     },
-    [],
+    [setActiveIndex],
   );
+
+  const pauseForInteraction = useCallback(() => {
+    interactingRef.current = true;
+    if (resumeTimerRef.current) window.clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = window.setTimeout(() => {
+      interactingRef.current = false;
+    }, RESUME_AFTER_INTERACT_MS);
+  }, []);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting && entry.intersectionRatio > 0.35),
+      { threshold: [0, 0.35, 0.6] },
+    );
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -89,36 +140,48 @@ export function HeroCarousel() {
           closest = i;
         }
       });
-      setActive(closest);
+      setActiveIndex(closest);
     };
 
+    const onPointerDown = () => pauseForInteraction();
+    const onWheel = () => pauseForInteraction();
+
     scroller.addEventListener("scroll", onScroll, { passive: true });
+    scroller.addEventListener("pointerdown", onPointerDown, { passive: true });
+    scroller.addEventListener("wheel", onWheel, { passive: true });
     onScroll();
-    return () => scroller.removeEventListener("scroll", onScroll);
-  }, []);
+
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      scroller.removeEventListener("pointerdown", onPointerDown);
+      scroller.removeEventListener("wheel", onWheel);
+    };
+  }, [pauseForInteraction, setActiveIndex]);
 
   useEffect(() => {
-    if (paused || reduceMotion) return;
+    if (reduceMotion || !inView) return;
+
     const id = window.setInterval(() => {
-      const next = (active + 1) % SLIDES.length;
+      if (interactingRef.current) return;
+      const next = (activeRef.current + 1) % SLIDES.length;
       scrollToIndex(next);
     }, AUTOPLAY_MS);
+
     return () => window.clearInterval(id);
-  }, [active, paused, reduceMotion, scrollToIndex]);
+  }, [inView, reduceMotion, scrollToIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (resumeTimerRef.current) window.clearTimeout(resumeTimerRef.current);
+    };
+  }, []);
 
   return (
     <section
+      ref={sectionRef}
       className="animate-rise relative w-full pt-3 sm:pt-5"
       aria-roledescription="carousel"
       aria-label="Featured collections"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
-      onBlurCapture={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-          setPaused(false);
-        }
-      }}
     >
       <div
         ref={scrollerRef}
@@ -172,7 +235,10 @@ export function HeroCarousel() {
               type="button"
               aria-label={`Go to slide ${index + 1}: ${slide.title}`}
               aria-current={isActive ? "true" : undefined}
-              onClick={() => scrollToIndex(index)}
+              onClick={() => {
+                pauseForInteraction();
+                scrollToIndex(index);
+              }}
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 isActive ? "w-7 bg-ink" : "w-1.5 bg-ink/25 hover:bg-ink/45"
               }`}
