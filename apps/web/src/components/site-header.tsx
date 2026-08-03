@@ -342,9 +342,16 @@ export function SiteHeader() {
       </div>
 
       <div className="border-b border-line/60 bg-[#2a1f24] text-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 overflow-x-auto px-3 py-2 text-sm sm:px-5">
-          <Link href="/" className="shrink-0 font-medium hover:text-accent">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-3 py-2 text-sm sm:gap-4 sm:px-5">
+          <Link href="/" className="shrink-0 font-medium text-white/90 hover:text-white">
             All stores
+          </Link>
+          <Link
+            href="/for-you"
+            className="shrink-0 rounded-full bg-white px-3.5 py-1 text-sm font-medium shadow-sm transition hover:bg-[#fff6f8]"
+          >
+            <span className="text-accent-deep">For</span>{" "}
+            <span className="text-[#5c4a50]">you</span>
           </Link>
           {EMIRATES.map((item) => (
             <Link
