@@ -11,7 +11,7 @@ export default function CartPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="font-display text-4xl text-ink">Your bag</h1>
+      <h1 className="font-display text-4xl text-ink">Your cart</h1>
       {storeName ? (
         <p className="mt-2 text-sm text-muted">
           From {storeName} · one store per order for 1-hour delivery
@@ -20,7 +20,7 @@ export default function CartPage() {
 
       {items.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-line bg-surface/70 p-10 text-center">
-          <p className="text-muted">Your bag is empty.</p>
+          <p className="text-muted">Your cart is empty.</p>
           <Link href="/" className="mt-4 inline-block text-accent-deep underline">
             Browse stores
           </Link>

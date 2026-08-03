@@ -1,27 +1,58 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { UserRole } from "@/lib/types";
-import { Suspense } from "react";
 
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [role, setRole] = useState<UserRole>("shopper");
+  const authError = searchParams.get("error");
+  const roleParam = searchParams.get("role");
+  const initialRole: UserRole =
+    roleParam === "store_owner" || roleParam === "admin" ? roleParam : "shopper";
+  const [mode, setMode] = useState<"signin" | "signup">(
+    initialRole === "store_owner" ? "signup" : "signin",
+  );
+  const [role, setRole] = useState<UserRole>(initialRole);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(
+    authError ? "Google sign-in failed. Please try again." : null,
+  );
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const title = useMemo(
     () => (mode === "signin" ? "Welcome back" : "Create your Morni account"),
     [mode],
   );
+
+  async function signInWithGoogle() {
+    setGoogleLoading(true);
+    setMessage(null);
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setGoogleLoading(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,7 +67,7 @@ function AuthForm() {
         setLoading(false);
         return;
       }
-      router.push(role === "store_owner" ? "/portal" : next);
+      router.push(next.startsWith("/") ? next : "/");
       router.refresh();
       return;
     }
@@ -64,10 +95,28 @@ function AuthForm() {
     <div className="mx-auto max-w-md px-4 py-14 sm:px-6">
       <h1 className="font-display text-4xl text-ink">{title}</h1>
       <p className="mt-2 text-sm text-muted">
-        Email sign-in for now. Phone OTP can be enabled in Supabase later.
+        Sign in with Google, or use email and password.
       </p>
 
-      <div className="mt-6 flex gap-2">
+      <button
+        type="button"
+        onClick={signInWithGoogle}
+        disabled={googleLoading}
+        className="mt-6 flex w-full items-center justify-center gap-3 rounded-full border border-line bg-surface px-4 py-3 text-sm font-medium text-ink transition hover:border-accent disabled:opacity-50"
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-bold text-[#4285F4]">
+          G
+        </span>
+        {googleLoading ? "Redirecting to Google…" : "Continue with Google"}
+      </button>
+
+      <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted">
+        <span className="h-px flex-1 bg-line" />
+        or
+        <span className="h-px flex-1 bg-line" />
+      </div>
+
+      <div className="flex gap-2">
         <button
           type="button"
           onClick={() => setMode("signin")}

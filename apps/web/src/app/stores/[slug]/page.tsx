@@ -51,6 +51,24 @@ export default async function StorePage({
             {s.area}, {emirateLabel(s.emirate)} · {s.address}
           </p>
           {s.description ? <p className="max-w-2xl text-ink/85">{s.description}</p> : null}
+          {s.lat != null && s.lng != null ? (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-line">
+              <iframe
+                title={`${s.name} location`}
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${s.lng - 0.012}%2C${s.lat - 0.008}%2C${s.lng + 0.012}%2C${s.lat + 0.008}&layer=mapnik&marker=${s.lat}%2C${s.lng}`}
+                className="h-48 w-full border-0 sm:h-56"
+                loading="lazy"
+              />
+              <a
+                href={`https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lng}#map=16/${s.lat}/${s.lng}`}
+                target="_blank"
+                rel="noreferrer"
+                className="block border-t border-line bg-background px-4 py-2 text-xs text-accent-deep hover:underline"
+              >
+                Open exact location on map
+              </a>
+            </div>
+          ) : null}
         </div>
       </div>
 

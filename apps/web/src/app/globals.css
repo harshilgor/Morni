@@ -37,6 +37,22 @@ body {
   font-family: var(--font-body), system-ui, sans-serif;
 }
 
+/* Seller mode: clearly cooler sage background vs shopper blush */
+body.sell-mode {
+  background:
+    radial-gradient(1000px 560px at 12% -10%, #b9ddd4 0%, transparent 58%),
+    radial-gradient(900px 500px at 95% 5%, #c5d5e0 0%, transparent 55%),
+    #e6f0ed !important;
+}
+
+.sell-shell {
+  min-height: 100%;
+  background:
+    radial-gradient(900px 480px at 0% 0%, rgba(47, 111, 102, 0.12), transparent 60%),
+    radial-gradient(800px 420px at 100% 20%, rgba(70, 100, 120, 0.1), transparent 55%),
+    #e6f0ed;
+}
+
 h1,
 h2,
 h3,

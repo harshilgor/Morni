@@ -4,21 +4,27 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerStore } from "@/lib/use-owner-store";
-import { EMIRATES } from "@/lib/format";
-import type { UaeEmirate } from "@/lib/types";
+import {
+  StoreLocationFields,
+  type StoreLocationValue,
+} from "@/components/store-location-fields";
 
 export default function PortalSettingsPage() {
   const { store, loading, error, refresh } = useOwnerStore();
   const [form, setForm] = useState({
     name: "",
     description: "",
-    emirate: "dubai" as UaeEmirate,
-    area: "",
-    address: "",
     delivery_eta_minutes: "60",
     opens_at: "10:00",
     closes_at: "22:00",
     is_active: true,
+  });
+  const [location, setLocation] = useState<StoreLocationValue>({
+    emirate: "dubai",
+    area: "",
+    address: "",
+    lat: null,
+    lng: null,
   });
   const [logo, setLogo] = useState<File | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -29,19 +35,27 @@ export default function PortalSettingsPage() {
     setForm({
       name: store.name,
       description: store.description ?? "",
-      emirate: store.emirate,
-      area: store.area,
-      address: store.address,
       delivery_eta_minutes: String(store.delivery_eta_minutes),
       opens_at: store.opens_at?.slice(0, 5) ?? "10:00",
       closes_at: store.closes_at?.slice(0, 5) ?? "22:00",
       is_active: store.is_active,
+    });
+    setLocation({
+      emirate: store.emirate,
+      area: store.area,
+      address: store.address,
+      lat: store.lat,
+      lng: store.lng,
     });
   }, [store]);
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
     if (!store) return;
+    if (!location.area.trim() || !location.address.trim()) {
+      setMessage("Add your area and exact street address.");
+      return;
+    }
     setSaving(true);
     setMessage(null);
     const supabase = createClient();
@@ -57,7 +71,8 @@ export default function PortalSettingsPage() {
         setSaving(false);
         return;
       }
-      logo_url = supabase.storage.from("store-logos").getPublicUrl(path).data.publicUrl;
+      logo_url = supabase.storage.from("store-logos").getPublicUrl(path).data
+        .publicUrl;
     }
 
     const { error: updateError } = await supabase
@@ -65,9 +80,11 @@ export default function PortalSettingsPage() {
       .update({
         name: form.name,
         description: form.description || null,
-        emirate: form.emirate,
-        area: form.area,
-        address: form.address,
+        emirate: location.emirate,
+        area: location.area.trim(),
+        address: location.address.trim(),
+        lat: location.lat,
+        lng: location.lng,
         delivery_eta_minutes: Number(form.delivery_eta_minutes),
         opens_at: form.opens_at,
         closes_at: form.closes_at,
@@ -109,10 +126,13 @@ export default function PortalSettingsPage() {
     <div className="max-w-xl">
       <h1 className="font-display text-3xl text-ink">Store settings</h1>
       <p className="mt-1 text-sm text-muted">
-        Delivery promise defaults to 1 hour for shoppers.
+        Set your exact store location so shoppers know where you operate from.
       </p>
 
-      <form onSubmit={onSave} className="mt-8 space-y-4 rounded-[1.5rem] border border-line bg-surface p-6">
+      <form
+        onSubmit={onSave}
+        className="mt-8 space-y-4 rounded-[1.5rem] border border-line bg-surface p-6"
+      >
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted">Name</span>
           <input
@@ -128,43 +148,14 @@ export default function PortalSettingsPage() {
             className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
             rows={3}
             value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </label>
-        <label className="block space-y-1.5 text-sm">
-          <span className="text-muted">Emirate</span>
-          <select
-            className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-            value={form.emirate}
             onChange={(e) =>
-              setForm((f) => ({ ...f, emirate: e.target.value as UaeEmirate }))
+              setForm((f) => ({ ...f, description: e.target.value }))
             }
-          >
-            {EMIRATES.map((e) => (
-              <option key={e.value} value={e.value}>
-                {e.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block space-y-1.5 text-sm">
-          <span className="text-muted">Area</span>
-          <input
-            className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-            value={form.area}
-            onChange={(e) => setForm((f) => ({ ...f, area: e.target.value }))}
-            required
           />
         </label>
-        <label className="block space-y-1.5 text-sm">
-          <span className="text-muted">Address</span>
-          <input
-            className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-            value={form.address}
-            onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-            required
-          />
-        </label>
+
+        <StoreLocationFields value={location} onChange={setLocation} />
+
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted">Delivery ETA (minutes)</span>
           <input
@@ -185,7 +176,9 @@ export default function PortalSettingsPage() {
               type="time"
               className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
               value={form.opens_at}
-              onChange={(e) => setForm((f) => ({ ...f, opens_at: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, opens_at: e.target.value }))
+              }
             />
           </label>
           <label className="block space-y-1.5 text-sm">
@@ -194,7 +187,9 @@ export default function PortalSettingsPage() {
               type="time"
               className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
               value={form.closes_at}
-              onChange={(e) => setForm((f) => ({ ...f, closes_at: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, closes_at: e.target.value }))
+              }
             />
           </label>
         </div>
@@ -202,7 +197,9 @@ export default function PortalSettingsPage() {
           <input
             type="checkbox"
             checked={form.is_active}
-            onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, is_active: e.target.checked }))
+            }
           />
           Store is active / visible to shoppers
         </label>

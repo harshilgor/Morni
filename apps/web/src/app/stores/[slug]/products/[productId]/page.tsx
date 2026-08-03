@@ -82,14 +82,14 @@ export default function ProductPage() {
             }}
             className="rounded-full bg-ink px-6 py-3 text-sm text-white transition hover:bg-accent-deep disabled:opacity-40"
           >
-            {added ? "Added to bag" : "Add to bag"}
+            {added ? "Added to cart" : "Add to cart"}
           </button>
           <button
             type="button"
             onClick={() => router.push("/cart")}
             className="rounded-full border border-line bg-surface px-6 py-3 text-sm"
           >
-            View bag
+            View cart
           </button>
         </div>
       </div>

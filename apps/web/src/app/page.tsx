@@ -1,7 +1,13 @@
+import { Suspense } from "react";
 import { StoreCard } from "@/components/cards";
+import { FeaturedCategories } from "@/components/featured-categories";
+import { HeroCarousel } from "@/components/hero-carousel";
+import { LocationHomeSync } from "@/components/location-home-sync";
 import { createClient } from "@/lib/supabase/server";
+import type { BrowseCategory } from "@/lib/browse-categories";
 import type { Store } from "@/lib/types";
-import { EMIRATES } from "@/lib/format";
+import { EMIRATES, emirateLabel } from "@/lib/format";
+import type { UaeEmirate } from "@/lib/types";
 import Link from "next/link";
 
 export default async function HomePage({
@@ -22,61 +28,36 @@ export default async function HomePage({
     query = query.eq("emirate", emirate);
   }
 
-  const { data: stores } = await query;
+  const [{ data: stores }, { data: categories }] = await Promise.all([
+    query,
+    supabase
+      .from("browse_categories")
+      .select("*")
+      .eq("is_featured", true)
+      .order("sort_order"),
+  ]);
+
   const list = (stores ?? []) as Store[];
+  const featured = (categories ?? []) as BrowseCategory[];
+  const activeEmirate = emirate as UaeEmirate | undefined;
 
   return (
     <div>
-      <section className="relative overflow-hidden">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-16 pt-14 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end lg:pt-20">
-          <div className="animate-rise space-y-6">
-            <p className="text-sm uppercase tracking-[0.22em] text-accent-deep">
-              UAE · Local boutiques
-            </p>
-            <h1 className="font-display text-5xl leading-[0.95] text-ink sm:text-7xl">
-              Morni
-            </h1>
-            <p className="max-w-md text-lg text-muted">
-              Discover what nearby retail stores are offering — then get it
-              delivered within the hour.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href="#stores"
-                className="rounded-full bg-ink px-6 py-3 text-sm text-white transition hover:bg-accent-deep"
-              >
-                Browse stores
-              </a>
-              <Link
-                href="/auth"
-                className="rounded-full border border-line bg-surface px-6 py-3 text-sm text-ink transition hover:border-accent"
-              >
-                Sign in
-              </Link>
-            </div>
-          </div>
-          <div className="animate-rise-delay relative min-h-[280px] overflow-hidden rounded-[2rem] bg-sand">
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{
-                backgroundImage:
-                  "url(https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200)",
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#1c1418]/55 via-transparent to-transparent" />
-            <p className="absolute bottom-5 left-5 right-5 text-sm text-white/95">
-              <span className="animate-pulse-soft inline-block rounded-full bg-white/15 px-3 py-1 backdrop-blur">
-                Delivery within 1 hour
-              </span>
-            </p>
-          </div>
+      <HeroCarousel />
+      <Suspense fallback={null}>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <LocationHomeSync />
         </div>
-      </section>
+      </Suspense>
 
-      <section id="stores" className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+      <section id="stores" className="mx-auto max-w-6xl px-4 pb-12 pt-6 sm:px-6">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 className="font-display text-3xl text-ink">Stores near you</h2>
+            <h2 className="font-display text-3xl text-ink">
+              {activeEmirate
+                ? `Stores in ${emirateLabel(activeEmirate)}`
+                : "Stores near you"}
+            </h2>
             <p className="mt-1 text-sm text-muted">
               Same-hour delivery from local retail floors.
             </p>
@@ -88,7 +69,7 @@ export default async function HomePage({
             >
               All
             </Link>
-            {EMIRATES.slice(0, 4).map((e) => (
+            {EMIRATES.map((e) => (
               <Link
                 key={e.value}
                 href={`/?emirate=${e.value}`}
@@ -102,7 +83,8 @@ export default async function HomePage({
 
         {list.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line bg-surface/60 p-10 text-center text-muted">
-            No stores in this emirate yet.
+            No stores in this emirate yet. Try another delivery location in the
+            top bar.
           </p>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -112,6 +94,8 @@ export default async function HomePage({
           </div>
         )}
       </section>
+
+      <FeaturedCategories categories={featured} />
     </div>
   );
 }
