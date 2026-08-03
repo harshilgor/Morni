@@ -87,9 +87,14 @@ export default async function HomePage({
             top bar.
           </p>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {list.map((store) => (
-              <StoreCard key={store.id} store={store} />
+              <div
+                key={store.id}
+                className="w-[min(78vw,280px)] shrink-0 snap-start"
+              >
+                <StoreCard store={store} />
+              </div>
             ))}
           </div>
         )}
