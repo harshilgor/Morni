@@ -40,6 +40,7 @@ export type Store = {
   delivery_eta_minutes: number;
   opens_at: string | null;
   closes_at: string | null;
+  pause_note?: string | null;
 };
 
 export type Product = {

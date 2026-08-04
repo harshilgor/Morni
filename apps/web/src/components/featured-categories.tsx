@@ -10,13 +10,13 @@ export function FeaturedCategories({
 
   return (
     <section className="w-full bg-white">
-      <div className="border-t border-[#e8e8e8] py-10 text-center">
-        <h2 className="text-sm font-bold uppercase tracking-[0.32em] text-ink">
+      <div className="border-t border-[#e8e8e8] py-8 text-center">
+        <h2 className="text-sm font-bold uppercase tracking-[0.28em] text-ink">
           Featured categories
         </h2>
       </div>
 
-      <div className="grid w-full grid-cols-2 gap-px border-y border-[#e8e8e8] bg-[#e8e8e8] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
+      <div className="grid w-full grid-cols-2 gap-px border-y border-[#e8e8e8] bg-[#e8e8e8] sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {categories.map((category) => (
           <Link
             key={category.id}
@@ -25,10 +25,10 @@ export function FeaturedCategories({
                 ? "/categories"
                 : `/categories/${category.slug}`
             }
-            className="group flex flex-col bg-white p-5 transition hover:bg-[#fafafa] sm:p-6"
+            className="group flex flex-col bg-transparent p-4 transition hover:bg-white/30 sm:p-5"
           >
-            <div className="mb-5 flex min-h-[1.25rem] items-start justify-between gap-2">
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink">
+            <div className="flex min-h-[1.25rem] items-start justify-between gap-2">
+              <h3 className="font-display text-[12px] font-bold uppercase tracking-[0.14em] text-ink">
                 {category.name}
               </h3>
               {category.badge ? (
@@ -38,12 +38,12 @@ export function FeaturedCategories({
               ) : null}
             </div>
 
-            <div className="relative mt-auto aspect-[3/4] w-full overflow-hidden">
+            <div className="relative mt-4 aspect-[4/5] w-full overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={category.image_url}
                 alt={category.name}
-                className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.03]"
+                className="h-full w-full object-contain object-top transition duration-500 group-hover:scale-[1.02]"
               />
             </div>
           </Link>

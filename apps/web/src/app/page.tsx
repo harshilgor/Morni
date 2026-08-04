@@ -22,7 +22,7 @@ export default async function HomePage({
     .from("stores")
     .select("*")
     .eq("is_active", true)
-    .order("name");
+    .order("created_at", { ascending: false });
 
   if (emirate) {
     query = query.eq("emirate", emirate);

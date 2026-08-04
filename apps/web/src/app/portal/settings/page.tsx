@@ -18,6 +18,7 @@ export default function PortalSettingsPage() {
     opens_at: "10:00",
     closes_at: "22:00",
     is_active: true,
+    pause_note: "",
   });
   const [location, setLocation] = useState<StoreLocationValue>({
     emirate: "dubai",
@@ -32,21 +33,26 @@ export default function PortalSettingsPage() {
 
   useEffect(() => {
     if (!store) return;
-    setForm({
-      name: store.name,
-      description: store.description ?? "",
-      delivery_eta_minutes: String(store.delivery_eta_minutes),
-      opens_at: store.opens_at?.slice(0, 5) ?? "10:00",
-      closes_at: store.closes_at?.slice(0, 5) ?? "22:00",
-      is_active: store.is_active,
-    });
-    setLocation({
-      emirate: store.emirate,
-      area: store.area,
-      address: store.address,
-      lat: store.lat,
-      lng: store.lng,
-    });
+    const syncFromStore = () => {
+      setForm({
+        name: store.name,
+        description: store.description ?? "",
+        delivery_eta_minutes: String(store.delivery_eta_minutes),
+        opens_at: store.opens_at?.slice(0, 5) ?? "10:00",
+        closes_at: store.closes_at?.slice(0, 5) ?? "22:00",
+        is_active: store.is_active,
+        pause_note: store.pause_note ?? "",
+      });
+      setLocation({
+        emirate: store.emirate,
+        area: store.area,
+        address: store.address,
+        lat: store.lat,
+        lng: store.lng,
+      });
+    };
+    if (typeof queueMicrotask === "function") queueMicrotask(syncFromStore);
+    else window.setTimeout(syncFromStore, 0);
   }, [store]);
 
   async function onSave(e: FormEvent) {
@@ -89,6 +95,7 @@ export default function PortalSettingsPage() {
         opens_at: form.opens_at,
         closes_at: form.closes_at,
         is_active: form.is_active,
+        pause_note: form.pause_note || null,
         logo_url,
       })
       .eq("id", store.id);
@@ -203,6 +210,19 @@ export default function PortalSettingsPage() {
           />
           Store is active / visible to shoppers
         </label>
+        {!form.is_active ? (
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-muted">Pause reason (shown internally)</span>
+            <input
+              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+              placeholder="Temporarily closed for inventory update"
+              value={form.pause_note}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, pause_note: e.target.value }))
+              }
+            />
+          </label>
+        ) : null}
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted">Logo</span>
           <input

@@ -19,6 +19,14 @@ export default function PortalProductsPage() {
   });
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState("");
+  const [showLowStock, setShowLowStock] = useState(false);
+  const [showHiddenOnly, setShowHiddenOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "price_desc" | "price_asc" | "stock_asc">(
+    "newest",
+  );
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkStock, setBulkStock] = useState("");
 
   async function loadProducts(storeId: string) {
     const supabase = createClient();
@@ -31,8 +39,31 @@ export default function PortalProductsPage() {
   }
 
   useEffect(() => {
-    if (store) loadProducts(store.id);
+    if (!store) return;
+    const run = () => {
+      void loadProducts(store.id);
+    };
+    if (typeof queueMicrotask === "function") queueMicrotask(run);
+    else window.setTimeout(run, 0);
   }, [store]);
+
+  const visibleProducts = [...products]
+    .filter((product) => {
+      if (showHiddenOnly && product.is_available) return false;
+      if (showLowStock && product.stock > 5) return false;
+      if (!query.trim()) return true;
+      const q = query.toLowerCase();
+      return (
+        product.title.toLowerCase().includes(q) ||
+        (product.description ?? "").toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === "price_desc") return b.price_aed - a.price_aed;
+      if (sortBy === "price_asc") return a.price_aed - b.price_aed;
+      if (sortBy === "stock_asc") return a.stock - b.stock;
+      return 0;
+    });
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -100,6 +131,34 @@ export default function PortalProductsPage() {
     if (store) await loadProducts(store.id);
   }
 
+  function toggleSelected(productId: string) {
+    setSelectedIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId],
+    );
+  }
+
+  async function bulkSetAvailability(isAvailable: boolean) {
+    if (!selectedIds.length) return;
+    const supabase = createClient();
+    await supabase
+      .from("products")
+      .update({ is_available: isAvailable })
+      .in("id", selectedIds);
+    setSelectedIds([]);
+    if (store) await loadProducts(store.id);
+  }
+
+  async function bulkSetStock() {
+    if (!selectedIds.length || !bulkStock.trim()) return;
+    const stock = Number(bulkStock);
+    if (Number.isNaN(stock) || stock < 0) return;
+    const supabase = createClient();
+    await supabase.from("products").update({ stock }).in("id", selectedIds);
+    setSelectedIds([]);
+    setBulkStock("");
+    if (store) await loadProducts(store.id);
+  }
+
   if (error === "unauthenticated") {
     return (
       <Link href="/auth?next=/portal/products" className="text-accent-deep underline">
@@ -126,6 +185,89 @@ export default function PortalProductsPage() {
       <div>
         <h1 className="font-display text-3xl text-ink">Products</h1>
         <p className="mt-1 text-sm text-muted">Manage catalog for {store.name}</p>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-surface p-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <input
+            className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
+            placeholder="Search title or description"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <select
+            className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          >
+            <option value="newest">Sort: Newest</option>
+            <option value="price_desc">Sort: Price high to low</option>
+            <option value="price_asc">Sort: Price low to high</option>
+            <option value="stock_asc">Sort: Stock low to high</option>
+          </select>
+          <label className="flex items-center gap-2 rounded-xl border border-line bg-background px-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              checked={showLowStock}
+              onChange={(e) => setShowLowStock(e.target.checked)}
+            />
+            Low stock only (≤5)
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-line bg-background px-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              checked={showHiddenOnly}
+              onChange={(e) => setShowHiddenOnly(e.target.checked)}
+            />
+            Hidden only
+          </label>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedIds(visibleProducts.map((p) => p.id))}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-muted"
+          >
+            Select visible
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds([])}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-muted"
+          >
+            Clear selection
+          </button>
+          <button
+            type="button"
+            onClick={() => bulkSetAvailability(false)}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-muted"
+          >
+            Hide selected
+          </button>
+          <button
+            type="button"
+            onClick={() => bulkSetAvailability(true)}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-muted"
+          >
+            Show selected
+          </button>
+          <input
+            type="number"
+            min="0"
+            placeholder="Bulk stock"
+            value={bulkStock}
+            onChange={(e) => setBulkStock(e.target.value)}
+            className="w-28 rounded-lg border border-line bg-background px-2 py-1.5 text-xs"
+          />
+          <button
+            type="button"
+            onClick={bulkSetStock}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-muted"
+          >
+            Update stock
+          </button>
+        </div>
       </div>
 
       <form
@@ -185,11 +327,17 @@ export default function PortalProductsPage() {
       </form>
 
       <ul className="space-y-3">
-        {products.map((product) => (
+        {visibleProducts.map((product) => (
           <li
             key={product.id}
             className="flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-surface p-4"
           >
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(product.id)}
+              onChange={() => toggleSelected(product.id)}
+              aria-label={`Select ${product.title}`}
+            />
             <div className="h-16 w-14 overflow-hidden rounded-lg bg-sand">
               {product.image_urls?.[0] ? (
                 // eslint-disable-next-line @next/next/no-img-element

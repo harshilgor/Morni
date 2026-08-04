@@ -3,16 +3,21 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useOwnerStore } from "@/lib/use-owner-store";
 
 const links = [
-  { href: "/portal", label: "Orders" },
+  { href: "/portal", label: "Dashboard" },
+  { href: "/portal/orders", label: "Orders" },
   { href: "/portal/products", label: "Products" },
+  { href: "/portal/promotions", label: "Promotions" },
+  { href: "/portal/analytics", label: "Analytics" },
   { href: "/portal/settings", label: "Store" },
 ];
 
 export function PortalNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { store } = useOwnerStore();
 
   async function signOut() {
     const supabase = createClient();
@@ -27,10 +32,15 @@ export function PortalNav() {
           Morni Portal
         </Link>
         <p className="mt-1 text-xs text-muted">Store owner</p>
+        {store ? (
+          <p className="mt-2 text-sm font-medium text-ink">{store.name}</p>
+        ) : null}
       </div>
       <nav className="flex gap-1 px-3 pb-4 lg:flex-col">
         {links.map((link) => {
-          const active = pathname === link.href;
+          const active =
+            pathname === link.href ||
+            (link.href !== "/portal" && pathname.startsWith(link.href + "/"));
           return (
             <Link
               key={link.href}
