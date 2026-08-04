@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Store } from "@/lib/types";
 import { deliveryPromise, emirateLabel, formatAed } from "@/lib/format";
+import { WishlistToggle } from "@/components/wishlist-toggle";
 
 export function StoreCard({ store }: { store: Store }) {
   return (
@@ -49,8 +50,8 @@ export function ProductCard({
 }) {
   const image = product.image_urls?.[0];
   return (
-    <Link href={href} className="group block">
-      <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-sand">
+    <Link href={href} className="group relative block">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-sand">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -59,6 +60,9 @@ export function ProductCard({
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         ) : null}
+        <div className="absolute right-3 top-3 z-10">
+          <WishlistToggle productId={product.id} size="sm" />
+        </div>
       </div>
       <div className="mt-3 space-y-1">
         <h3 className="text-sm font-medium text-ink">{product.title}</h3>

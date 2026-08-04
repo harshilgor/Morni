@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/cart";
 import { deliveryPromise, formatAed } from "@/lib/format";
 import type { Product, Store } from "@/lib/types";
+import { WishlistToggle } from "@/components/wishlist-toggle";
 
 export default function ProductPage() {
   const params = useParams<{ slug: string; productId: string }>();
@@ -57,7 +58,14 @@ export default function ProductPage() {
         <p className="text-xs uppercase tracking-[0.18em] text-accent-deep">
           {store.name} · {deliveryPromise(store.delivery_eta_minutes)}
         </p>
-        <h1 className="font-display text-4xl text-ink sm:text-5xl">{product.title}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="font-display text-4xl text-ink sm:text-5xl">
+              {product.title}
+            </h1>
+            <div className="pt-2">
+              <WishlistToggle productId={product.id} />
+            </div>
+          </div>
         <div className="flex items-center gap-3 text-lg">
           <span>{formatAed(product.price_aed)}</span>
           {product.compare_at_price_aed ? (
