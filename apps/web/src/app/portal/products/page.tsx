@@ -8,6 +8,11 @@ import { formatAed } from "@/lib/format";
 import { PRODUCT_SIZES } from "@/lib/product-sizes";
 import type { Product } from "@/lib/types";
 
+type ProductDraft = {
+  title: string;
+  price_aed: string;
+};
+
 export default function PortalProductsPage() {
   const { store, loading, error } = useOwnerStore();
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,6 +34,12 @@ export default function PortalProductsPage() {
   );
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStock, setBulkStock] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, ProductDraft>>({});
+  const [editFiles, setEditFiles] = useState<Record<string, File>>({});
+  const [editPreviews, setEditPreviews] = useState<Record<string, string>>({});
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [editMessage, setEditMessage] = useState<string | null>(null);
 
   async function loadProducts(storeId: string) {
     const supabase = createClient();
@@ -180,6 +191,168 @@ export default function PortalProductsPage() {
     if (store) await loadProducts(store.id);
   }
 
+  function startEditing() {
+    setDrafts(
+      Object.fromEntries(
+        products.map((product) => [
+          product.id,
+          {
+            title: product.title,
+            price_aed: String(product.price_aed),
+          },
+        ]),
+      ),
+    );
+    setEditFiles({});
+    setEditPreviews({});
+    setEditMessage(null);
+    setEditing(true);
+  }
+
+  function clearEditPreviews() {
+    Object.values(editPreviews).forEach((url) => URL.revokeObjectURL(url));
+  }
+
+  function cancelEditing() {
+    clearEditPreviews();
+    setDrafts({});
+    setEditFiles({});
+    setEditPreviews({});
+    setEditMessage(null);
+    setEditing(false);
+  }
+
+  function updateDraft(
+    product: Product,
+    field: keyof ProductDraft,
+    value: string,
+  ) {
+    setDrafts((current) => ({
+      ...current,
+      [product.id]: {
+        ...(current[product.id] ?? {
+          title: product.title,
+          price_aed: String(product.price_aed),
+        }),
+        [field]: value,
+      },
+    }));
+  }
+
+  function chooseEditImage(productId: string, nextFile: File | null) {
+    if (!nextFile) return;
+    if (!nextFile.type.startsWith("image/")) {
+      setEditMessage("Please choose an image file.");
+      return;
+    }
+    if (nextFile.size > 10 * 1024 * 1024) {
+      setEditMessage("Images must be smaller than 10 MB.");
+      return;
+    }
+
+    setEditMessage(null);
+    setEditFiles((current) => ({ ...current, [productId]: nextFile }));
+    setEditPreviews((current) => {
+      if (current[productId]) URL.revokeObjectURL(current[productId]);
+      return { ...current, [productId]: URL.createObjectURL(nextFile) };
+    });
+  }
+
+  function isProductChanged(product: Product) {
+    const draft = drafts[product.id];
+    return Boolean(
+      editFiles[product.id] ||
+        (draft &&
+          (draft.title.trim() !== product.title ||
+            Number(draft.price_aed) !== Number(product.price_aed))),
+    );
+  }
+
+  async function saveEdits() {
+    if (!store) return;
+
+    const changedProducts = products.filter(isProductChanged);
+    if (changedProducts.length === 0) {
+      cancelEditing();
+      return;
+    }
+
+    for (const product of changedProducts) {
+      const draft = drafts[product.id];
+      const price = Number(draft?.price_aed);
+      if (!draft?.title.trim()) {
+        setEditMessage("Every product needs a name.");
+        return;
+      }
+      if (!Number.isFinite(price) || price < 0) {
+        setEditMessage(`Enter a valid price for ${draft.title.trim()}.`);
+        return;
+      }
+    }
+
+    setSavingEdits(true);
+    setEditMessage(null);
+    const supabase = createClient();
+
+    for (const product of changedProducts) {
+      const draft = drafts[product.id];
+      const updates: {
+        title: string;
+        price_aed: number;
+        image_urls?: string[];
+      } = {
+        title: draft.title.trim(),
+        price_aed: Number(draft.price_aed),
+      };
+      const nextFile = editFiles[product.id];
+
+      if (nextFile) {
+        const safeName = nextFile.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+        const path = `${store.id}/${product.id}/${Date.now()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("product-images")
+          .upload(path, nextFile, { upsert: true });
+
+        if (uploadError) {
+          setEditMessage(`Could not update ${product.title}: ${uploadError.message}`);
+          setSavingEdits(false);
+          return;
+        }
+
+        const { data: publicUrl } = supabase.storage
+          .from("product-images")
+          .getPublicUrl(path);
+        updates.image_urls = [
+          publicUrl.publicUrl,
+          ...(product.image_urls ?? []).slice(1),
+        ];
+      }
+
+      const { error: updateError } = await supabase
+        .from("products")
+        .update(updates)
+        .eq("id", product.id)
+        .eq("store_id", store.id);
+
+      if (updateError) {
+        setEditMessage(`Could not update ${product.title}: ${updateError.message}`);
+        setSavingEdits(false);
+        return;
+      }
+    }
+
+    await loadProducts(store.id);
+    clearEditPreviews();
+    setDrafts({});
+    setEditFiles({});
+    setEditPreviews({});
+    setSavingEdits(false);
+    setEditing(false);
+    setMessage(
+      `${changedProducts.length} product${changedProducts.length === 1 ? "" : "s"} updated.`,
+    );
+  }
+
   if (error === "unauthenticated") {
     return (
       <Link href="/auth?next=/portal/products" className="text-accent-deep underline">
@@ -203,10 +376,54 @@ export default function PortalProductsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-3xl text-ink">Products</h1>
-        <p className="mt-1 text-sm text-muted">Manage catalog for {store.name}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl text-ink">Products</h1>
+          <p className="mt-1 text-sm text-muted">Manage catalog for {store.name}</p>
+        </div>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={cancelEditing}
+              disabled={savingEdits}
+              className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition hover:border-ink/30 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={saveEdits}
+              disabled={savingEdits}
+              className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-white transition hover:bg-ink/90 disabled:opacity-50"
+            >
+              {savingEdits ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={startEditing}
+            disabled={products.length === 0}
+            className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-white transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Edit products
+          </button>
+        )}
       </div>
+
+      {editing ? (
+        <div className="rounded-2xl border border-accent/30 bg-[#fff0f4] px-4 py-3 text-sm text-ink">
+          Editing is on. Click any product image to replace it, then edit its
+          name or price directly. Save once when you are finished.
+        </div>
+      ) : null}
+
+      {editMessage ? (
+        <p role="alert" className="rounded-xl bg-[#fff0f4] px-4 py-3 text-sm text-accent-deep">
+          {editMessage}
+        </p>
+      ) : null}
 
       <div className="rounded-2xl border border-line bg-surface p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -392,19 +609,78 @@ export default function PortalProductsPage() {
               onChange={() => toggleSelected(product.id)}
               aria-label={`Select ${product.title}`}
             />
-            <div className="h-16 w-14 overflow-hidden rounded-lg bg-sand">
-              {product.image_urls?.[0] ? (
+            <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-sand">
+              {editing ? (
+                <input
+                  id={`edit-image-${product.id}`}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => {
+                    chooseEditImage(product.id, event.target.files?.[0] ?? null);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              ) : null}
+              {editPreviews[product.id] || product.image_urls?.[0] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={product.image_urls[0]}
-                  alt=""
+                  src={editPreviews[product.id] ?? product.image_urls[0]}
+                  alt={product.title}
                   className="h-full w-full object-cover"
                 />
               ) : null}
+              {editing ? (
+                <label
+                  htmlFor={`edit-image-${product.id}`}
+                  className="absolute inset-0 flex cursor-pointer items-center justify-center bg-ink/45 px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-white opacity-0 transition hover:opacity-100 focus-within:opacity-100"
+                  title={`Change image for ${product.title}`}
+                >
+                  Change image
+                </label>
+              ) : null}
             </div>
             <div className="min-w-[140px] flex-1">
-              <p className="font-medium">{product.title}</p>
-              <p className="text-sm text-muted">{formatAed(product.price_aed)}</p>
+              {editing ? (
+                <div className="space-y-2">
+                  <label className="block">
+                    <span className="sr-only">Product name</span>
+                    <input
+                      type="text"
+                      value={drafts[product.id]?.title ?? product.title}
+                      onChange={(event) =>
+                        updateDraft(product, "title", event.target.value)
+                      }
+                      className="w-full rounded-lg border border-line bg-background px-3 py-2 text-sm font-medium text-ink outline-none transition focus:border-accent"
+                      aria-label={`Name for ${product.title}`}
+                    />
+                  </label>
+                  <label className="flex max-w-44 items-center rounded-lg border border-line bg-background px-3 py-2 text-sm focus-within:border-accent">
+                    <span className="mr-2 text-xs font-medium text-muted">AED</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={drafts[product.id]?.price_aed ?? String(product.price_aed)}
+                      onChange={(event) =>
+                        updateDraft(product, "price_aed", event.target.value)
+                      }
+                      className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
+                      aria-label={`Price for ${product.title}`}
+                    />
+                  </label>
+                  {isProductChanged(product) ? (
+                    <span className="inline-flex rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-deep">
+                      Changed
+                    </span>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <p className="font-medium">{product.title}</p>
+                  <p className="text-sm text-muted">{formatAed(product.price_aed)}</p>
+                </>
+              )}
               <div className="mt-2 flex flex-wrap gap-1">
                 {PRODUCT_SIZES.map((size) => {
                   const selected = (product.sizes ?? []).includes(size);

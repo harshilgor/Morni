@@ -1,8 +1,17 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ProductCard } from "@/components/cards";
+import {
+  ProductBrowser,
+  type BrowsableProduct,
+} from "@/components/product-browser";
 import { createClient } from "@/lib/supabase/server";
 import { deliveryPromise, emirateLabel } from "@/lib/format";
 import type { Product, Store } from "@/lib/types";
+
+type StoreProduct = Product & {
+  created_at?: string | null;
+  categories: { name: string; slug: string } | null;
+};
 
 function toMinutes(value: string | null) {
   if (!value) return null;
@@ -38,121 +47,200 @@ export default async function StorePage({
   if (!store) notFound();
   const s = store as Store;
 
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .eq("store_id", s.id)
-    .eq("is_available", true)
-    .order("created_at", { ascending: false });
+  const [{ data: products }, { data: browseCategories }] = await Promise.all([
+    supabase
+      .from("products")
+      .select("*, categories(name, slug)")
+      .eq("store_id", s.id)
+      .eq("is_available", true)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("browse_categories")
+      .select("name, slug, search_terms")
+      .neq("slug", "more")
+      .order("sort_order"),
+  ]);
 
-  const list = (products ?? []) as Product[];
+  const list = (products ?? []) as StoreProduct[];
+  const catalog = (browseCategories ?? []) as {
+    name: string;
+    slug: string;
+    search_terms: string[] | null;
+  }[];
+
+  // Owners can't tag products with a category in the portal yet, so fall back to
+  // matching the catalog's search terms against the title.
+  function categoryFor(product: StoreProduct) {
+    if (product.categories) return product.categories;
+    const text = `${product.title} ${product.description ?? ""}`.toLowerCase();
+    const hit = catalog.find((category) =>
+      (category.search_terms ?? []).some((term) =>
+        text.includes(term.toLowerCase()),
+      ),
+    );
+    return hit ? { name: hit.name, slug: hit.slug } : null;
+  }
   const openNow = isStoreOpenNow(s.opens_at, s.closes_at);
+  const hours =
+    s.opens_at && s.closes_at
+      ? `${s.opens_at.slice(0, 5)} – ${s.closes_at.slice(0, 5)}`
+      : "Hours not set";
+
+  const browsable: BrowsableProduct[] = list.map((product) => ({
+    id: product.id,
+    title: product.title,
+    description: product.description,
+    price_aed: Number(product.price_aed),
+    compare_at_price_aed: product.compare_at_price_aed,
+    image_urls: product.image_urls,
+    sizes: product.sizes,
+    stock: product.stock,
+    created_at: product.created_at ?? null,
+    category: categoryFor(product),
+    stores: {
+      slug: s.slug,
+      name: s.name,
+      emirate: s.emirate,
+      area: s.area,
+      delivery_eta_minutes: s.delivery_eta_minutes,
+    },
+  }));
+
+  const facts = [
+    { label: "Delivery", value: deliveryPromise(s.delivery_eta_minutes) },
+    { label: "Today's hours", value: hours },
+    { label: "Located in", value: `${s.area}, ${emirateLabel(s.emirate)}` },
+    { label: "Pieces in stock", value: `${list.length} listed` },
+  ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-10 overflow-hidden rounded-[2rem] border border-line bg-surface">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <nav className="flex items-center gap-1.5 text-xs text-muted">
+        <Link href="/" className="hover:text-ink">
+          Home
+        </Link>
+        <span aria-hidden>/</span>
+        <Link href={`/?emirate=${s.emirate}`} className="hover:text-ink">
+          {emirateLabel(s.emirate)} stores
+        </Link>
+        <span aria-hidden>/</span>
+        <span className="text-ink">{s.name}</span>
+      </nav>
+
+      <section className="relative mt-3 overflow-hidden rounded-[1.75rem] border border-line">
         <div
-          className="h-48 bg-sand bg-cover bg-center sm:h-64"
+          className="h-44 bg-sand bg-cover bg-center sm:h-60"
           style={{
             backgroundImage: s.cover_url
               ? `url(${s.cover_url})`
               : "linear-gradient(135deg, #f3e4dc, #ffd9e4)",
           }}
         />
-        <div className="space-y-4 p-6 sm:p-8">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[#fff0f4] px-3 py-1 text-xs font-medium text-accent-deep">
-              {deliveryPromise(s.delivery_eta_minutes)}
-            </span>
-            <span className="rounded-full border border-line bg-white/75 px-3 py-1 text-xs text-muted">
-              {s.area}, {emirateLabel(s.emirate)}
-            </span>
-            {openNow !== null ? (
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  openNow
-                    ? "bg-[#eaf6f1] text-[#2f6f66]"
-                    : "bg-[#f4f2f2] text-muted"
-                }`}
-              >
-                {openNow ? "Open now" : "Closed now"}
-              </span>
+        <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/80 via-black/35 to-transparent sm:h-60" />
+        <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-4 p-5 sm:p-7">
+          <div className="flex items-end gap-4">
+            {s.logo_url ? (
+              <div className="hidden h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-white/80 bg-white sm:block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={s.logo_url}
+                  alt={`${s.name} logo`}
+                  className="h-full w-full object-cover"
+                />
+              </div>
             ) : null}
-          </div>
-          <h1 className="font-display text-4xl text-ink sm:text-5xl">{s.name}</h1>
-          <p className="text-muted">{s.address}</p>
-          {s.description ? <p className="max-w-2xl text-ink/85">{s.description}</p> : null}
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-2xl border border-line bg-white/70 p-4">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-muted">
-                Delivery and location
-              </p>
-              <p className="mt-2 text-sm text-ink">
-                Delivery in about {s.delivery_eta_minutes} minutes to nearby areas.
-              </p>
-              <p className="mt-1.5 text-sm text-muted">
-                Based in {s.area}, {emirateLabel(s.emirate)}.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-line bg-white/70 p-4">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-muted">
-                Store hours
-              </p>
-              <p className="mt-2 text-sm text-ink">
-                {s.opens_at && s.closes_at
-                  ? `${s.opens_at.slice(0, 5)} - ${s.closes_at.slice(0, 5)}`
-                  : "Hours not set"}
-              </p>
-              <p className="mt-1.5 text-sm text-muted">
-                {openNow === null
-                  ? "Ask the store for live availability."
-                  : openNow
-                    ? "Ordering now usually gets fastest dispatch."
-                    : "You can still browse and order when they reopen."}
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-accent-deep">
+                  {deliveryPromise(s.delivery_eta_minutes)}
+                </span>
+                {openNow !== null ? (
+                  <span
+                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                      openNow
+                        ? "bg-[#eaf6f1] text-[#2f6f66]"
+                        : "bg-white/80 text-muted"
+                    }`}
+                  >
+                    {openNow ? "Open now" : "Closed now"}
+                  </span>
+                ) : null}
+              </div>
+              <h1 className="mt-2 font-display text-3xl text-white sm:text-5xl">
+                {s.name}
+              </h1>
+              <p className="mt-1 text-sm text-white/85">
+                {s.area}, {emirateLabel(s.emirate)} · {s.address}
               </p>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-line bg-white/70 px-3 py-1 text-xs text-ink">
-              Verified local boutique
-            </span>
-            <span className="rounded-full border border-line bg-white/70 px-3 py-1 text-xs text-ink">
-              Secure checkout
-            </span>
-            <span className="rounded-full border border-line bg-white/70 px-3 py-1 text-xs text-ink">
-              Fast local dispatch
-            </span>
           </div>
           <a
-            href="#offerings"
-            className="inline-flex rounded-full bg-ink px-5 py-2.5 text-sm text-white transition hover:bg-accent-deep"
+            href="#shop"
+            className="rounded-full bg-white px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink transition hover:bg-accent hover:text-white"
           >
-            Shop from this store
+            Shop now
           </a>
+        </div>
+      </section>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {facts.map((fact) => (
+          <div
+            key={fact.label}
+            className="rounded-2xl border border-line bg-surface/70 px-4 py-3"
+          >
+            <p className="text-[10px] uppercase tracking-[0.14em] text-muted">
+              {fact.label}
+            </p>
+            <p className="mt-1 text-sm font-medium text-ink">{fact.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {s.description ? (
+        <p className="mt-5 max-w-3xl text-sm leading-relaxed text-ink/85">
+          {s.description}
+        </p>
+      ) : null}
+
+      <div
+        id="shop"
+        className="mt-8 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-5"
+      >
+        <div>
+          <h2 className="font-display text-2xl text-ink">Shop {s.name}</h2>
+          <p className="mt-1 text-sm text-muted">
+            Filter by category, size, colour, and price to find your piece.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-[11px] text-muted">
+          <span className="rounded-full border border-line bg-white/70 px-3 py-1">
+            Verified local boutique
+          </span>
+          <span className="rounded-full border border-line bg-white/70 px-3 py-1">
+            Secure checkout
+          </span>
         </div>
       </div>
 
-      <div id="offerings" className="mb-6 flex items-end justify-between gap-3">
-        <div>
-          <h2 className="font-display text-2xl text-ink">Offerings</h2>
-          <p className="mt-1 text-sm text-muted">
-            Handpicked pieces from {s.name}, with shopper ratings.
-          </p>
-        </div>
+      <div className="mt-6">
+        {browsable.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-line bg-surface/70 p-10 text-center">
+            <p className="text-muted">
+              {s.name} has no products listed right now. Check back soon.
+            </p>
+            <Link
+              href="/"
+              className="mt-4 inline-block text-sm text-accent-deep underline"
+            >
+              Browse other stores
+            </Link>
+          </div>
+        ) : (
+          <ProductBrowser products={browsable} />
+        )}
       </div>
-      {list.length === 0 ? (
-        <p className="text-muted">No products available right now.</p>
-      ) : (
-        <div className="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4">
-          {list.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              href={`/stores/${s.slug}/products/${product.id}`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

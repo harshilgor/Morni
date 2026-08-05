@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { ProductCard } from "@/components/cards";
+import { notFound, redirect } from "next/navigation";
+import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
 import { createClient } from "@/lib/supabase/server";
 import type { BrowseCategory } from "@/lib/browse-categories";
-import type { Product } from "@/lib/types";
 
 export default async function CategoryPage({
   params,
@@ -22,40 +21,63 @@ export default async function CategoryPage({
   if (!categoryData) notFound();
   const category = categoryData as BrowseCategory;
 
-  if (category.slug === "more") {
-    const { redirect } = await import("next/navigation");
-    redirect("/categories");
-  }
+  if (category.slug === "more") redirect("/categories");
 
-  const { data: productsData } = await supabase
+  const terms = (category.search_terms ?? [])
+    .map((term) => term.replace(/[,()]/g, " ").trim())
+    .filter(Boolean);
+
+  let productsQuery = supabase
     .from("products")
-    .select("*, stores!inner(slug, name, is_active)")
+    .select(
+      "*, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
+    )
     .eq("is_available", true)
     .eq("stores.is_active", true)
     .order("created_at", { ascending: false })
-    .limit(60);
+    .limit(200);
 
-  const terms = (category.search_terms ?? []).map((t) => t.toLowerCase());
-  const products = ((productsData ?? []) as (Product & {
-    stores: { slug: string; name: string };
-  })[]).filter((product) => {
-    if (terms.length === 0) return true;
-    const haystack = `${product.title} ${product.description ?? ""}`.toLowerCase();
-    return terms.some((term) => haystack.includes(term));
-  });
+  if (terms.length > 0) {
+    productsQuery = productsQuery.or(
+      terms
+        .flatMap((term) => [`title.ilike.%${term}%`, `description.ilike.%${term}%`])
+        .join(","),
+    );
+  }
+
+  const [{ data: productsData }, { data: categoryList }] = await Promise.all([
+    productsQuery,
+    supabase
+      .from("browse_categories")
+      .select("name, slug")
+      .neq("slug", "more")
+      .order("sort_order"),
+  ]);
+
+  const products = (productsData ?? []) as BrowsableProduct[];
+  const categories = (categoryList ?? []) as { name: string; slug: string }[];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <p className="text-xs uppercase tracking-[0.18em] text-accent-deep">
-        Category
-      </p>
-      <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <nav className="flex items-center gap-1.5 text-xs text-muted">
+        <Link href="/" className="hover:text-ink">
+          Home
+        </Link>
+        <span aria-hidden>/</span>
+        <Link href="/categories" className="hover:text-ink">
+          Categories
+        </Link>
+        <span aria-hidden>/</span>
+        <span className="text-ink">{category.name}</span>
+      </nav>
+
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
-          <h1 className="font-display text-4xl text-ink sm:text-5xl">
+          <h1 className="font-display text-3xl text-ink sm:text-4xl">
             {category.name}
           </h1>
-          <p className="mt-2 text-sm text-muted">
-            From local UAE stores · Delivery within 1 hour
+          <p className="mt-1.5 text-sm text-muted">
+            From local UAE boutiques · Same-hour delivery available
           </p>
         </div>
         {category.badge ? (
@@ -65,26 +87,38 @@ export default async function CategoryPage({
         ) : null}
       </div>
 
-      {products.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-dashed border-line bg-surface/70 p-10 text-center">
-          <p className="text-muted">
-            No products in this category yet. Check back soon or browse stores.
-          </p>
-          <Link href="/" className="mt-4 inline-block text-accent-deep underline">
-            Back home
-          </Link>
-        </div>
-      ) : (
-        <div className="mt-10 grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              href={`/stores/${product.stores.slug}/products/${product.id}`}
-            />
-          ))}
-        </div>
-      )}
+      <div className="mt-6">
+        {products.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-line bg-surface/70 p-10 text-center">
+            <p className="text-muted">
+              No {category.name.toLowerCase()} listed yet. Try another category
+              below.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {categories
+                .filter((item) => item.slug !== category.slug)
+                .map((item) => (
+                  <Link
+                    key={item.slug}
+                    href={`/categories/${item.slug}`}
+                    className="rounded-full border border-line bg-white px-3.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40"
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+            </div>
+            <Link href="/" className="mt-5 inline-block text-sm text-accent-deep underline">
+              Back home
+            </Link>
+          </div>
+        ) : (
+          <ProductBrowser
+            products={products}
+            categories={categories}
+            activeSlug={category.slug}
+          />
+        )}
+      </div>
     </div>
   );
 }

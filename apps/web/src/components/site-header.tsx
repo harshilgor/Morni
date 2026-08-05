@@ -103,8 +103,10 @@ export function SiteHeader() {
   function applyLocation(nextEmirate: UaeEmirate, nextArea: string) {
     setLocation(nextEmirate, nextArea);
     setLocationOpen(false);
-    if (pathname === "/" || pathname?.startsWith("/search")) {
-      router.push(`/?emirate=${nextEmirate}`);
+    // On search, keep the URL in sync so results reflect the new emirate.
+    // On home we leave scroll position alone — HomeStores reacts to the store.
+    if (pathname?.startsWith("/search")) {
+      router.push(`/search?emirate=${nextEmirate}`, { scroll: false });
     }
   }
 
@@ -353,26 +355,11 @@ export function SiteHeader() {
             <span className="text-accent-deep">For</span>{" "}
             <span className="text-[#5c4a50]">you</span>
           </Link>
-          {EMIRATES.map((item) => (
-            <Link
-              key={item.value}
-              href={`/?emirate=${item.value}`}
-              className="shrink-0 text-white/85 hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
-          <Link href="/categories/lehengas" className="shrink-0 text-white/85 hover:text-white">
-            Lehengas
-          </Link>
-          <Link href="/categories/kurtis" className="shrink-0 text-white/85 hover:text-white">
-            Kurtis
-          </Link>
-          <Link href="/categories/party-wear" className="shrink-0 text-white/85 hover:text-white">
-            Party wear
-          </Link>
-          <Link href="/categories" className="shrink-0 text-white/85 hover:text-white">
-            More
+          <Link
+            href="/categories"
+            className="shrink-0 font-medium text-white/90 hover:text-white"
+          >
+            Categories
           </Link>
           {isStoreOwner ? (
             <Link href="/portal" className="shrink-0 text-white/85 hover:text-white">
