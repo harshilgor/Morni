@@ -27,7 +27,7 @@ Open http://localhost:3000
 
 ## Supabase
 
-Migrations live in `supabase/migrations/`. Applied to the linked project with seed stores (Lume Boutique, Sand & Silk, Noor Atelier).
+Migrations live in `supabase/migrations/`. Applied to the linked project with a single seed store (Lume Boutique).
 
 MVP checkout uses COD. `payment_method` / `payment_status` columns are ready for a gateway later.
 

@@ -1,17 +1,8 @@
 import Link from "next/link";
 import type { Store } from "@/lib/types";
 import { deliveryPromise, emirateLabel, formatAed } from "@/lib/format";
+import { getProductSocialProof } from "@/lib/product-social";
 import { WishlistToggle } from "@/components/wishlist-toggle";
-
-function getProductSocialProof(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) % 100000;
-  }
-  const rating = 4 + ((hash % 10) / 10);
-  const reviews = 18 + (hash % 220);
-  return { rating: rating.toFixed(1), reviews };
-}
 
 function StarIcon({ filled }: { filled: boolean }) {
   return (
@@ -31,19 +22,29 @@ function StarIcon({ filled }: { filled: boolean }) {
 }
 
 export function StoreCard({ store }: { store: Store }) {
+  const isNew =
+    store.created_at &&
+    Date.now() - new Date(store.created_at).getTime() < 7 * 24 * 60 * 60 * 1000;
+
   return (
     <Link
       href={`/stores/${store.slug}`}
       className="group block overflow-hidden rounded-2xl border border-line bg-surface transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-30px_rgba(28,20,24,0.45)]"
     >
       <div
-        className="h-40 bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
+        className="relative h-40 bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
         style={{
           backgroundImage: store.cover_url
             ? `url(${store.cover_url})`
             : "linear-gradient(135deg, #f3e4dc, #ffd9e4)",
         }}
-      />
+      >
+        {isNew ? (
+          <span className="absolute left-3 top-3 rounded-full bg-ink px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+            New
+          </span>
+        ) : null}
+      </div>
       <div className="space-y-2 p-5">
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-display text-xl text-ink">{store.name}</h3>
@@ -65,6 +66,7 @@ export function StoreCard({ store }: { store: Store }) {
 export function ProductCard({
   product,
   href,
+  onWishlistChange,
 }: {
   product: {
     id: string;
@@ -74,10 +76,11 @@ export function ProductCard({
     image_urls?: string[];
   };
   href: string;
+  onWishlistChange?: (isWished: boolean) => void;
 }) {
   const image = product.image_urls?.[0];
   const social = getProductSocialProof(`${product.id}-${product.title}`);
-  const roundedRating = Math.round(Number(social.rating));
+  const roundedRating = Math.round(social.rating);
   return (
     <Link
       href={href}
@@ -93,7 +96,11 @@ export function ProductCard({
           />
         ) : null}
         <div className="absolute right-2.5 top-2.5 z-10">
-          <WishlistToggle productId={product.id} size="sm" />
+          <WishlistToggle
+            productId={product.id}
+            size="sm"
+            onChange={onWishlistChange}
+          />
         </div>
       </div>
       <div className="space-y-1.5 px-1 pb-1 pt-3">
@@ -104,9 +111,14 @@ export function ProductCard({
           {[1, 2, 3, 4, 5].map((s) => (
             <StarIcon key={s} filled={s <= roundedRating} />
           ))}
-          <span className="ml-1 text-xs font-medium text-ink/85">{social.rating}</span>
-          <span className="text-xs text-muted">({social.reviews} reviews)</span>
+          <span className="ml-1 text-xs font-medium text-ink/85">
+            {social.ratingLabel}
+          </span>
+          <span className="text-xs text-muted">({social.reviews})</span>
         </div>
+        <p className="text-[11px] text-muted">
+          Bought {social.boughtToday} times today
+        </p>
         <div className="flex items-center gap-2 text-sm font-medium">
           <span>{formatAed(product.price_aed)}</span>
           {product.compare_at_price_aed ? (

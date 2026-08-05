@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { formatAed } from "@/lib/format";
+import { PRODUCT_SIZES } from "@/lib/product-sizes";
 import type { Product } from "@/lib/types";
 
 export default function PortalProductsPage() {
@@ -16,6 +17,7 @@ export default function PortalProductsPage() {
     description: "",
     price_aed: "",
     stock: "10",
+    sizes: ["S", "M", "L"] as string[],
   });
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -95,6 +97,7 @@ export default function PortalProductsPage() {
       description: form.description || null,
       price_aed: Number(form.price_aed),
       stock: Number(form.stock),
+      sizes: form.sizes,
       is_available: true,
       image_urls: imageUrls,
     });
@@ -105,7 +108,13 @@ export default function PortalProductsPage() {
       return;
     }
 
-    setForm({ title: "", description: "", price_aed: "", stock: "10" });
+    setForm({
+      title: "",
+      description: "",
+      price_aed: "",
+      stock: "10",
+      sizes: ["S", "M", "L"],
+    });
     setFile(null);
     await loadProducts(store.id);
   }
@@ -122,6 +131,18 @@ export default function PortalProductsPage() {
   async function updateStock(product: Product, stock: number) {
     const supabase = createClient();
     await supabase.from("products").update({ stock }).eq("id", product.id);
+    if (store) await loadProducts(store.id);
+  }
+
+  async function toggleProductSize(product: Product, size: string) {
+    const current = product.sizes ?? [];
+    const sizes = current.includes(size)
+      ? current.filter((item) => item !== size)
+      : PRODUCT_SIZES.filter(
+          (item) => current.includes(item) || item === size,
+        );
+    const supabase = createClient();
+    await supabase.from("products").update({ sizes }).eq("id", product.id);
     if (store) await loadProducts(store.id);
   }
 
@@ -307,6 +328,39 @@ export default function PortalProductsPage() {
           className="rounded-xl border border-line bg-background px-3 py-2 text-sm"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
+        <fieldset className="rounded-xl border border-line bg-background p-3 sm:col-span-2">
+          <legend className="px-1 text-sm text-muted">Available sizes</legend>
+          <div className="flex flex-wrap gap-2">
+            {PRODUCT_SIZES.map((size) => {
+              const selected = form.sizes.includes(size);
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() =>
+                    setForm((current) => ({
+                      ...current,
+                      sizes: selected
+                        ? current.sizes.filter((item) => item !== size)
+                        : [...current.sizes, size],
+                    }))
+                  }
+                  className={`min-w-11 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    selected
+                      ? "border-ink bg-ink text-white"
+                      : "border-line bg-surface text-muted hover:border-ink/40"
+                  }`}
+                >
+                  {size}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            Shoppers will select one of these before adding the item to cart.
+          </p>
+        </fieldset>
         <textarea
           className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm sm:col-span-2"
           placeholder="Description"
@@ -351,6 +405,27 @@ export default function PortalProductsPage() {
             <div className="min-w-[140px] flex-1">
               <p className="font-medium">{product.title}</p>
               <p className="text-sm text-muted">{formatAed(product.price_aed)}</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {PRODUCT_SIZES.map((size) => {
+                  const selected = (product.sizes ?? []).includes(size);
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => toggleProductSize(product, size)}
+                      className={`rounded-md border px-2 py-1 text-[10px] transition ${
+                        selected
+                          ? "border-ink bg-ink text-white"
+                          : "border-line text-muted hover:border-ink/40"
+                      }`}
+                      aria-pressed={selected}
+                      aria-label={`${selected ? "Remove" : "Add"} size ${size} for ${product.title}`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <label className="text-xs text-muted">
               Stock

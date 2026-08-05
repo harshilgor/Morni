@@ -79,7 +79,8 @@ export default function OrderDetailPage() {
           {items.map((item) => (
             <li key={item.id} className="flex justify-between gap-3">
               <span>
-                {item.title} × {item.quantity}
+                {item.title}
+                {item.size ? ` · Size ${item.size}` : ""} × {item.quantity}
               </span>
               <span>{formatAed(item.line_total_aed)}</span>
             </li>

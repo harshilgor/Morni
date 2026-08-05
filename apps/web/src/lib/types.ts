@@ -41,6 +41,7 @@ export type Store = {
   opens_at: string | null;
   closes_at: string | null;
   pause_note?: string | null;
+  created_at?: string;
 };
 
 export type Product = {
@@ -52,6 +53,7 @@ export type Product = {
   price_aed: number;
   compare_at_price_aed: number | null;
   image_urls: string[];
+  sizes: string[];
   stock: number;
   is_available: boolean;
 };
@@ -82,6 +84,7 @@ export type OrderItem = {
   order_id: string;
   product_id: string | null;
   title: string;
+  size: string | null;
   unit_price_aed: number;
   quantity: number;
   line_total_aed: number;

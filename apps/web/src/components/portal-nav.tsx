@@ -11,7 +11,7 @@ const links = [
   { href: "/portal/products", label: "Products" },
   { href: "/portal/promotions", label: "Promotions" },
   { href: "/portal/analytics", label: "Analytics" },
-  { href: "/portal/settings", label: "Store" },
+  { href: "/portal/settings", label: "Settings" },
 ];
 
 export function PortalNav() {
@@ -36,7 +36,7 @@ export function PortalNav() {
           <p className="mt-2 text-sm font-medium text-ink">{store.name}</p>
         ) : null}
       </div>
-      <nav className="flex gap-1 px-3 pb-4 lg:flex-col">
+      <nav className="flex flex-wrap gap-1 px-3 pb-4 lg:flex-col">
         {links.map((link) => {
           const active =
             pathname === link.href ||
@@ -51,6 +51,27 @@ export function PortalNav() {
             </Link>
           );
         })}
+
+        <div className="my-2 hidden h-px w-full bg-line lg:block" />
+
+        <p className="hidden px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted/80 lg:block">
+          Shopper view
+        </p>
+        <Link
+          href="/"
+          className="rounded-xl px-3 py-2 text-sm text-accent-deep hover:bg-background"
+        >
+          Browse Morni
+        </Link>
+        {store ? (
+          <Link
+            href={`/stores/${store.slug}`}
+            className="rounded-xl px-3 py-2 text-sm text-accent-deep hover:bg-background"
+          >
+            View my store page
+          </Link>
+        ) : null}
+
         <button
           type="button"
           onClick={signOut}

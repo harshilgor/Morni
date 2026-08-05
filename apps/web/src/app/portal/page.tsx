@@ -126,9 +126,25 @@ export default function PortalOrdersPage() {
 
   return (
     <div className="space-y-8">
-      <div className="mb-8">
-        <h1 className="font-display text-3xl text-ink">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted">Welcome back, {store.name}</p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl text-ink">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted">Welcome back, {store.name}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/stores/${store.slug}`}
+            className="rounded-full bg-ink px-4 py-2 text-sm text-white transition hover:bg-accent-deep"
+          >
+            View my store page
+          </Link>
+          <Link
+            href="/"
+            className="rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink transition hover:bg-white"
+          >
+            Browse as shopper
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

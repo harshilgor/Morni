@@ -92,6 +92,7 @@ export default function CheckoutPage() {
         order_id: order.id,
         product_id: item.productId,
         title: item.title,
+        size: item.size || null,
         unit_price_aed: item.priceAed,
         quantity: item.quantity,
         line_total_aed: item.priceAed * item.quantity,
@@ -210,9 +211,13 @@ export default function CheckoutPage() {
         <h2 className="font-display text-2xl">Order summary</h2>
         <ul className="mt-4 space-y-3 text-sm">
           {items.map((item) => (
-            <li key={item.productId} className="flex justify-between gap-3">
+            <li
+              key={item.lineId ?? `${item.productId}:${item.size ?? "one-size"}`}
+              className="flex justify-between gap-3"
+            >
               <span>
-                {item.title} × {item.quantity}
+                {item.title}
+                {item.size ? ` · Size ${item.size}` : ""} × {item.quantity}
               </span>
               <span>{formatAed(item.priceAed * item.quantity)}</span>
             </li>

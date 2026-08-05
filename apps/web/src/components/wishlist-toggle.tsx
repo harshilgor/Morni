@@ -22,9 +22,11 @@ function HeartIcon({ filled }: { filled: boolean }) {
 export function WishlistToggle({
   productId,
   size = "md",
+  onChange,
 }: {
   productId: string;
   size?: "sm" | "md";
+  onChange?: (isWished: boolean) => void;
 }) {
   const router = useRouter();
   const { auth, loading } = useAuthUser();
@@ -87,13 +89,19 @@ export function WishlistToggle({
           .eq("shopper_id", userId)
           .eq("product_id", productId);
 
-        if (!error) setIsWished(false);
+        if (!error) {
+          setIsWished(false);
+          onChange?.(false);
+        }
       } else {
         const { error } = await supabase
           .from("wishlist_items")
           .insert({ shopper_id: userId, product_id: productId });
 
-        if (!error) setIsWished(true);
+        if (!error) {
+          setIsWished(true);
+          onChange?.(true);
+        }
       }
     } finally {
       setBusy(false);

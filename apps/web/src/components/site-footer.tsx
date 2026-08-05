@@ -15,6 +15,7 @@ export function SiteFooter() {
   const accountLinks = auth
     ? [
         { href: "/orders", label: "Your orders" },
+        { href: "/wishlist", label: "Your wishlist" },
         { href: "/cart", label: "Your cart" },
         { href: "/checkout", label: "Checkout" },
         { href: "/auth", label: "Account" },
@@ -22,6 +23,7 @@ export function SiteFooter() {
     : [
         { href: "/auth", label: "Sign in" },
         { href: "/orders", label: "Orders" },
+        { href: "/wishlist", label: "Wishlist" },
         { href: "/cart", label: "Cart" },
         { href: "/checkout", label: "Checkout" },
       ];

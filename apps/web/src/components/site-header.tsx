@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart";
 import { EMIRATES } from "@/lib/format";
@@ -9,6 +9,7 @@ import { UAE_AREAS, useLocation } from "@/lib/location";
 import { useAuthUser } from "@/lib/use-auth-user";
 import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
+import { SearchTypeahead } from "@/components/search-typeahead";
 
 function PinIcon({ className }: { className?: string }) {
   return (
@@ -19,15 +20,6 @@ function PinIcon({ className }: { className?: string }) {
         strokeWidth="1.8"
       />
       <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
-      <path d="M16.5 16.5 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -48,6 +40,19 @@ function CartIcon({ className }: { className?: string }) {
   );
 }
 
+function HeartIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 20.5s-7.5-4.7-9.5-9C.9 8.1 2.7 5.2 5.8 4.8c2.1-.3 4.1.7 5.2 2.3 1.1-1.6 3.1-2.6 5.2-2.3 3.1.4 4.9 3.3 3.3 6.7-2 4.3-9.5 9-9.5 9Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
@@ -62,7 +67,6 @@ export function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [draftEmirate, setDraftEmirate] = useState<UaeEmirate>(emirate);
   const [draftArea, setDraftArea] = useState(area);
-  const [query, setQuery] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
 
@@ -96,13 +100,6 @@ export function SiteHeader() {
     return null;
   }
 
-  function onSearch(e: FormEvent) {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    router.push(`/search?q=${encodeURIComponent(q)}`);
-  }
-
   function applyLocation(nextEmirate: UaeEmirate, nextArea: string) {
     setLocation(nextEmirate, nextArea);
     setLocationOpen(false);
@@ -121,6 +118,8 @@ export function SiteHeader() {
 
   const areas = UAE_AREAS[draftEmirate] ?? [];
   const firstName = auth?.firstName;
+  const isStoreOwner =
+    auth?.profile?.role === "store_owner" || auth?.profile?.role === "admin";
 
   return (
     <header className="sticky top-0 z-50">
@@ -220,32 +219,13 @@ export function SiteHeader() {
             ) : null}
           </div>
 
-          <form
-            onSubmit={onSearch}
-            className="flex min-w-0 flex-1 overflow-hidden rounded-md bg-white shadow-sm ring-2 ring-transparent focus-within:ring-accent"
-          >
-            <label className="sr-only" htmlFor="morni-search">
-              Search Morni
-            </label>
-            <input
-              id="morni-search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={
-                firstName
-                  ? `Search Morni, ${firstName}`
-                  : "Search stores and products"
-              }
-              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-ink outline-none placeholder:text-muted"
-            />
-            <button
-              type="submit"
-              className="flex items-center justify-center bg-accent px-3.5 text-white transition hover:bg-accent-deep sm:px-4"
-              aria-label="Search"
-            >
-              <SearchIcon className="h-5 w-5" />
-            </button>
-          </form>
+          <SearchTypeahead
+            placeholder={
+              firstName
+                ? `Search Morni, ${firstName}`
+                : "Search stores and products"
+            }
+          />
 
           <nav className="hidden shrink-0 items-center gap-1 md:flex">
             <div className="relative min-w-[7.5rem]" ref={accountRef}>
@@ -278,15 +258,26 @@ export function SiteHeader() {
                       >
                         Your cart
                       </Link>
-                      {auth.profile?.role === "store_owner" ||
-                      auth.profile?.role === "admin" ? (
-                        <Link
-                          href="/portal"
-                          className="block rounded-lg px-2 py-2 text-sm hover:bg-background"
-                          onClick={() => setAccountOpen(false)}
-                        >
-                          Store portal
-                        </Link>
+                      <Link
+                        href="/wishlist"
+                        className="block rounded-lg px-2 py-2 text-sm hover:bg-background"
+                        onClick={() => setAccountOpen(false)}
+                      >
+                        Your wishlist
+                      </Link>
+                      {isStoreOwner ? (
+                        <>
+                          <Link
+                            href="/portal"
+                            className="block rounded-lg px-2 py-2 text-sm hover:bg-background"
+                            onClick={() => setAccountOpen(false)}
+                          >
+                            My Store
+                          </Link>
+                          <p className="px-2 pt-1 text-[10px] uppercase tracking-[0.12em] text-muted">
+                            You&apos;re browsing as a shopper
+                          </p>
+                        </>
                       ) : (
                         <Link
                           href="/sell"
@@ -324,6 +315,15 @@ export function SiteHeader() {
               <span className="block text-sm font-semibold">& Orders</span>
             </Link>
           </nav>
+
+          <Link
+            href="/wishlist"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-white transition hover:border-white/35 hover:bg-white/5"
+            aria-label="View wishlist"
+            title="Wishlist"
+          >
+            <HeartIcon className="h-6 w-6" />
+          </Link>
 
           <Link
             href="/cart"
@@ -374,9 +374,15 @@ export function SiteHeader() {
           <Link href="/categories" className="shrink-0 text-white/85 hover:text-white">
             More
           </Link>
-          <Link href="/sell" className="shrink-0 text-white/85 hover:text-white">
-            Sell on Morni
-          </Link>
+          {isStoreOwner ? (
+            <Link href="/portal" className="shrink-0 text-white/85 hover:text-white">
+              My Store
+            </Link>
+          ) : (
+            <Link href="/sell" className="shrink-0 text-white/85 hover:text-white">
+              Sell on Morni
+            </Link>
+          )}
           <span className="ml-auto hidden shrink-0 text-xs text-white/60 sm:inline">
             {firstName
               ? `Welcome back, ${firstName} · Delivery within 1 hour`
