@@ -5,10 +5,14 @@ import { formatRatingLabel, type ProductRatingSummary } from "@/lib/product-rati
 import { StarRating } from "@/components/star-rating";
 import { WishlistToggle } from "@/components/wishlist-toggle";
 
+const NEW_STORE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const STORE_CARD_REFERENCE_TIME_MS = Date.now();
+
 export function StoreCard({ store }: { store: Store }) {
+  const createdAtMs = store.created_at ? Date.parse(store.created_at) : NaN;
   const isNew =
-    store.created_at &&
-    Date.now() - new Date(store.created_at).getTime() < 7 * 24 * 60 * 60 * 1000;
+    Number.isFinite(createdAtMs) &&
+    STORE_CARD_REFERENCE_TIME_MS - createdAtMs < NEW_STORE_WINDOW_MS;
 
   return (
     <Link

@@ -132,12 +132,6 @@ export default function ProductPage() {
     };
   }, [reviews]);
 
-  useEffect(() => {
-    setActiveImage(0);
-    if (selectedSize && !availableSizes.includes(selectedSize)) {
-      setSelectedSize(null);
-    }
-  }, [selectedVariantId, availableSizes, selectedSize]);
 
   useEffect(() => {
     if (!product || !store) return;
@@ -151,6 +145,15 @@ export default function ProductPage() {
       storeName: store.name,
     });
   }, [product, store, gallery, addRecentlyViewed]);
+
+  function selectVariant(variant: ProductVariant) {
+    setSelectedVariantId(variant.id);
+    setSelectedSize((current) =>
+      current && variant.sizes.includes(current) ? current : null,
+    );
+    setActiveImage(0);
+    setAdded(false);
+  }
 
   if (!product || !store) {
     return (
@@ -252,10 +255,7 @@ export default function ProductPage() {
                     <button
                       key={variant.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedVariantId(variant.id);
-                        setAdded(false);
-                      }}
+                      onClick={() => selectVariant(variant)}
                       disabled={variant.stock <= 0}
                       aria-pressed={selected}
                       className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${

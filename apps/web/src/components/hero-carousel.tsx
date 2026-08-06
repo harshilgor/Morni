@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 type Slide = {
   id: string;
@@ -68,6 +74,7 @@ const SLIDES: Slide[] = [
 
 const AUTOPLAY_MS = 4000;
 const RESUME_AFTER_INTERACT_MS = 6000;
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 export function HeroCarousel() {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -251,15 +258,25 @@ export function HeroCarousel() {
 }
 
 function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false);
+  return useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotionSnapshot,
+    getReducedMotionServerSnapshot,
+  );
+}
 
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const onChange = () => setReduced(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
+function subscribeReducedMotion(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
 
-  return reduced;
+function getReducedMotionSnapshot() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function getReducedMotionServerSnapshot() {
+  return false;
 }

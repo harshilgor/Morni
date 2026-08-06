@@ -70,18 +70,6 @@ export function SiteHeader() {
   const panelRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setDraftEmirate(emirate);
-    setDraftArea(area);
-  }, [emirate, area]);
-
-  useEffect(() => {
-    setDraftArea((current) => {
-      const suggestions = UAE_AREAS[draftEmirate] ?? [];
-      if (suggestions.includes(current) || current.trim()) return current;
-      return suggestions[0] ?? "";
-    });
-  }, [draftEmirate]);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -98,6 +86,24 @@ export function SiteHeader() {
 
   if (pathname?.startsWith("/portal")) {
     return null;
+  }
+
+  function toggleLocationPanel() {
+    const nextOpen = !locationOpen;
+    if (nextOpen) {
+      setDraftEmirate(emirate);
+      setDraftArea(area);
+    }
+    setLocationOpen(nextOpen);
+  }
+
+  function changeDraftEmirate(nextEmirate: UaeEmirate) {
+    setDraftEmirate(nextEmirate);
+    setDraftArea((current) => {
+      const suggestions = UAE_AREAS[nextEmirate] ?? [];
+      if (suggestions.includes(current) || current.trim()) return current;
+      return suggestions[0] ?? "";
+    });
   }
 
   function applyLocation(nextEmirate: UaeEmirate, nextArea: string) {
@@ -136,7 +142,7 @@ export function SiteHeader() {
           <div className="relative shrink-0" ref={panelRef}>
             <button
               type="button"
-              onClick={() => setLocationOpen((o) => !o)}
+              onClick={toggleLocationPanel}
               className="flex max-w-[10.5rem] items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-left transition hover:border-white/35 hover:bg-white/5 sm:max-w-[13rem]"
               aria-expanded={locationOpen}
               aria-haspopup="dialog"
@@ -162,7 +168,9 @@ export function SiteHeader() {
                   <select
                     className="w-full rounded-lg border border-line bg-background px-3 py-2"
                     value={draftEmirate}
-                    onChange={(e) => setDraftEmirate(e.target.value as UaeEmirate)}
+                    onChange={(e) =>
+                      changeDraftEmirate(e.target.value as UaeEmirate)
+                    }
                   >
                     {EMIRATES.map((item) => (
                       <option key={item.value} value={item.value}>

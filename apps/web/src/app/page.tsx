@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { BrowseCategory } from "@/lib/browse-categories";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
+import type { Product, Store, UaeEmirate } from "@/lib/types";
 
 type ProductWithStore = Product & {
   stores: { slug: string; name: string };

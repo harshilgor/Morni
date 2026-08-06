@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { EMIRATES } from "@/lib/format";
 import { UAE_AREAS } from "@/lib/location";
 import type { UaeEmirate } from "@/lib/types";
@@ -37,9 +37,6 @@ export function StoreLocationFields({
 
   const suggestions = UAE_AREAS[value.emirate] ?? [];
 
-  useEffect(() => {
-    setHits([]);
-  }, [value.emirate]);
 
   function patch(partial: Partial<StoreLocationValue>) {
     onChange({ ...value, ...partial });
@@ -148,9 +145,14 @@ export function StoreLocationFields({
         <select
           className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
           value={value.emirate}
-          onChange={(e) =>
-            patch({ emirate: e.target.value as UaeEmirate, lat: null, lng: null })
-          }
+          onChange={(e) => {
+            setHits([]);
+            patch({
+              emirate: e.target.value as UaeEmirate,
+              lat: null,
+              lng: null,
+            });
+          }}
         >
           {EMIRATES.map((item) => (
             <option key={item.value} value={item.value}>

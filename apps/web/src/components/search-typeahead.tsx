@@ -50,15 +50,12 @@ export function SearchTypeahead({
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) {
-      setSuggestions([]);
-      setLoading(false);
-      return;
-    }
+    if (q.length < 2) return;
 
     let cancelled = false;
-    setLoading(true);
     const timer = setTimeout(async () => {
+      if (cancelled) return;
+      setLoading(true);
       const supabase = createClient();
       const [{ data: stores }, { data: products }] = await Promise.all([
         supabase
@@ -123,6 +120,15 @@ export function SearchTypeahead({
     };
   }, [query]);
 
+  function updateQuery(value: string) {
+    setQuery(value);
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      setLoading(false);
+      setOpen(false);
+    }
+  }
+
   function onSearch(e: FormEvent) {
     e.preventDefault();
     const q = query.trim();
@@ -143,7 +149,7 @@ export function SearchTypeahead({
         <input
           id="morni-search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => updateQuery(e.target.value)}
           onFocus={() => {
             if (suggestions.length > 0) setOpen(true);
           }}

@@ -149,10 +149,7 @@ export default function PortalOrdersPage() {
   ).length;
   const lowStock = products.filter((p) => p.stock <= 5).length;
   const unavailable = products.filter((p) => !p.is_available).length;
-  const orderCountsByStatus = orders.reduce<Record<string, number>>((acc, o) => {
-    acc[o.status] = (acc[o.status] ?? 0) + 1;
-    return acc;
-  }, {});
+
   const recent = orders.slice(0, 6);
   const setupHref = `/sell/setup`;
 
