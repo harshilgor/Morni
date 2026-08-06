@@ -79,6 +79,7 @@ export function ProductReviewsSection({
             {existingReview ? "Update your review" : "Write a review"}
           </p>
           <ProductReviewForm
+            key={existingReview?.id ?? `${formContext.productId}-${formContext.orderId}`}
             productId={formContext.productId}
             orderId={formContext.orderId}
             orderItemId={formContext.orderItemId}

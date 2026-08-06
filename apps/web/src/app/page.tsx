@@ -77,7 +77,7 @@ export default async function HomePage({
       product,
       rating: ratingRecord[product.id],
     }))
-    .filter((entry) => entry.rating && entry.rating.reviewCount > 0)
+    .filter((entry) => entry.rating && entry.rating.reviewCount >= 3)
     .sort(
       (a, b) =>
         (b.rating?.avgRating ?? 0) - (a.rating?.avgRating ?? 0) ||
@@ -152,13 +152,15 @@ export default async function HomePage({
 
       <HomeDiscovery />
 
-      <ProductRail
-        id="top-rated"
-        title="Top rated this week"
-        subtitle="Looks shoppers love — sorted by verified ratings."
-        products={topRated}
-        href="/search?sort=rated"
-      />
+      {topRated.length > 0 ? (
+        <ProductRail
+          id="top-rated"
+          title="Top rated this week"
+          subtitle="Looks shoppers love — sorted by verified ratings."
+          products={topRated}
+          href="/search?sort=rated"
+        />
+      ) : null}
 
       <ProductRail
         title="Under AED 99"

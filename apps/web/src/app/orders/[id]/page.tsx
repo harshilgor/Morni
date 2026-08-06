@@ -154,6 +154,7 @@ export default function OrderDetailPage() {
                 </div>
                 {item.product_id ? (
                   <ProductReviewForm
+                    key={existing?.id ?? item.id}
                     productId={item.product_id}
                     orderId={order.id}
                     orderItemId={item.id}
