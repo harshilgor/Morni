@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   MEDIA_ACCEPT,
   MEDIA_ACCEPT_LABEL,
@@ -35,6 +35,7 @@ export function ImageUploadField({
   error?: string | null;
 }) {
   const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const preview = useMemo(
@@ -75,8 +76,8 @@ export function ImageUploadField({
         {hint ? <p className="mt-0.5 text-xs text-muted">{hint}</p> : null}
       </div>
 
-      <label
-        htmlFor={inputId}
+      <button
+        type="button"
         onDragEnter={(e) => {
           e.preventDefault();
           setDragging(true);
@@ -94,13 +95,15 @@ export function ImageUploadField({
           setDragging(false);
           select(e.dataTransfer.files?.[0] ?? null);
         }}
-        className={`group relative block cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition ${
+        onClick={() => inputRef.current?.click()}
+        className={`group relative block w-full cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${
           ASPECT_CLASS[aspect]
         } ${
           dragging
             ? "border-accent bg-[#fff0f4]"
             : "border-line bg-background hover:border-accent/60"
         }`}
+        aria-label={`Choose ${label.toLowerCase()}`}
       >
         <div className="relative h-full w-full overflow-hidden">
           {shown ? (
@@ -114,27 +117,32 @@ export function ImageUploadField({
               <div className="absolute inset-0 bg-black/25 transition group-hover:bg-black/40" />
               <div className="absolute inset-0 flex items-center justify-center p-3">
                 <span className="rounded-full bg-white/90 px-3 py-1.5 text-center text-xs font-medium text-ink shadow-sm">
-                  Drop to replace or click
+                  Replace image
                 </span>
               </div>
             </>
           ) : (
             <div className="flex h-full flex-col items-center justify-center px-4 text-center">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-xl text-accent-deep shadow-sm">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-xl text-accent-deep shadow-sm">
                 +
               </span>
-              <p className="mt-2 text-sm font-medium text-ink">Drop image here</p>
-              <p className="mt-1 text-xs text-muted">{MEDIA_ACCEPT_LABEL}</p>
+              <p className="mt-2 text-sm font-medium text-ink">Drop an image here</p>
+              <p className="mt-1 text-xs text-muted">
+                or click to browse · {MEDIA_ACCEPT_LABEL}
+              </p>
             </div>
           )}
         </div>
-      </label>
+      </button>
 
       <input
+        ref={inputRef}
         id={inputId}
         type="file"
         accept={MEDIA_ACCEPT}
-        className="sr-only"
+        className="hidden"
+        tabIndex={-1}
+        aria-label={`Choose ${label.toLowerCase()}`}
         onChange={(e) => {
           select(e.target.files?.[0] ?? null);
           e.currentTarget.value = "";
