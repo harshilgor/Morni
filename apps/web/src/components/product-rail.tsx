@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProductCard } from "@/components/cards";
+import { MouseDragScroll } from "@/components/mouse-drag-scroll";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 
 export type RailProduct = {
@@ -43,7 +44,7 @@ export function ProductRail({
           </Link>
         ) : null}
       </div>
-      <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <MouseDragScroll className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {products.map((product) => (
           <div
             key={product.id}
@@ -52,7 +53,7 @@ export function ProductRail({
             <ProductCard product={product} href={product.href} rating={product.rating} />
           </div>
         ))}
-      </div>
+      </MouseDragScroll>
     </section>
   );
 }

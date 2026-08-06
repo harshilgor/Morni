@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { MouseDragScroll } from "@/components/mouse-drag-scroll";
 
 const AUTOPLAY_MS = 2000;
 const CARD_GAP = 16;
@@ -90,8 +91,8 @@ export function HomeCollections() {
           Curated edits from local UAE boutiques, for wherever you are headed.
         </p>
       </div>
-      <div
-        ref={trackRef}
+      <MouseDragScroll
+        scrollRef={trackRef}
         onMouseEnter={() => (pausedRef.current = true)}
         onMouseLeave={() => (pausedRef.current = false)}
         onFocusCapture={() => (pausedRef.current = true)}
@@ -131,7 +132,7 @@ export function HomeCollections() {
             </div>
           </Link>
         ))}
-      </div>
+      </MouseDragScroll>
     </section>
   );
 }

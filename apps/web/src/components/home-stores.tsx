@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { StoreCard } from "@/components/cards";
+import { MouseDragScroll } from "@/components/mouse-drag-scroll";
 import { EMIRATES, emirateLabel } from "@/lib/format";
 import { useLocation } from "@/lib/location";
 import type { Store, UaeEmirate } from "@/lib/types";
@@ -82,7 +83,7 @@ export function HomeStores({
           top bar.
         </p>
       ) : (
-        <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <MouseDragScroll className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {filtered.map((store) => (
             <div
               key={store.id}
@@ -91,7 +92,7 @@ export function HomeStores({
               <StoreCard store={store} />
             </div>
           ))}
-        </div>
+        </MouseDragScroll>
       )}
     </section>
   );
