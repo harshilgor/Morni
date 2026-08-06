@@ -120,8 +120,7 @@ export function SiteHeader() {
 
   const areas = UAE_AREAS[draftEmirate] ?? [];
   const firstName = auth?.firstName;
-  const isStoreOwner =
-    auth?.profile?.role === "store_owner" || auth?.profile?.role === "admin";
+  const isStoreOwner = auth?.hasStore ?? false;
 
   return (
     <header className="sticky top-0 z-50">

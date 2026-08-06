@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
 import { createClient } from "@/lib/supabase/server";
+import { fetchProductRatingMap } from "@/lib/product-ratings";
 import type { BrowseCategory } from "@/lib/browse-categories";
 
 export default async function CategoryPage({
@@ -56,6 +57,11 @@ export default async function CategoryPage({
 
   const products = (productsData ?? []) as BrowsableProduct[];
   const categories = (categoryList ?? []) as { name: string; slug: string }[];
+  const ratingMap = await fetchProductRatingMap(
+    supabase,
+    products.map((product) => product.id),
+  );
+  const ratings = Object.fromEntries(ratingMap);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -116,6 +122,7 @@ export default async function CategoryPage({
             products={products}
             categories={categories}
             activeSlug={category.slug}
+            ratings={ratings}
           />
         )}
       </div>

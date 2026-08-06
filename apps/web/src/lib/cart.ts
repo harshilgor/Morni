@@ -7,12 +7,14 @@ import type { Product } from "@/lib/types";
 export type CartItem = {
   lineId?: string;
   productId: string;
+  variantId?: string;
   storeId: string;
   storeName: string;
   title: string;
   priceAed: number;
   imageUrl?: string;
   size?: string;
+  colorName?: string;
   quantity: number;
 };
 
@@ -22,7 +24,12 @@ type CartState = {
     product: Product,
     storeName: string,
     qty?: number,
-    size?: string,
+    options?: {
+      size?: string;
+      variantId?: string;
+      colorName?: string;
+      imageUrl?: string;
+    },
   ) => void;
   removeItem: (lineId: string) => void;
   setQuantity: (lineId: string, quantity: number) => void;
@@ -32,35 +39,46 @@ type CartState = {
   count: () => number;
 };
 
-export function cartLineId(productId: string, size?: string) {
-  return `${productId}:${size || "one-size"}`;
+export function cartLineId(
+  productId: string,
+  size?: string,
+  variantId?: string,
+) {
+  return `${productId}:${variantId || "default"}:${size || "one-size"}`;
 }
 
 function itemLineId(item: CartItem) {
-  return item.lineId ?? cartLineId(item.productId, item.size);
+  return item.lineId ?? cartLineId(item.productId, item.size, item.variantId);
 }
 
 export const useCart = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
-      addItem: (product, storeName, qty = 1, size) => {
+      addItem: (product, storeName, qty = 1, options) => {
         const existing = get().items;
-        const lineId = cartLineId(product.id, size);
+        const lineId = cartLineId(
+          product.id,
+          options?.size,
+          options?.variantId,
+        );
+        const imageUrl =
+          options?.imageUrl ?? product.image_urls?.[0] ?? undefined;
         const otherStore = existing.find((i) => i.storeId !== product.store_id);
         if (otherStore) {
-          // One store per cart for 1-hour delivery routing
           set({
             items: [
               {
                 lineId,
                 productId: product.id,
+                variantId: options?.variantId,
                 storeId: product.store_id,
                 storeName,
                 title: product.title,
                 priceAed: Number(product.price_aed),
-                imageUrl: product.image_urls?.[0],
-                size,
+                imageUrl,
+                size: options?.size,
+                colorName: options?.colorName,
                 quantity: qty,
               },
             ],
@@ -83,12 +101,14 @@ export const useCart = create<CartState>()(
               {
                 lineId,
                 productId: product.id,
+                variantId: options?.variantId,
                 storeId: product.store_id,
                 storeName,
                 title: product.title,
                 priceAed: Number(product.price_aed),
-                imageUrl: product.image_urls?.[0],
-                size,
+                imageUrl,
+                size: options?.size,
+                colorName: options?.colorName,
                 quantity: qty,
               },
             ],

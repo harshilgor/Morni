@@ -59,27 +59,32 @@ export default function CheckoutPage() {
       .eq("id", storeId)
       .single();
 
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .insert({
-        shopper_id: user.id,
-        store_id: storeId,
-        status: "placed",
-        payment_method: "cod",
-        payment_status: "pending",
-        subtotal_aed: orderSubtotal,
-        delivery_fee_aed: deliveryFee,
-        total_aed: total,
-        delivery_emirate: form.emirate,
-        delivery_area: form.area,
-        delivery_street: form.street,
-        delivery_building: form.building || null,
-        delivery_apartment: form.apartment || null,
-        delivery_notes: form.notes || null,
-        delivery_eta_minutes: store?.delivery_eta_minutes ?? 60,
-      })
-      .select("id, order_number")
-      .single();
+    const { data: order, error: orderError } = await supabase.rpc(
+      "place_order_with_items",
+      {
+        p_store_id: storeId,
+        p_payment_method: "cod",
+        p_subtotal_aed: orderSubtotal,
+        p_delivery_fee_aed: deliveryFee,
+        p_total_aed: total,
+        p_delivery_emirate: form.emirate,
+        p_delivery_area: form.area,
+        p_delivery_street: form.street,
+        p_delivery_building: form.building || null,
+        p_delivery_apartment: form.apartment || null,
+        p_delivery_notes: form.notes || null,
+        p_delivery_eta_minutes: store?.delivery_eta_minutes ?? 60,
+        p_items: items.map((item) => ({
+          product_id: item.productId,
+          variant_id: item.variantId ?? null,
+          title: item.title,
+          size: item.size || null,
+          color_name: item.colorName || null,
+          unit_price_aed: item.priceAed,
+          quantity: item.quantity,
+        })),
+      },
+    );
 
     if (orderError || !order) {
       setError(orderError?.message ?? "Could not place order.");
@@ -87,26 +92,8 @@ export default function CheckoutPage() {
       return;
     }
 
-    const { error: itemsError } = await supabase.from("order_items").insert(
-      items.map((item) => ({
-        order_id: order.id,
-        product_id: item.productId,
-        title: item.title,
-        size: item.size || null,
-        unit_price_aed: item.priceAed,
-        quantity: item.quantity,
-        line_total_aed: item.priceAed * item.quantity,
-      })),
-    );
-
-    if (itemsError) {
-      setError(itemsError.message);
-      setLoading(false);
-      return;
-    }
-
     clear();
-    router.push(`/orders/${order.id}`);
+    router.push(`/orders/${(order as { id: string }).id}`);
   }
 
   if (items.length === 0) {
@@ -212,11 +199,15 @@ export default function CheckoutPage() {
         <ul className="mt-4 space-y-3 text-sm">
           {items.map((item) => (
             <li
-              key={item.lineId ?? `${item.productId}:${item.size ?? "one-size"}`}
+              key={
+                item.lineId ??
+                `${item.productId}:${item.variantId ?? "default"}:${item.size ?? "one-size"}`
+              }
               className="flex justify-between gap-3"
             >
               <span>
                 {item.title}
+                {item.colorName ? ` · ${item.colorName}` : ""}
                 {item.size ? ` · Size ${item.size}` : ""} × {item.quantity}
               </span>
               <span>{formatAed(item.priceAed * item.quantity)}</span>

@@ -1,25 +1,9 @@
 import Link from "next/link";
 import type { Store } from "@/lib/types";
 import { deliveryPromise, emirateLabel, formatAed } from "@/lib/format";
-import { getProductSocialProof } from "@/lib/product-social";
+import { formatRatingLabel, type ProductRatingSummary } from "@/lib/product-ratings";
+import { StarRating } from "@/components/star-rating";
 import { WishlistToggle } from "@/components/wishlist-toggle";
-
-function StarIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      aria-hidden
-      className={`h-3.5 w-3.5 ${filled ? "fill-[#f2b246] text-[#f2b246]" : "fill-none text-[#d6c2a0]"}`}
-    >
-      <path
-        d="m10 1.6 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L2.2 7.3l5.4-.8L10 1.6Z"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 export function StoreCard({ store }: { store: Store }) {
   const isNew =
@@ -66,6 +50,7 @@ export function StoreCard({ store }: { store: Store }) {
 export function ProductCard({
   product,
   href,
+  rating,
   onWishlistChange,
 }: {
   product: {
@@ -76,11 +61,12 @@ export function ProductCard({
     image_urls?: string[];
   };
   href: string;
+  rating?: ProductRatingSummary | null;
   onWishlistChange?: (isWished: boolean) => void;
 }) {
   const image = product.image_urls?.[0];
-  const social = getProductSocialProof(`${product.id}-${product.title}`);
-  const roundedRating = Math.round(social.rating);
+  const showRating = rating && rating.reviewCount > 0;
+
   return (
     <Link
       href={href}
@@ -107,18 +93,15 @@ export function ProductCard({
         <h3 className="line-clamp-2 text-sm font-medium leading-snug text-ink">
           {product.title}
         </h3>
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((s) => (
-            <StarIcon key={s} filled={s <= roundedRating} />
-          ))}
-          <span className="ml-1 text-xs font-medium text-ink/85">
-            {social.ratingLabel}
-          </span>
-          <span className="text-xs text-muted">({social.reviews})</span>
-        </div>
-        <p className="text-[11px] text-muted">
-          Bought {social.boughtToday} times today
-        </p>
+        {showRating ? (
+          <div className="flex items-center gap-1.5">
+            <StarRating value={rating.avgRating} />
+            <span className="text-xs font-medium text-ink/85">
+              {formatRatingLabel(rating.avgRating)}
+            </span>
+            <span className="text-xs text-muted">({rating.reviewCount})</span>
+          </div>
+        ) : null}
         <div className="flex items-center gap-2 text-sm font-medium">
           <span>{formatAed(product.price_aed)}</span>
           {product.compare_at_price_aed ? (

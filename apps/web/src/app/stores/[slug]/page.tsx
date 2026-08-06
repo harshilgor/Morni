@@ -6,6 +6,7 @@ import {
 } from "@/components/product-browser";
 import { createClient } from "@/lib/supabase/server";
 import { deliveryPromise, emirateLabel } from "@/lib/format";
+import { fetchProductRatingMap } from "@/lib/product-ratings";
 import type { Product, Store } from "@/lib/types";
 
 type StoreProduct = Product & {
@@ -106,6 +107,11 @@ export default async function StorePage({
       delivery_eta_minutes: s.delivery_eta_minutes,
     },
   }));
+  const ratingMap = await fetchProductRatingMap(
+    supabase,
+    browsable.map((product) => product.id),
+  );
+  const ratings = Object.fromEntries(ratingMap);
 
   const facts = [
     { label: "Delivery", value: deliveryPromise(s.delivery_eta_minutes) },
@@ -238,7 +244,7 @@ export default async function StorePage({
             </Link>
           </div>
         ) : (
-          <ProductBrowser products={browsable} />
+          <ProductBrowser products={browsable} ratings={ratings} />
         )}
       </div>
     </div>

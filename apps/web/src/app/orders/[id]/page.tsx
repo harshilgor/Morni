@@ -10,7 +10,9 @@ import {
   formatAed,
   orderStatusLabel,
 } from "@/lib/format";
-import type { Order, OrderItem } from "@/lib/types";
+import type { Order, OrderItem, ProductReview } from "@/lib/types";
+import { ProductReviewForm } from "@/components/product-review-form";
+import { StarRating } from "@/components/star-rating";
 
 const STEPS = ["placed", "accepted", "picking", "out_for_delivery", "delivered"] as const;
 
@@ -18,6 +20,8 @@ export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -33,8 +37,29 @@ export default function OrderDetailPage() {
         .select("*")
         .eq("order_id", params.id);
       setItems((itemData as OrderItem[]) ?? []);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setReviews([]);
+        return;
+      }
+      const productIds = ((itemData as OrderItem[]) ?? [])
+        .map((item) => item.product_id)
+        .filter(Boolean) as string[];
+      if (productIds.length === 0) {
+        setReviews([]);
+        return;
+      }
+      const { data: reviewData } = await supabase
+        .from("product_reviews")
+        .select("*")
+        .eq("shopper_id", user.id)
+        .in("product_id", productIds);
+      setReviews((reviewData as ProductReview[]) ?? []);
     })();
-  }, [params.id]);
+  }, [params.id, reloadKey]);
 
   if (!order) {
     return <div className="mx-auto max-w-3xl px-4 py-14 text-muted">Loading…</div>;
@@ -43,6 +68,9 @@ export default function OrderDetailPage() {
   const stepIndex = STEPS.indexOf(
     order.status === "cancelled" ? "placed" : (order.status as (typeof STEPS)[number]),
   );
+  const reviewableItems = order.status === "delivered"
+    ? items.filter((item) => item.product_id)
+    : [];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -80,6 +108,7 @@ export default function OrderDetailPage() {
             <li key={item.id} className="flex justify-between gap-3">
               <span>
                 {item.title}
+                {item.color_name ? ` · ${item.color_name}` : ""}
                 {item.size ? ` · Size ${item.size}` : ""} × {item.quantity}
               </span>
               <span>{formatAed(item.line_total_aed)}</span>
@@ -99,6 +128,46 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {reviewableItems.length > 0 ? (
+        <div className="mt-4 space-y-4 rounded-[1.5rem] border border-line bg-surface p-6">
+          <div>
+            <h2 className="font-display text-2xl text-ink">Rate your items</h2>
+            <p className="mt-1 text-sm text-muted">
+              Share a verified review for products from this delivered order.
+            </p>
+          </div>
+          {reviewableItems.map((item) => {
+            const existing = reviews.find(
+              (review) => review.product_id === item.product_id,
+            );
+            return (
+              <div key={item.id} className="rounded-2xl border border-line/70 bg-white/70 p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-ink">{item.title}</p>
+                  {existing ? (
+                    <div className="flex items-center gap-2 text-xs text-muted">
+                      <StarRating value={existing.rating} />
+                      <span>Review submitted</span>
+                    </div>
+                  ) : null}
+                </div>
+                {item.product_id ? (
+                  <ProductReviewForm
+                    productId={item.product_id}
+                    orderId={order.id}
+                    orderItemId={item.id}
+                    existingReviewId={existing?.id}
+                    initialRating={existing?.rating}
+                    initialBody={existing?.body}
+                    onSaved={() => setReloadKey((value) => value + 1)}
+                  />
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className="mt-4 rounded-[1.5rem] border border-line bg-surface p-6 text-sm">
         <h2 className="font-display text-2xl">Delivery</h2>

@@ -29,7 +29,10 @@ export default function CartPage() {
         <div className="mt-8 space-y-4">
           {items.map((item) => (
             <div
-              key={item.lineId ?? cartLineId(item.productId, item.size)}
+              key={
+                item.lineId ??
+                cartLineId(item.productId, item.size, item.variantId)
+              }
               className="flex gap-4 rounded-2xl border border-line bg-surface p-4"
             >
               <div className="h-24 w-20 overflow-hidden rounded-xl bg-sand">
@@ -47,9 +50,11 @@ export default function CartPage() {
                   <div>
                     <h2 className="font-medium text-ink">{item.title}</h2>
                     <p className="text-sm text-muted">{formatAed(item.priceAed)}</p>
-                    {item.size ? (
+                    {(item.colorName || item.size) ? (
                       <p className="mt-1 text-xs font-medium text-accent-deep">
-                        Size {item.size}
+                        {[item.colorName, item.size ? `Size ${item.size}` : null]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
                     ) : null}
                   </div>
@@ -57,7 +62,8 @@ export default function CartPage() {
                     type="button"
                     onClick={() =>
                       removeItem(
-                        item.lineId ?? cartLineId(item.productId, item.size),
+                        item.lineId ??
+                          cartLineId(item.productId, item.size, item.variantId),
                       )
                     }
                     className="text-xs text-muted hover:text-ink"
@@ -71,7 +77,8 @@ export default function CartPage() {
                     className="h-8 w-8 rounded-full border border-line"
                     onClick={() =>
                       setQuantity(
-                        item.lineId ?? cartLineId(item.productId, item.size),
+                        item.lineId ??
+                          cartLineId(item.productId, item.size, item.variantId),
                         item.quantity - 1,
                       )
                     }
@@ -84,7 +91,8 @@ export default function CartPage() {
                     className="h-8 w-8 rounded-full border border-line"
                     onClick={() =>
                       setQuantity(
-                        item.lineId ?? cartLineId(item.productId, item.size),
+                        item.lineId ??
+                          cartLineId(item.productId, item.size, item.variantId),
                         item.quantity + 1,
                       )
                     }

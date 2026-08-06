@@ -3,20 +3,13 @@
 import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { UserRole } from "@/lib/types";
 
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
   const authError = searchParams.get("error");
-  const roleParam = searchParams.get("role");
-  const initialRole: UserRole =
-    roleParam === "store_owner" || roleParam === "admin" ? roleParam : "shopper";
-  const [mode, setMode] = useState<"signin" | "signup">(
-    initialRole === "store_owner" ? "signup" : "signin",
-  );
-  const [role, setRole] = useState<UserRole>(initialRole);
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -76,7 +69,7 @@ function AuthForm() {
       email,
       password,
       options: {
-        data: { full_name: fullName, role },
+        data: { full_name: fullName },
       },
     });
 
@@ -135,28 +128,15 @@ function AuthForm() {
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4 rounded-[1.5rem] border border-line bg-surface p-6">
         {mode === "signup" ? (
-          <>
-            <label className="block space-y-1.5 text-sm">
-              <span className="text-muted">Full name</span>
-              <input
-                className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
-            </label>
-            <label className="block space-y-1.5 text-sm">
-              <span className="text-muted">I am a</span>
-              <select
-                className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-              >
-                <option value="shopper">Shopper</option>
-                <option value="store_owner">Store owner</option>
-              </select>
-            </label>
-          </>
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-muted">Full name</span>
+            <input
+              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+          </label>
         ) : null}
 
         <label className="block space-y-1.5 text-sm">

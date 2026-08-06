@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Store } from "@/lib/types";
 
+export function isOnboardingComplete(store: Store | null | undefined) {
+  if (!store) return false;
+  return Boolean(store.onboarding_completed_at);
+}
+
+export function getResumeOnboardingStep(store: Store | null | undefined) {
+  if (!store) return 1;
+  if (isOnboardingComplete(store)) return 5;
+  return Math.min(5, Math.max(1, store.onboarding_step || 1));
+}
+
 export function useOwnerStore() {
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,8 +58,23 @@ export function useOwnerStore() {
   }
 
   useEffect(() => {
-    refresh();
+    const run = () => {
+      void refresh();
+    };
+    if (typeof queueMicrotask === "function") queueMicrotask(run);
+    else window.setTimeout(run, 0);
   }, []);
 
-  return { store, loading, error, userId, refresh };
+  const onboardingComplete = isOnboardingComplete(store);
+  const resumeStep = getResumeOnboardingStep(store);
+
+  return {
+    store,
+    loading,
+    error,
+    userId,
+    refresh,
+    onboardingComplete,
+    resumeStep,
+  };
 }

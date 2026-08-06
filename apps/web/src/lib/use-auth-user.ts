@@ -8,6 +8,7 @@ import type { Profile } from "@/lib/types";
 export type AuthUser = {
   user: User;
   profile: Profile | null;
+  hasStore: boolean;
   firstName: string;
   displayName: string;
 };
@@ -38,11 +39,15 @@ export function useAuthUser() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
+      const [{ data: profile }, { data: membership }] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabase
+          .from("store_members")
+          .select("store_id")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
       if (!active) return;
 
@@ -60,6 +65,7 @@ export function useAuthUser() {
       setAuth({
         user,
         profile: (profile as Profile | null) ?? null,
+        hasStore: !!membership,
         firstName,
         displayName,
       });

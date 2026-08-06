@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ProductCard } from "@/components/cards";
 import { emirateLabel } from "@/lib/format";
-import { getProductSocialProof } from "@/lib/product-social";
+import type { ProductRatingSummary } from "@/lib/product-ratings";
 import {
   COLOR_FACETS,
   DELIVERY_BUCKETS,
@@ -93,9 +93,12 @@ const SORTS = [
 
 const PAGE_SIZE = 24;
 
-function annotate(product: BrowsableProduct): Annotated {
+function annotate(
+  product: BrowsableProduct,
+  ratings: Record<string, ProductRatingSummary>,
+): Annotated {
   const text = `${product.title} ${product.description ?? ""}`;
-  const social = getProductSocialProof(`${product.id}-${product.title}`);
+  const ratingSummary = ratings[product.id];
   return {
     ...product,
     colors: deriveColors(text),
@@ -103,8 +106,8 @@ function annotate(product: BrowsableProduct): Annotated {
     fits: deriveFits(text),
     priceBucket: priceBucketId(Number(product.price_aed)),
     deliveryBucket: deliveryBucketId(product.stores.delivery_eta_minutes),
-    rating: social.rating,
-    reviews: social.reviews,
+    rating: ratingSummary?.avgRating ?? 0,
+    reviews: ratingSummary?.reviewCount ?? 0,
     onSale:
       product.compare_at_price_aed != null &&
       Number(product.compare_at_price_aed) > Number(product.price_aed),
@@ -271,17 +274,22 @@ export function ProductBrowser({
   products,
   categories,
   activeSlug,
+  ratings = {},
 }: {
   products: BrowsableProduct[];
   categories?: { name: string; slug: string }[];
   activeSlug?: string;
+  ratings?: Record<string, ProductRatingSummary>;
 }) {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState("recommended");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const annotated = useMemo(() => products.map(annotate), [products]);
+  const annotated = useMemo(
+    () => products.map((product) => annotate(product, ratings)),
+    [products, ratings],
+  );
 
   const sizeOptions = useMemo(
     () =>
@@ -777,6 +785,7 @@ export function ProductBrowser({
                     compare_at_price_aed: product.compare_at_price_aed,
                     image_urls: product.image_urls ?? [],
                   }}
+                  rating={ratings[product.id] ?? null}
                   href={`/stores/${product.stores.slug}/products/${product.id}`}
                 />
               ))}

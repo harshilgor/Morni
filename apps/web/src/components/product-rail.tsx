@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProductCard } from "@/components/cards";
+import type { ProductRatingSummary } from "@/lib/product-ratings";
 
 export type RailProduct = {
   id: string;
@@ -8,6 +9,7 @@ export type RailProduct = {
   compare_at_price_aed?: number | null;
   image_urls?: string[];
   href: string;
+  rating?: ProductRatingSummary | null;
 };
 
 export function ProductRail({
@@ -47,7 +49,7 @@ export function ProductRail({
             key={product.id}
             className="w-[min(58vw,220px)] shrink-0 snap-start sm:w-[230px]"
           >
-            <ProductCard product={product} href={product.href} />
+            <ProductCard product={product} href={product.href} rating={product.rating} />
           </div>
         ))}
       </div>

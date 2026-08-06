@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ProductCard, StoreCard } from "@/components/cards";
 import { createClient } from "@/lib/supabase/server";
-import { getProductSocialProof } from "@/lib/product-social";
+import { fetchProductRatingMap } from "@/lib/product-ratings";
+import type { ProductRatingSummary } from "@/lib/product-ratings";
 import type { Product, Store } from "@/lib/types";
 
 export default async function SearchPage({
@@ -68,11 +69,23 @@ export default async function SearchPage({
     stores: { slug: string; name: string };
   })[];
 
+  const ratingMap = await fetchProductRatingMap(
+    supabase,
+    productList.map((product) => product.id),
+  );
+  const ratingRecord = Object.fromEntries(ratingMap) as Record<
+    string,
+    ProductRatingSummary
+  >;
+
   if (sort === "rated") {
     productList = [...productList].sort((a, b) => {
-      const sa = getProductSocialProof(`${a.id}-${a.title}`);
-      const sb = getProductSocialProof(`${b.id}-${b.title}`);
-      return sb.rating - sa.rating || sb.reviews - sa.reviews;
+      const sa = ratingRecord[a.id];
+      const sb = ratingRecord[b.id];
+      return (
+        (sb?.avgRating ?? 0) - (sa?.avgRating ?? 0) ||
+        (sb?.reviewCount ?? 0) - (sa?.reviewCount ?? 0)
+      );
     });
   }
 
@@ -154,6 +167,7 @@ export default async function SearchPage({
                   <ProductCard
                     key={product.id}
                     product={product}
+                    rating={ratingRecord[product.id] ?? null}
                     href={`/stores/${product.stores.slug}/products/${product.id}`}
                   />
                 ))}

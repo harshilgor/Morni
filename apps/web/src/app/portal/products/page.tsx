@@ -2,29 +2,71 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { ColorVariantEditor } from "@/components/color-variant-editor";
+import {
+  ImagePreviewDialog,
+  type PreviewImage,
+} from "@/components/image-preview-dialog";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { formatAed } from "@/lib/format";
-import { PRODUCT_SIZES } from "@/lib/product-sizes";
-import type { Product } from "@/lib/types";
+import {
+  aggregateFromColorDrafts,
+  colorDraftFromProduct,
+  createColorDraft,
+  validateColorDrafts,
+  type ColorDraft,
+} from "@/lib/product-variants";
+import { replaceProductVariants } from "@/lib/save-product-variants";
+import type { Product, ProductVariant } from "@/lib/types";
+
+type ProductWithVariants = Product & {
+  product_variants?: ProductVariant[] | null;
+};
 
 type ProductDraft = {
   title: string;
   price_aed: string;
 };
 
+function draftsFromVariants(
+  product: ProductWithVariants,
+): ColorDraft[] {
+  const variants = [...(product.product_variants ?? [])].sort(
+    (a, b) => a.sort_order - b.sort_order,
+  );
+  if (variants.length === 0) {
+    return [colorDraftFromProduct(product)];
+  }
+  return variants.map((variant) =>
+    createColorDraft({
+      id: variant.id,
+      key: variant.id,
+      color_name: variant.color_name,
+      color_hex: variant.color_hex ?? "#c45b7a",
+      sizes: variant.sizes?.length ? [...variant.sizes] : ["S", "M", "L"],
+      stock: String(variant.stock ?? 0),
+      images: (variant.image_urls ?? []).map((url, index) => ({
+        id: `${variant.id}-${index}`,
+        url,
+        existing: true,
+      })),
+    }),
+  );
+}
+
 export default function PortalProductsPage() {
   const { store, loading, error } = useOwnerStore();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductWithVariants[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: "",
     description: "",
     price_aed: "",
-    stock: "10",
-    sizes: ["S", "M", "L"] as string[],
   });
-  const [file, setFile] = useState<File | null>(null);
+  const [createColors, setCreateColors] = useState<ColorDraft[]>([
+    createColorDraft({ color_name: "Default" }),
+  ]);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [showLowStock, setShowLowStock] = useState(false);
@@ -36,19 +78,22 @@ export default function PortalProductsPage() {
   const [bulkStock, setBulkStock] = useState("");
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, ProductDraft>>({});
-  const [editFiles, setEditFiles] = useState<Record<string, File>>({});
-  const [editPreviews, setEditPreviews] = useState<Record<string, string>>({});
+  const [colorDrafts, setColorDrafts] = useState<Record<string, ColorDraft[]>>({});
   const [savingEdits, setSavingEdits] = useState(false);
   const [editMessage, setEditMessage] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    images: PreviewImage[];
+    title: string;
+  } | null>(null);
 
   async function loadProducts(storeId: string) {
     const supabase = createClient();
     const { data } = await supabase
       .from("products")
-      .select("*")
+      .select("*, product_variants(*)")
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
-    setProducts((data as Product[]) ?? []);
+    setProducts((data as ProductWithVariants[]) ?? []);
   }
 
   useEffect(() => {
@@ -68,7 +113,10 @@ export default function PortalProductsPage() {
       const q = query.toLowerCase();
       return (
         product.title.toLowerCase().includes(q) ||
-        (product.description ?? "").toLowerCase().includes(q)
+        (product.description ?? "").toLowerCase().includes(q) ||
+        (product.product_variants ?? []).some((variant) =>
+          variant.color_name.toLowerCase().includes(q),
+        )
       );
     })
     .sort((a, b) => {
@@ -81,52 +129,54 @@ export default function PortalProductsPage() {
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     if (!store) return;
-    setSaving(true);
-    setMessage(null);
-    const supabase = createClient();
-
-    let imageUrls: string[] = [];
-    if (file) {
-      const path = `${store.id}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("product-images")
-        .upload(path, file, { upsert: true });
-      if (uploadError) {
-        setMessage(uploadError.message);
-        setSaving(false);
-        return;
-      }
-      const { data: publicUrl } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(path);
-      imageUrls = [publicUrl.publicUrl];
-    }
-
-    const { error: insertError } = await supabase.from("products").insert({
-      store_id: store.id,
-      title: form.title,
-      description: form.description || null,
-      price_aed: Number(form.price_aed),
-      stock: Number(form.stock),
-      sizes: form.sizes,
-      is_available: true,
-      image_urls: imageUrls,
-    });
-
-    setSaving(false);
-    if (insertError) {
-      setMessage(insertError.message);
+    const colorError = validateColorDrafts(createColors);
+    if (colorError) {
+      setMessage(colorError);
       return;
     }
 
-    setForm({
-      title: "",
-      description: "",
-      price_aed: "",
-      stock: "10",
-      sizes: ["S", "M", "L"],
-    });
-    setFile(null);
+    setSaving(true);
+    setMessage(null);
+    const supabase = createClient();
+    const aggregate = aggregateFromColorDrafts(createColors);
+
+    const { data: created, error: insertError } = await supabase
+      .from("products")
+      .insert({
+        store_id: store.id,
+        title: form.title,
+        description: form.description || null,
+        price_aed: Number(form.price_aed),
+        stock: aggregate.stock,
+        sizes: aggregate.sizes,
+        is_available: true,
+        image_urls: [],
+      })
+      .select("*")
+      .single();
+
+    if (insertError || !created) {
+      setMessage(insertError?.message ?? "Could not create product.");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      await replaceProductVariants({
+        storeId: store.id,
+        productId: created.id,
+        drafts: createColors,
+      });
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Could not save colors.");
+      setSaving(false);
+      return;
+    }
+
+    setForm({ title: "", description: "", price_aed: "" });
+    setCreateColors([createColorDraft({ color_name: "Default" })]);
+    setSaving(false);
+    setMessage("Product added with color options.");
     await loadProducts(store.id);
   }
 
@@ -136,24 +186,6 @@ export default function PortalProductsPage() {
       .from("products")
       .update({ is_available: !product.is_available })
       .eq("id", product.id);
-    if (store) await loadProducts(store.id);
-  }
-
-  async function updateStock(product: Product, stock: number) {
-    const supabase = createClient();
-    await supabase.from("products").update({ stock }).eq("id", product.id);
-    if (store) await loadProducts(store.id);
-  }
-
-  async function toggleProductSize(product: Product, size: string) {
-    const current = product.sizes ?? [];
-    const sizes = current.includes(size)
-      ? current.filter((item) => item !== size)
-      : PRODUCT_SIZES.filter(
-          (item) => current.includes(item) || item === size,
-        );
-    const supabase = createClient();
-    await supabase.from("products").update({ sizes }).eq("id", product.id);
     if (store) await loadProducts(store.id);
   }
 
@@ -181,14 +213,28 @@ export default function PortalProductsPage() {
   }
 
   async function bulkSetStock() {
-    if (!selectedIds.length || !bulkStock.trim()) return;
+    if (!selectedIds.length || !bulkStock.trim() || !store) return;
     const stock = Number(bulkStock);
     if (Number.isNaN(stock) || stock < 0) return;
     const supabase = createClient();
-    await supabase.from("products").update({ stock }).in("id", selectedIds);
+
+    for (const productId of selectedIds) {
+      const product = products.find((item) => item.id === productId);
+      if (!product) continue;
+      const variants = product.product_variants ?? [];
+      if (variants.length > 0) {
+        await supabase
+          .from("product_variants")
+          .update({ stock })
+          .eq("product_id", productId);
+      } else {
+        await supabase.from("products").update({ stock }).eq("id", productId);
+      }
+    }
+
     setSelectedIds([]);
     setBulkStock("");
-    if (store) await loadProducts(store.id);
+    await loadProducts(store.id);
   }
 
   function startEditing() {
@@ -203,21 +249,18 @@ export default function PortalProductsPage() {
         ]),
       ),
     );
-    setEditFiles({});
-    setEditPreviews({});
+    setColorDrafts(
+      Object.fromEntries(
+        products.map((product) => [product.id, draftsFromVariants(product)]),
+      ),
+    );
     setEditMessage(null);
     setEditing(true);
   }
 
-  function clearEditPreviews() {
-    Object.values(editPreviews).forEach((url) => URL.revokeObjectURL(url));
-  }
-
   function cancelEditing() {
-    clearEditPreviews();
     setDrafts({});
-    setEditFiles({});
-    setEditPreviews({});
+    setColorDrafts({});
     setEditMessage(null);
     setEditing(false);
   }
@@ -239,29 +282,41 @@ export default function PortalProductsPage() {
     }));
   }
 
-  function chooseEditImage(productId: string, nextFile: File | null) {
-    if (!nextFile) return;
-    if (!nextFile.type.startsWith("image/")) {
-      setEditMessage("Please choose an image file.");
-      return;
-    }
-    if (nextFile.size > 10 * 1024 * 1024) {
-      setEditMessage("Images must be smaller than 10 MB.");
-      return;
-    }
-
-    setEditMessage(null);
-    setEditFiles((current) => ({ ...current, [productId]: nextFile }));
-    setEditPreviews((current) => {
-      if (current[productId]) URL.revokeObjectURL(current[productId]);
-      return { ...current, [productId]: URL.createObjectURL(nextFile) };
-    });
+  function colorsChanged(product: ProductWithVariants) {
+    const next = colorDrafts[product.id];
+    if (!next) return false;
+    const current = draftsFromVariants(product);
+    if (next.length !== current.length) return true;
+    return JSON.stringify(
+      next.map((draft) => ({
+        id: draft.id ?? null,
+        color_name: draft.color_name.trim(),
+        color_hex: draft.color_hex,
+        sizes: draft.sizes,
+        stock: Number(draft.stock) || 0,
+        imageCount: draft.images.length,
+        hasNewFiles: draft.images.some((image) => Boolean(image.file)),
+        urls: draft.images.map((image) => image.url),
+      })),
+    ) !==
+      JSON.stringify(
+        current.map((draft) => ({
+          id: draft.id ?? null,
+          color_name: draft.color_name.trim(),
+          color_hex: draft.color_hex,
+          sizes: draft.sizes,
+          stock: Number(draft.stock) || 0,
+          imageCount: draft.images.length,
+          hasNewFiles: false,
+          urls: draft.images.map((image) => image.url),
+        })),
+      );
   }
 
-  function isProductChanged(product: Product) {
+  function isProductChanged(product: ProductWithVariants) {
     const draft = drafts[product.id];
     return Boolean(
-      editFiles[product.id] ||
+      colorsChanged(product) ||
         (draft &&
           (draft.title.trim() !== product.title ||
             Number(draft.price_aed) !== Number(product.price_aed))),
@@ -279,6 +334,7 @@ export default function PortalProductsPage() {
 
     for (const product of changedProducts) {
       const draft = drafts[product.id];
+      const colors = colorDrafts[product.id] ?? [];
       const price = Number(draft?.price_aed);
       if (!draft?.title.trim()) {
         setEditMessage("Every product needs a name.");
@@ -286,6 +342,11 @@ export default function PortalProductsPage() {
       }
       if (!Number.isFinite(price) || price < 0) {
         setEditMessage(`Enter a valid price for ${draft.title.trim()}.`);
+        return;
+      }
+      const colorError = validateColorDrafts(colors);
+      if (colorError) {
+        setEditMessage(`${product.title}: ${colorError}`);
         return;
       }
     }
@@ -296,41 +357,14 @@ export default function PortalProductsPage() {
 
     for (const product of changedProducts) {
       const draft = drafts[product.id];
-      const updates: {
-        title: string;
-        price_aed: number;
-        image_urls?: string[];
-      } = {
-        title: draft.title.trim(),
-        price_aed: Number(draft.price_aed),
-      };
-      const nextFile = editFiles[product.id];
-
-      if (nextFile) {
-        const safeName = nextFile.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-        const path = `${store.id}/${product.id}/${Date.now()}-${safeName}`;
-        const { error: uploadError } = await supabase.storage
-          .from("product-images")
-          .upload(path, nextFile, { upsert: true });
-
-        if (uploadError) {
-          setEditMessage(`Could not update ${product.title}: ${uploadError.message}`);
-          setSavingEdits(false);
-          return;
-        }
-
-        const { data: publicUrl } = supabase.storage
-          .from("product-images")
-          .getPublicUrl(path);
-        updates.image_urls = [
-          publicUrl.publicUrl,
-          ...(product.image_urls ?? []).slice(1),
-        ];
-      }
+      const colors = colorDrafts[product.id] ?? [];
 
       const { error: updateError } = await supabase
         .from("products")
-        .update(updates)
+        .update({
+          title: draft.title.trim(),
+          price_aed: Number(draft.price_aed),
+        })
         .eq("id", product.id)
         .eq("store_id", store.id);
 
@@ -339,13 +373,27 @@ export default function PortalProductsPage() {
         setSavingEdits(false);
         return;
       }
+
+      try {
+        await replaceProductVariants({
+          storeId: store.id,
+          productId: product.id,
+          drafts: colors,
+        });
+      } catch (err) {
+        setEditMessage(
+          `Could not update colors for ${product.title}: ${
+            err instanceof Error ? err.message : "Unknown error"
+          }`,
+        );
+        setSavingEdits(false);
+        return;
+      }
     }
 
     await loadProducts(store.id);
-    clearEditPreviews();
     setDrafts({});
-    setEditFiles({});
-    setEditPreviews({});
+    setColorDrafts({});
     setSavingEdits(false);
     setEditing(false);
     setMessage(
@@ -414,8 +462,8 @@ export default function PortalProductsPage() {
 
       {editing ? (
         <div className="rounded-2xl border border-accent/30 bg-[#fff0f4] px-4 py-3 text-sm text-ink">
-          Editing is on. Click any product image to replace it, then edit its
-          name or price directly. Save once when you are finished.
+          Editing is on. Update names, prices, and color options (photos, sizes,
+          stock) on this page, then save once.
         </div>
       ) : null}
 
@@ -429,7 +477,7 @@ export default function PortalProductsPage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <input
             className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
-            placeholder="Search title or description"
+            placeholder="Search title, description, or color"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -530,54 +578,6 @@ export default function PortalProductsPage() {
           onChange={(e) => setForm((f) => ({ ...f, price_aed: e.target.value }))}
           required
         />
-        <input
-          className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
-          placeholder="Stock"
-          type="number"
-          min="0"
-          value={form.stock}
-          onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
-          required
-        />
-        <input
-          type="file"
-          accept="image/*"
-          className="rounded-xl border border-line bg-background px-3 py-2 text-sm"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-        <fieldset className="rounded-xl border border-line bg-background p-3 sm:col-span-2">
-          <legend className="px-1 text-sm text-muted">Available sizes</legend>
-          <div className="flex flex-wrap gap-2">
-            {PRODUCT_SIZES.map((size) => {
-              const selected = form.sizes.includes(size);
-              return (
-                <button
-                  key={size}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() =>
-                    setForm((current) => ({
-                      ...current,
-                      sizes: selected
-                        ? current.sizes.filter((item) => item !== size)
-                        : [...current.sizes, size],
-                    }))
-                  }
-                  className={`min-w-11 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                    selected
-                      ? "border-ink bg-ink text-white"
-                      : "border-line bg-surface text-muted hover:border-ink/40"
-                  }`}
-                >
-                  {size}
-                </button>
-              );
-            })}
-          </div>
-          <p className="mt-2 text-xs text-muted">
-            Shoppers will select one of these before adding the item to cart.
-          </p>
-        </fieldset>
         <textarea
           className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm sm:col-span-2"
           placeholder="Description"
@@ -585,6 +585,13 @@ export default function PortalProductsPage() {
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
         />
+        <div className="sm:col-span-2">
+          <ColorVariantEditor
+            value={createColors}
+            onChange={setCreateColors}
+            disabled={saving}
+          />
+        </div>
         <button
           type="submit"
           disabled={saving}
@@ -598,137 +605,164 @@ export default function PortalProductsPage() {
       </form>
 
       <ul className="space-y-3">
-        {visibleProducts.map((product) => (
-          <li
-            key={product.id}
-            className="flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-surface p-4"
-          >
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(product.id)}
-              onChange={() => toggleSelected(product.id)}
-              aria-label={`Select ${product.title}`}
-            />
-            <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-sand">
-              {editing ? (
+        {visibleProducts.map((product) => {
+          const variants = [...(product.product_variants ?? [])].sort(
+            (a, b) => a.sort_order - b.sort_order,
+          );
+          return (
+            <li
+              key={product.id}
+              className="rounded-2xl border border-line bg-surface p-4"
+            >
+              <div className="flex flex-wrap items-start gap-4">
                 <input
-                  id={`edit-image-${product.id}`}
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={(event) => {
-                    chooseEditImage(product.id, event.target.files?.[0] ?? null);
-                    event.currentTarget.value = "";
-                  }}
+                  type="checkbox"
+                  className="mt-2"
+                  checked={selectedIds.includes(product.id)}
+                  onChange={() => toggleSelected(product.id)}
+                  aria-label={`Select ${product.title}`}
                 />
-              ) : null}
-              {editPreviews[product.id] || product.image_urls?.[0] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={editPreviews[product.id] ?? product.image_urls[0]}
-                  alt={product.title}
-                  className="h-full w-full object-cover"
-                />
-              ) : null}
-              {editing ? (
-                <label
-                  htmlFor={`edit-image-${product.id}`}
-                  className="absolute inset-0 flex cursor-pointer items-center justify-center bg-ink/45 px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-white opacity-0 transition hover:opacity-100 focus-within:opacity-100"
-                  title={`Change image for ${product.title}`}
-                >
-                  Change image
-                </label>
-              ) : null}
-            </div>
-            <div className="min-w-[140px] flex-1">
-              {editing ? (
-                <div className="space-y-2">
-                  <label className="block">
-                    <span className="sr-only">Product name</span>
-                    <input
-                      type="text"
-                      value={drafts[product.id]?.title ?? product.title}
-                      onChange={(event) =>
-                        updateDraft(product, "title", event.target.value)
-                      }
-                      className="w-full rounded-lg border border-line bg-background px-3 py-2 text-sm font-medium text-ink outline-none transition focus:border-accent"
-                      aria-label={`Name for ${product.title}`}
+                {product.image_urls?.length ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreview({
+                        images: product.image_urls.map((url, imageIndex) => ({
+                          url,
+                          label: `${product.title} · photo ${imageIndex + 1}`,
+                        })),
+                        title: product.title,
+                      })
+                    }
+                    title={`Preview photos for ${product.title}`}
+                    className="group relative h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-sand"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={product.image_urls[0]}
+                      alt={product.title}
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     />
-                  </label>
-                  <label className="flex max-w-44 items-center rounded-lg border border-line bg-background px-3 py-2 text-sm focus-within:border-accent">
-                    <span className="mr-2 text-xs font-medium text-muted">AED</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={drafts[product.id]?.price_aed ?? String(product.price_aed)}
-                      onChange={(event) =>
-                        updateDraft(product, "price_aed", event.target.value)
-                      }
-                      className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
-                      aria-label={`Price for ${product.title}`}
-                    />
-                  </label>
-                  {isProductChanged(product) ? (
-                    <span className="inline-flex rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-deep">
-                      Changed
+                    <span className="absolute inset-x-0 bottom-0 bg-ink/75 py-0.5 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100">
+                      {product.image_urls.length} photo
+                      {product.image_urls.length === 1 ? "" : "s"}
                     </span>
-                  ) : null}
+                  </button>
+                ) : (
+                  <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-sand" />
+                )}
+                <div className="min-w-[180px] flex-1 space-y-2">
+                  {editing ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={drafts[product.id]?.title ?? product.title}
+                        onChange={(event) =>
+                          updateDraft(product, "title", event.target.value)
+                        }
+                        className="w-full rounded-lg border border-line bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-accent"
+                        aria-label={`Name for ${product.title}`}
+                      />
+                      <label className="flex max-w-44 items-center rounded-lg border border-line bg-background px-3 py-2 text-sm focus-within:border-accent">
+                        <span className="mr-2 text-xs font-medium text-muted">AED</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={
+                            drafts[product.id]?.price_aed ??
+                            String(product.price_aed)
+                          }
+                          onChange={(event) =>
+                            updateDraft(product, "price_aed", event.target.value)
+                          }
+                          className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
+                          aria-label={`Price for ${product.title}`}
+                        />
+                      </label>
+                      {isProductChanged(product) ? (
+                        <span className="inline-flex rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-deep">
+                          Changed
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-medium">{product.title}</p>
+                      <p className="text-sm text-muted">
+                        {formatAed(product.price_aed)} · {product.stock} in stock
+                      </p>
+                      {variants.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {variants.map((variant) => (
+                            <span
+                              key={variant.id}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-background px-2.5 py-1 text-[11px] text-ink"
+                            >
+                              <span
+                                className="h-2.5 w-2.5 rounded-full border border-line"
+                                style={{
+                                  background: variant.color_hex ?? "#c45b7a",
+                                }}
+                              />
+                              {variant.color_name}
+                              <span className="text-muted">· {variant.stock}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted">
+                          No color options yet — use Edit products to add them.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
-              ) : (
-                <>
-                  <p className="font-medium">{product.title}</p>
-                  <p className="text-sm text-muted">{formatAed(product.price_aed)}</p>
-                </>
-              )}
-              <div className="mt-2 flex flex-wrap gap-1">
-                {PRODUCT_SIZES.map((size) => {
-                  const selected = (product.sizes ?? []).includes(size);
-                  return (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => toggleProductSize(product, size)}
-                      className={`rounded-md border px-2 py-1 text-[10px] transition ${
-                        selected
-                          ? "border-ink bg-ink text-white"
-                          : "border-line text-muted hover:border-ink/40"
-                      }`}
-                      aria-pressed={selected}
-                      aria-label={`${selected ? "Remove" : "Add"} size ${size} for ${product.title}`}
-                    >
-                      {size}
-                    </button>
-                  );
-                })}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleAvailable(product)}
+                    className="rounded-full border border-line px-3 py-1.5 text-xs"
+                  >
+                    {product.is_available ? "Available" : "Hidden"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeProduct(product)}
+                    className="text-xs text-accent-deep"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
-            <label className="text-xs text-muted">
-              Stock
-              <input
-                type="number"
-                className="ml-2 w-20 rounded-lg border border-line px-2 py-1"
-                value={product.stock}
-                onChange={(e) => updateStock(product, Number(e.target.value))}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => toggleAvailable(product)}
-              className="rounded-full border border-line px-3 py-1.5 text-xs"
-            >
-              {product.is_available ? "Available" : "Hidden"}
-            </button>
-            <button
-              type="button"
-              onClick={() => removeProduct(product)}
-              className="text-xs text-accent-deep"
-            >
-              Delete
-            </button>
-          </li>
-        ))}
+
+              {editing ? (
+                <div className="mt-4 border-t border-line pt-4">
+                  <ColorVariantEditor
+                    compact
+                    value={colorDrafts[product.id] ?? draftsFromVariants(product)}
+                    onChange={(next) =>
+                      setColorDrafts((current) => ({
+                        ...current,
+                        [product.id]: next,
+                      }))
+                    }
+                    disabled={savingEdits}
+                  />
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
+
+      {preview ? (
+        <ImagePreviewDialog
+          images={preview.images}
+          title={preview.title}
+          onClose={() => setPreview(null)}
+        />
+      ) : null}
     </div>
   );
 }

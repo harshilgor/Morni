@@ -41,6 +41,8 @@ export type Store = {
   opens_at: string | null;
   closes_at: string | null;
   pause_note?: string | null;
+  onboarding_step: number;
+  onboarding_completed_at: string | null;
   created_at?: string;
 };
 
@@ -56,6 +58,17 @@ export type Product = {
   sizes: string[];
   stock: number;
   is_available: boolean;
+};
+
+export type ProductVariant = {
+  id: string;
+  product_id: string;
+  color_name: string;
+  color_hex: string | null;
+  image_urls: string[];
+  sizes: string[];
+  stock: number;
+  sort_order: number;
 };
 
 export type Order = {
@@ -83,9 +96,27 @@ export type OrderItem = {
   id: string;
   order_id: string;
   product_id: string | null;
+  variant_id?: string | null;
   title: string;
   size: string | null;
+  color_name?: string | null;
   unit_price_aed: number;
   quantity: number;
   line_total_aed: number;
+};
+
+export type ProductReview = {
+  id: string;
+  product_id: string;
+  store_id: string;
+  shopper_id: string;
+  order_id: string;
+  order_item_id: string | null;
+  rating: number;
+  body: string | null;
+  shopper_name: string;
+  owner_reply: string | null;
+  owner_replied_at: string | null;
+  created_at: string;
+  updated_at: string;
 };

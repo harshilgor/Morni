@@ -3,20 +3,26 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { useOwnerStore } from "@/lib/use-owner-store";
+import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
 import {
   StoreLocationFields,
   type StoreLocationValue,
 } from "@/components/store-location-fields";
+import {
+  StoreBrandingFields,
+  type StoreBrandingValue,
+} from "@/components/store-branding-fields";
+import {
+  DeliverySetupFields,
+  type DeliverySetupValue,
+} from "@/components/delivery-setup-fields";
+import { uploadStoreMedia } from "@/lib/media-upload";
 
 export default function PortalSettingsPage() {
   const { store, loading, error, refresh } = useOwnerStore();
   const [form, setForm] = useState({
     name: "",
     description: "",
-    delivery_eta_minutes: "60",
-    opens_at: "10:00",
-    closes_at: "22:00",
     is_active: true,
     pause_note: "",
   });
@@ -27,13 +33,24 @@ export default function PortalSettingsPage() {
     lat: null,
     lng: null,
   });
-  const [logo, setLogo] = useState<File | null>(null);
-  const [cover, setCover] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [coverError, setCoverError] = useState<string | null>(null);
-  const [draggingCover, setDraggingCover] = useState(false);
+  const [delivery, setDelivery] = useState<DeliverySetupValue>({
+    delivery_eta_minutes: "60",
+    opens_at: "10:00",
+    closes_at: "22:00",
+  });
+  const [branding, setBranding] = useState<StoreBrandingValue>({
+    logoFile: null,
+    coverFile: null,
+    logoUrl: null,
+    coverUrl: null,
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [storeActionError, setStoreActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!store) return;
@@ -41,9 +58,6 @@ export default function PortalSettingsPage() {
       setForm({
         name: store.name,
         description: store.description ?? "",
-        delivery_eta_minutes: String(store.delivery_eta_minutes),
-        opens_at: store.opens_at?.slice(0, 5) ?? "10:00",
-        closes_at: store.closes_at?.slice(0, 5) ?? "22:00",
         is_active: store.is_active,
         pause_note: store.pause_note ?? "",
       });
@@ -54,38 +68,21 @@ export default function PortalSettingsPage() {
         lat: store.lat,
         lng: store.lng,
       });
+      setDelivery({
+        delivery_eta_minutes: String(store.delivery_eta_minutes),
+        opens_at: store.opens_at?.slice(0, 5) ?? "10:00",
+        closes_at: store.closes_at?.slice(0, 5) ?? "22:00",
+      });
+      setBranding({
+        logoFile: null,
+        coverFile: null,
+        logoUrl: store.logo_url,
+        coverUrl: store.cover_url,
+      });
     };
     if (typeof queueMicrotask === "function") queueMicrotask(syncFromStore);
     else window.setTimeout(syncFromStore, 0);
   }, [store]);
-
-  useEffect(() => {
-    if (!cover) {
-      setCoverPreview(null);
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(cover);
-    setCoverPreview(previewUrl);
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [cover]);
-
-  function selectCover(file: File | null) {
-    setCoverError(null);
-    if (!file) {
-      setCover(null);
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      setCoverError("Choose a JPG, PNG, or WebP image.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setCoverError("Banner images must be smaller than 8 MB.");
-      return;
-    }
-    setCover(file);
-  }
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
@@ -96,67 +93,132 @@ export default function PortalSettingsPage() {
     }
     setSaving(true);
     setMessage(null);
-    const supabase = createClient();
 
-    let logo_url = store.logo_url;
-    if (logo) {
-      const path = `${store.id}/logo-${Date.now()}-${logo.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("store-logos")
-        .upload(path, logo, { upsert: true });
-      if (uploadError) {
-        setMessage(uploadError.message);
-        setSaving(false);
-        return;
+    try {
+      let logo_url = branding.logoUrl ?? store.logo_url;
+      let cover_url = branding.coverUrl ?? store.cover_url;
+
+      if (branding.logoFile) {
+        logo_url = await uploadStoreMedia({
+          bucket: "store-logos",
+          storeId: store.id,
+          file: branding.logoFile,
+          prefix: "logo",
+        });
       }
-      logo_url = supabase.storage.from("store-logos").getPublicUrl(path).data
-        .publicUrl;
-    }
-
-    let cover_url = store.cover_url;
-    if (cover) {
-      const path = `${store.id}/cover-${Date.now()}-${cover.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("store-logos")
-        .upload(path, cover, { upsert: true });
-      if (uploadError) {
-        setMessage(uploadError.message);
-        setSaving(false);
-        return;
+      if (branding.coverFile) {
+        cover_url = await uploadStoreMedia({
+          bucket: "store-logos",
+          storeId: store.id,
+          file: branding.coverFile,
+          prefix: "cover",
+        });
       }
-      cover_url = supabase.storage.from("store-logos").getPublicUrl(path).data
-        .publicUrl;
+
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from("stores")
+        .update({
+          name: form.name,
+          description: form.description || null,
+          emirate: location.emirate,
+          area: location.area.trim(),
+          address: location.address.trim(),
+          lat: location.lat,
+          lng: location.lng,
+          delivery_eta_minutes: Number(delivery.delivery_eta_minutes),
+          opens_at: delivery.opens_at,
+          closes_at: delivery.closes_at,
+          pause_note: form.pause_note || null,
+          logo_url,
+          cover_url,
+        })
+        .eq("id", store.id);
+
+      if (updateError) throw new Error(updateError.message);
+
+      setBranding({
+        logoFile: null,
+        coverFile: null,
+        logoUrl: logo_url,
+        coverUrl: cover_url,
+      });
+      setMessage("Store updated.");
+      await refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Could not save settings.");
+    } finally {
+      setSaving(false);
     }
+  }
 
-    const { error: updateError } = await supabase
-      .from("stores")
-      .update({
-        name: form.name,
-        description: form.description || null,
-        emirate: location.emirate,
-        area: location.area.trim(),
-        address: location.address.trim(),
-        lat: location.lat,
-        lng: location.lng,
-        delivery_eta_minutes: Number(form.delivery_eta_minutes),
-        opens_at: form.opens_at,
-        closes_at: form.closes_at,
-        is_active: form.is_active,
-        pause_note: form.pause_note || null,
-        logo_url,
-        cover_url,
-      })
-      .eq("id", store.id);
-
-    setSaving(false);
-    if (updateError) {
-      setMessage(updateError.message);
+  async function toggleStoreVisibility() {
+    if (!store) return;
+    if (!isOnboardingComplete(store) && !store.is_active) {
+      setStoreActionError(
+        "Finish onboarding and launch your store before listing it publicly.",
+      );
       return;
     }
-    setLogo(null);
-    setCover(null);
-    setMessage("Store updated.");
+
+    const nextActive = !store.is_active;
+    setVisibilitySaving(true);
+    setStoreActionError(null);
+    setMessage(null);
+    const supabase = createClient();
+
+    if (nextActive) {
+      const { error: launchError } = await supabase.rpc("launch_owned_store", {
+        p_store_id: store.id,
+      });
+      if (launchError) {
+        setStoreActionError(launchError.message);
+        setVisibilitySaving(false);
+        return;
+      }
+    } else {
+      const { error: updateError } = await supabase
+        .from("stores")
+        .update({
+          is_active: false,
+          pause_note: form.pause_note.trim() || "Unlisted by store owner",
+        })
+        .eq("id", store.id);
+
+      if (updateError) {
+        setStoreActionError(updateError.message);
+        setVisibilitySaving(false);
+        return;
+      }
+    }
+
+    setForm((current) => ({
+      ...current,
+      is_active: nextActive,
+      pause_note: nextActive
+        ? ""
+        : current.pause_note || "Unlisted by store owner",
+    }));
     await refresh();
+    setVisibilitySaving(false);
+  }
+
+  async function deleteStore() {
+    if (!store || deleteConfirmation.trim() !== store.name) return;
+    setDeleting(true);
+    setStoreActionError(null);
+    const supabase = createClient();
+    const { error: deleteError } = await supabase.rpc("delete_owned_store", {
+      p_store_id: store.id,
+    });
+
+    if (deleteError) {
+      setStoreActionError(deleteError.message);
+      setDeleting(false);
+      return;
+    }
+
+    window.location.assign("/sell/setup");
   }
 
   if (error === "unauthenticated") {
@@ -179,12 +241,25 @@ export default function PortalSettingsPage() {
     );
   }
 
+  const incomplete = !isOnboardingComplete(store);
+
   return (
     <div className="max-w-xl">
       <h1 className="font-display text-3xl text-ink">Store settings</h1>
       <p className="mt-1 text-sm text-muted">
-        Set your exact store location so shoppers know where you operate from.
+        Set your branding, location, and delivery details so shoppers know what to
+        expect.
       </p>
+
+      {incomplete ? (
+        <div className="mt-4 rounded-2xl border border-accent/30 bg-[#fff0f4] px-4 py-3 text-sm text-ink">
+          Setup is still incomplete.{" "}
+          <Link href="/sell/setup" className="font-medium text-accent-deep underline">
+            Continue onboarding
+          </Link>{" "}
+          to launch publicly.
+        </div>
+      ) : null}
 
       <form
         onSubmit={onSave}
@@ -211,180 +286,9 @@ export default function PortalSettingsPage() {
           />
         </label>
 
-        <div className="space-y-2">
-          <div>
-            <p className="text-sm text-muted">Store banner / cover</p>
-            <p className="mt-0.5 text-xs text-muted">
-              This appears across the top of your public store page. Use a wide,
-              high-quality image (recommended 1600 × 600).
-            </p>
-          </div>
-
-          <label
-            htmlFor="store-cover-upload"
-            onDragEnter={(e) => {
-              e.preventDefault();
-              setDraggingCover(true);
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDraggingCover(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              setDraggingCover(false);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDraggingCover(false);
-              selectCover(e.dataTransfer.files?.[0] ?? null);
-            }}
-            className={`group relative block cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition ${
-              draggingCover
-                ? "border-accent bg-[#fff0f4]"
-                : "border-line bg-background hover:border-accent/60"
-            }`}
-          >
-            <div className="relative aspect-[8/3] min-h-36 w-full overflow-hidden">
-              {coverPreview || store.cover_url ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={coverPreview ?? store.cover_url ?? ""}
-                    alt={`${store.name} banner preview`}
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/25 transition group-hover:bg-black/40" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-ink shadow-sm">
-                      Drop a new banner or click to replace
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-2xl text-accent-deep shadow-sm">
-                    +
-                  </span>
-                  <p className="mt-3 text-sm font-medium text-ink">
-                    Drop your store banner here
-                  </p>
-                  <p className="mt-1 text-xs text-muted">
-                    or click to browse · JPG, PNG or WebP · max 8 MB
-                  </p>
-                </div>
-              )}
-            </div>
-          </label>
-          <input
-            id="store-cover-upload"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            onChange={(e) => selectCover(e.target.files?.[0] ?? null)}
-          />
-          {cover ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="min-w-0 truncate text-xs text-muted">
-                Selected: {cover.name}
-              </p>
-              <button
-                type="button"
-                onClick={() => selectCover(null)}
-                className="shrink-0 text-xs text-accent-deep hover:underline"
-              >
-                Undo selection
-              </button>
-            </div>
-          ) : null}
-          {coverError ? (
-            <p className="text-sm text-accent-deep">{coverError}</p>
-          ) : null}
-        </div>
-
+        <StoreBrandingFields value={branding} onChange={setBranding} />
         <StoreLocationFields value={location} onChange={setLocation} />
-
-        <label className="block space-y-1.5 text-sm">
-          <span className="text-muted">Delivery ETA (minutes)</span>
-          <input
-            type="number"
-            min="15"
-            max="180"
-            className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-            value={form.delivery_eta_minutes}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, delivery_eta_minutes: e.target.value }))
-            }
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block space-y-1.5 text-sm">
-            <span className="text-muted">Opens</span>
-            <input
-              type="time"
-              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-              value={form.opens_at}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, opens_at: e.target.value }))
-              }
-            />
-          </label>
-          <label className="block space-y-1.5 text-sm">
-            <span className="text-muted">Closes</span>
-            <input
-              type="time"
-              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-              value={form.closes_at}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, closes_at: e.target.value }))
-              }
-            />
-          </label>
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.is_active}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, is_active: e.target.checked }))
-            }
-          />
-          Store is active / visible to shoppers
-        </label>
-        {!form.is_active ? (
-          <label className="block space-y-1.5 text-sm">
-            <span className="text-muted">Pause reason (shown internally)</span>
-            <input
-              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-              placeholder="Temporarily closed for inventory update"
-              value={form.pause_note}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, pause_note: e.target.value }))
-              }
-            />
-          </label>
-        ) : null}
-        <label className="block space-y-1.5 text-sm">
-          <span className="text-muted">Logo</span>
-          {store.logo_url ? (
-            <div className="mb-2 h-16 w-16 overflow-hidden rounded-xl border border-line bg-sand">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={store.logo_url}
-                alt={`${store.name} logo`}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ) : null}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
-          />
-          {logo ? (
-            <p className="text-xs text-muted">Selected: {logo.name}</p>
-          ) : null}
-        </label>
+        <DeliverySetupFields value={delivery} onChange={setDelivery} />
 
         {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
         <button
@@ -395,6 +299,119 @@ export default function PortalSettingsPage() {
           {saving ? "Saving…" : "Save changes"}
         </button>
       </form>
+
+      <section className="mt-6 rounded-[1.5rem] border border-line bg-surface p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-sm">
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-xl text-ink">Store visibility</h2>
+              <span
+                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                  store.is_active
+                    ? "bg-[#e8f5ef] text-mint"
+                    : "bg-[#fff0f4] text-accent-deep"
+                }`}
+              >
+                {store.is_active ? "Listed" : "Unlisted"}
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              {store.is_active
+                ? "Your store and available products are visible to shoppers."
+                : incomplete
+                  ? "Finish onboarding before listing your store publicly."
+                  : "Your store is hidden from shoppers. You can still manage everything here and list it again at any time."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleStoreVisibility}
+            disabled={visibilitySaving || (incomplete && !store.is_active)}
+            className={`rounded-full px-5 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
+              store.is_active
+                ? "border border-line bg-background text-ink hover:border-ink/30"
+                : "bg-ink text-white hover:bg-ink/90"
+            }`}
+          >
+            {visibilitySaving
+              ? "Updating…"
+              : store.is_active
+                ? "Unlist store"
+                : "List store"}
+          </button>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-[1.5rem] border border-red-200 bg-surface p-6">
+        <h2 className="font-display text-xl text-red-700">Delete store</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Permanently removes your catalog and access to this store. Completed
+          order records are retained for customers and legal records. This
+          cannot be undone.
+        </p>
+
+        {!deleteOpen ? (
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteOpen(true);
+              setDeleteConfirmation("");
+              setStoreActionError(null);
+            }}
+            className="mt-4 rounded-full border border-red-300 px-5 py-2.5 text-sm font-medium text-red-700 transition hover:bg-red-50"
+          >
+            Delete store
+          </button>
+        ) : (
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50/60 p-4">
+            <p className="text-sm text-ink">
+              Type <strong>{store.name}</strong> to confirm permanent deletion.
+            </p>
+            <input
+              type="text"
+              autoComplete="off"
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              className="mt-3 w-full rounded-xl border border-red-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-red-500"
+              placeholder={store.name}
+              aria-label={`Type ${store.name} to confirm deletion`}
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteOpen(false);
+                  setDeleteConfirmation("");
+                  setStoreActionError(null);
+                }}
+                disabled={deleting}
+                className="rounded-full border border-line bg-white px-4 py-2 text-sm text-ink disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteStore}
+                disabled={
+                  deleting || deleteConfirmation.trim() !== store.name
+                }
+                className="rounded-full bg-red-700 px-5 py-2 text-sm font-medium text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {deleting ? "Deleting…" : "Delete permanently"}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {storeActionError ? (
+        <p
+          role="alert"
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {storeActionError}
+        </p>
+      ) : null}
     </div>
   );
 }

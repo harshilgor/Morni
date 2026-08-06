@@ -247,7 +247,10 @@ export default function PortalOrdersPage() {
                         <ul className="mt-1 space-y-1">
                           {order.order_items.map((item) => (
                             <li key={item.id} className="text-muted">
-                              {item.quantity}x {item.title} · {formatAed(item.line_total_aed)}
+                              {item.quantity}x {item.title}
+                              {item.color_name ? ` · ${item.color_name}` : ""}
+                              {item.size ? ` · Size ${item.size}` : ""} ·{" "}
+                              {formatAed(item.line_total_aed)}
                             </li>
                           ))}
                         </ul>

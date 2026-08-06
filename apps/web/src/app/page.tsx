@@ -10,8 +10,8 @@ import { ProductRail } from "@/components/product-rail";
 import { RecentlyViewedRail } from "@/components/recently-viewed-rail";
 import { createClient } from "@/lib/supabase/server";
 import type { BrowseCategory } from "@/lib/browse-categories";
-import type { Product, Store, UaeEmirate } from "@/lib/types";
-import { getProductSocialProof } from "@/lib/product-social";
+import type { ProductRatingSummary } from "@/lib/product-ratings";
+import { fetchProductRatingMap } from "@/lib/product-ratings";
 
 type ProductWithStore = Product & {
   stores: { slug: string; name: string };
@@ -50,6 +50,14 @@ export default async function HomePage({
   const featured = (categories ?? []) as BrowseCategory[];
   const initialEmirate = emirate as UaeEmirate | undefined;
   const productList = (products ?? []) as ProductWithStore[];
+  const ratingMap = await fetchProductRatingMap(
+    supabase,
+    productList.map((product) => product.id),
+  );
+  const ratingRecord = Object.fromEntries(ratingMap) as Record<
+    string,
+    ProductRatingSummary
+  >;
 
   const under99 = productList
     .filter((p) => Number(p.price_aed) <= 99)
@@ -64,11 +72,16 @@ export default async function HomePage({
     }));
 
   const topRated = [...productList]
-    .map((p) => ({
-      product: p,
-      social: getProductSocialProof(`${p.id}-${p.title}`),
+    .map((product) => ({
+      product,
+      rating: ratingRecord[product.id],
     }))
-    .sort((a, b) => b.social.rating - a.social.rating || b.social.reviews - a.social.reviews)
+    .filter((entry) => entry.rating && entry.rating.reviewCount > 0)
+    .sort(
+      (a, b) =>
+        (b.rating?.avgRating ?? 0) - (a.rating?.avgRating ?? 0) ||
+        (b.rating?.reviewCount ?? 0) - (a.rating?.reviewCount ?? 0),
+    )
     .slice(0, 10)
     .map(({ product: p }) => ({
       id: p.id,
@@ -77,6 +90,7 @@ export default async function HomePage({
       compare_at_price_aed: p.compare_at_price_aed,
       image_urls: p.image_urls,
       href: `/stores/${p.stores.slug}/products/${p.id}`,
+      rating: ratingRecord[p.id] ?? null,
     }));
 
   const newIn = productList.slice(0, 10).map((p) => ({
@@ -140,7 +154,7 @@ export default async function HomePage({
       <ProductRail
         id="top-rated"
         title="Top rated this week"
-        subtitle="Looks shoppers love — sorted by rating and review buzz."
+        subtitle="Looks shoppers love — sorted by verified ratings."
         products={topRated}
         href="/search?sort=rated"
       />

@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useOwnerStore } from "@/lib/use-owner-store";
+import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
 
 const links = [
   { href: "/portal", label: "Dashboard" },
   { href: "/portal/orders", label: "Orders" },
   { href: "/portal/products", label: "Products" },
   { href: "/portal/promotions", label: "Promotions" },
+  { href: "/portal/reviews", label: "Reviews" },
   { href: "/portal/analytics", label: "Analytics" },
   { href: "/portal/settings", label: "Settings" },
 ];
@@ -64,12 +65,21 @@ export function PortalNav() {
           Browse Morni
         </Link>
         {store ? (
-          <Link
-            href={`/stores/${store.slug}`}
-            className="rounded-xl px-3 py-2 text-sm text-accent-deep hover:bg-background"
-          >
-            View my store page
-          </Link>
+          isOnboardingComplete(store) && store.is_active ? (
+            <Link
+              href={`/stores/${store.slug}`}
+              className="rounded-xl px-3 py-2 text-sm text-accent-deep hover:bg-background"
+            >
+              View my store page
+            </Link>
+          ) : (
+            <Link
+              href="/sell/setup"
+              className="rounded-xl px-3 py-2 text-sm text-accent-deep hover:bg-background"
+            >
+              Continue setup
+            </Link>
+          )
         ) : null}
 
         <button

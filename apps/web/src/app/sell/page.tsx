@@ -1,22 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useAuthUser } from "@/lib/use-auth-user";
-import { createClient } from "@/lib/supabase/client";
 
 const steps = [
   {
-    title: "Create your seller account",
-    body: "Sign in with Google or email. We’ll mark you as a store owner.",
+    title: "Create your Morni account",
+    body: "Sign in with Google or email, then start setting up your boutique.",
   },
   {
-    title: "Set up your boutique",
-    body: "Add your store name, UAE location, hours, and 1-hour delivery area.",
+    title: "Brand your boutique",
+    body: "Add your name, location, logo, banner, hours, and delivery promise.",
   },
   {
-    title: "List products & get orders",
-    body: "Upload offerings, then accept and fulfil orders from the portal.",
+    title: "List a product & launch",
+    body: "Add a complete first product with photos, preview your storefront, then go live.",
   },
 ];
 
@@ -37,35 +35,10 @@ const perks = [
 
 export default function SellPage() {
   const { auth, loading } = useAuthUser();
-  const [hasStore, setHasStore] = useState(false);
-  const [checkingStore, setCheckingStore] = useState(false);
-
-  useEffect(() => {
-    if (!auth) {
-      setHasStore(false);
-      return;
-    }
-    let active = true;
-    setCheckingStore(true);
-    const supabase = createClient();
-    supabase
-      .from("store_members")
-      .select("store_id")
-      .eq("user_id", auth.user.id)
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!active) return;
-        setHasStore(!!data);
-        setCheckingStore(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [auth]);
+  const hasStore = auth?.hasStore ?? false;
 
   const ctaHref = !auth
-    ? "/auth?next=/sell/setup&role=store_owner"
+    ? "/auth?next=/sell/setup"
     : hasStore
       ? "/portal"
       : "/sell/setup";
@@ -94,10 +67,10 @@ export default function SellPage() {
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
-                href={loading || checkingStore ? "/sell/setup" : ctaHref}
+                href={loading ? "/sell/setup" : ctaHref}
                 className="rounded-full bg-ink px-6 py-3 text-sm text-white transition hover:bg-accent-deep"
               >
-                {loading || checkingStore ? "Loading…" : ctaLabel}
+                {loading ? "Loading…" : ctaLabel}
               </Link>
               <Link
                 href="/"
@@ -153,10 +126,10 @@ export default function SellPage() {
             ))}
           </div>
           <Link
-            href={loading || checkingStore ? "/sell/setup" : ctaHref}
+            href={loading ? "/sell/setup" : ctaHref}
             className="mt-10 inline-flex rounded-full bg-ink px-6 py-3 text-sm text-white transition hover:bg-accent-deep"
           >
-            {loading || checkingStore ? "Loading…" : ctaLabel}
+            {loading ? "Loading…" : ctaLabel}
           </Link>
         </div>
       </section>

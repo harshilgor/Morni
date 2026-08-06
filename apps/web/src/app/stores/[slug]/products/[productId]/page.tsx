@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/cart";
 import { deliveryPromise, formatAed } from "@/lib/format";
-import { getProductSocialProof } from "@/lib/product-social";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
-import type { Product, Store } from "@/lib/types";
+import type { Product, ProductReview, ProductVariant, Store } from "@/lib/types";
 import { WishlistToggle } from "@/components/wishlist-toggle";
+import { ProductReviewsSection } from "@/components/product-reviews-section";
+import { formatRatingLabel } from "@/lib/product-ratings";
+import { StarRating } from "@/components/star-rating";
 
 export default function ProductPage() {
   const params = useParams<{ slug: string; productId: string }>();
@@ -16,9 +18,58 @@ export default function ProductPage() {
   const addItem = useCart((s) => s.addItem);
   const addRecentlyViewed = useRecentlyViewed((s) => s.add);
   const [product, setProduct] = useState<Product | null>(null);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [store, setStore] = useState<Store | null>(null);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [existingReview, setExistingReview] = useState<ProductReview | null>(null);
+  const [reviewOrderId, setReviewOrderId] = useState<string | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [activeImage, setActiveImage] = useState(0);
   const [added, setAdded] = useState(false);
+
+  async function loadReviews(productId: string) {
+    const supabase = createClient();
+    const { data: reviewRows } = await supabase
+      .from("product_reviews")
+      .select("*")
+      .eq("product_id", productId)
+      .order("created_at", { ascending: false });
+    setReviews((reviewRows as ProductReview[]) ?? []);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setExistingReview(null);
+      setReviewOrderId(null);
+      return;
+    }
+
+    const { data: ownReview } = await supabase
+      .from("product_reviews")
+      .select("*")
+      .eq("product_id", productId)
+      .eq("shopper_id", user.id)
+      .maybeSingle();
+    setExistingReview((ownReview as ProductReview | null) ?? null);
+
+    if (ownReview) {
+      setReviewOrderId((ownReview as ProductReview).order_id);
+      return;
+    }
+
+    const { data: eligibleOrders } = await supabase
+      .from("orders")
+      .select("id, order_items!inner(product_id)")
+      .eq("shopper_id", user.id)
+      .eq("status", "delivered")
+      .eq("order_items.product_id", productId)
+      .order("placed_at", { ascending: false })
+      .limit(1);
+    const first = (eligibleOrders as { id: string }[] | null)?.[0];
+    setReviewOrderId(first?.id ?? null);
+  }
 
   useEffect(() => {
     const supabase = createClient();
@@ -32,13 +83,61 @@ export default function ProductPage() {
       setStore(storeData as Store);
       const { data: productData } = await supabase
         .from("products")
-        .select("*")
+        .select("*, product_variants(*)")
         .eq("id", params.productId)
         .eq("store_id", storeData.id)
         .maybeSingle();
-      setProduct((productData as Product) ?? null);
+      if (!productData) {
+        setProduct(null);
+        return;
+      }
+      const row = productData as Product & {
+        product_variants?: ProductVariant[] | null;
+      };
+      const nextVariants = [...(row.product_variants ?? [])].sort(
+        (a, b) => a.sort_order - b.sort_order,
+      );
+      setProduct(row);
+      setVariants(nextVariants);
+      setSelectedVariantId(nextVariants[0]?.id ?? null);
+      setSelectedSize(null);
+      setActiveImage(0);
+      await loadReviews(row.id);
     })();
   }, [params.slug, params.productId]);
+
+  const selectedVariant = useMemo(
+    () => variants.find((variant) => variant.id === selectedVariantId) ?? null,
+    [variants, selectedVariantId],
+  );
+
+  const gallery = useMemo(() => {
+    if (selectedVariant?.image_urls?.length) return selectedVariant.image_urls;
+    return product?.image_urls ?? [];
+  }, [product, selectedVariant]);
+
+  const availableSizes = useMemo(() => {
+    if (selectedVariant?.sizes?.length) return selectedVariant.sizes;
+    return product?.sizes ?? [];
+  }, [product, selectedVariant]);
+
+  const availableStock = selectedVariant?.stock ?? product?.stock ?? 0;
+
+  const ratingSummary = useMemo(() => {
+    if (reviews.length === 0) return null;
+    const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
+    return {
+      avgRating: Number((sum / reviews.length).toFixed(1)),
+      reviewCount: reviews.length,
+    };
+  }, [reviews]);
+
+  useEffect(() => {
+    setActiveImage(0);
+    if (selectedSize && !availableSizes.includes(selectedSize)) {
+      setSelectedSize(null);
+    }
+  }, [selectedVariantId, availableSizes, selectedSize]);
 
   useEffect(() => {
     if (!product || !store) return;
@@ -47,11 +146,11 @@ export default function ProductPage() {
       title: product.title,
       price_aed: Number(product.price_aed),
       compare_at_price_aed: product.compare_at_price_aed,
-      image_url: product.image_urls?.[0] ?? null,
+      image_url: gallery[0] ?? product.image_urls?.[0] ?? null,
       href: `/stores/${store.slug}/products/${product.id}`,
       storeName: store.name,
     });
-  }, [product, store, addRecentlyViewed]);
+  }, [product, store, gallery, addRecentlyViewed]);
 
   if (!product || !store) {
     return (
@@ -61,36 +160,46 @@ export default function ProductPage() {
     );
   }
 
-  const image = product.image_urls?.[0];
-  const social = getProductSocialProof(`${product.id}-${product.title}`);
-  const sampleReviews = [
-    {
-      name: "Aisha",
-      text: "Fabric quality was better than expected and arrived the same hour.",
-    },
-    {
-      name: "Meera",
-      text: "True to photos — sizing felt right and packaging was neat.",
-    },
-    {
-      name: "Sara",
-      text: "Would order again from this boutique. Fast local delivery helped.",
-    },
-  ];
+  const needsColor = variants.length > 0;
+  const needsSize = availableSizes.length > 0;
+  const canAdd =
+    availableStock > 0 &&
+    (!needsColor || Boolean(selectedVariant)) &&
+    (!needsSize || Boolean(selectedSize));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="grid gap-10 lg:grid-cols-2">
-        <div className="aspect-[4/5] overflow-hidden rounded-[2rem] bg-sand">
-          {image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={image}
-              alt={product.title}
-              className="h-full w-full object-cover"
-            />
+        <div className="space-y-3">
+          <div className="aspect-[4/5] overflow-hidden rounded-[2rem] bg-sand">
+            {gallery[activeImage] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={gallery[activeImage]}
+                alt={product.title}
+                className="h-full w-full object-cover"
+              />
+            ) : null}
+          </div>
+          {gallery.length > 1 ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {gallery.map((url, index) => (
+                <button
+                  key={`${url}-${index}`}
+                  type="button"
+                  onClick={() => setActiveImage(index)}
+                  className={`h-20 w-16 shrink-0 overflow-hidden rounded-xl border ${
+                    activeImage === index ? "border-ink" : "border-line"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
           ) : null}
         </div>
+
         <div className="flex flex-col justify-center space-y-5">
           <p className="text-xs uppercase tracking-[0.18em] text-accent-deep">
             {store.name} · {deliveryPromise(store.delivery_eta_minutes)}
@@ -104,14 +213,15 @@ export default function ProductPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="rounded-full bg-[#fff7e8] px-3 py-1 font-medium text-[#8a6418]">
-              {social.ratingLabel} ★ · {social.reviews} reviews
-            </span>
-            <span className="text-muted">
-              Bought {social.boughtToday} times today
-            </span>
-          </div>
+          {ratingSummary ? (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[#fff7e8] px-3 py-1 font-medium text-[#8a6418]">
+                <StarRating value={ratingSummary.avgRating} />
+                {formatRatingLabel(ratingSummary.avgRating)} · {ratingSummary.reviewCount}{" "}
+                {ratingSummary.reviewCount === 1 ? "review" : "reviews"}
+              </span>
+            </div>
+          ) : null}
 
           <div className="flex items-center gap-3 text-lg">
             <span>{formatAed(product.price_aed)}</span>
@@ -124,7 +234,49 @@ export default function ProductPage() {
           {product.description ? (
             <p className="max-w-md text-muted">{product.description}</p>
           ) : null}
-          {product.sizes?.length > 0 ? (
+
+          {variants.length > 0 ? (
+            <div>
+              <p className="text-sm font-medium text-ink">
+                Color
+                {selectedVariant ? (
+                  <span className="ml-2 text-muted">
+                    · {selectedVariant.color_name}
+                  </span>
+                ) : null}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {variants.map((variant) => {
+                  const selected = selectedVariantId === variant.id;
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedVariantId(variant.id);
+                        setAdded(false);
+                      }}
+                      disabled={variant.stock <= 0}
+                      aria-pressed={selected}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
+                        selected
+                          ? "border-ink bg-ink text-white"
+                          : "border-line bg-surface text-ink hover:border-ink/40"
+                      } ${variant.stock <= 0 ? "opacity-40" : ""}`}
+                    >
+                      <span
+                        className="h-3.5 w-3.5 rounded-full border border-white/40"
+                        style={{ background: variant.color_hex ?? "#c45b7a" }}
+                      />
+                      {variant.color_name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {availableSizes.length > 0 ? (
             <div>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium text-ink">
@@ -136,7 +288,7 @@ export default function ProductPage() {
                 <span className="text-xs text-muted">Available sizes</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {product.sizes.map((size) => (
+                {availableSizes.map((size) => (
                   <button
                     key={size}
                     type="button"
@@ -162,27 +314,38 @@ export default function ProductPage() {
               ) : null}
             </div>
           ) : null}
+
           <p className="text-sm text-mint">
-            {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}
+            {availableStock > 0
+              ? `${availableStock} in stock${
+                  selectedVariant ? ` · ${selectedVariant.color_name}` : ""
+                }`
+              : "Out of stock"}
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="button"
-              disabled={
-                product.stock <= 0 ||
-                (product.sizes?.length > 0 && !selectedSize)
-              }
+              disabled={!canAdd}
               onClick={() => {
-                addItem(product, store.name, 1, selectedSize ?? undefined);
+                addItem(product, store.name, 1, {
+                  size: selectedSize ?? undefined,
+                  variantId: selectedVariant?.id,
+                  colorName: selectedVariant?.color_name,
+                  imageUrl: gallery[0],
+                });
                 setAdded(true);
               }}
               className="rounded-full bg-ink px-6 py-3 text-sm text-white transition hover:bg-accent-deep disabled:opacity-40"
             >
               {added
-                ? `Added${selectedSize ? ` · ${selectedSize}` : ""}`
-                : selectedSize
-                  ? `Add size ${selectedSize} to cart`
-                  : "Select a size"}
+                ? `Added${selectedVariant ? ` · ${selectedVariant.color_name}` : ""}${
+                    selectedSize ? ` · ${selectedSize}` : ""
+                  }`
+                : needsColor && !selectedVariant
+                  ? "Select a color"
+                  : needsSize && !selectedSize
+                    ? "Select a size"
+                    : "Add to cart"}
             </button>
             <button
               type="button"
@@ -195,28 +358,21 @@ export default function ProductPage() {
         </div>
       </div>
 
-      <section className="mt-12 rounded-[1.6rem] border border-line bg-white/70 p-6 sm:p-8">
-        <h2 className="font-display text-2xl text-ink">What shoppers say</h2>
-        <p className="mt-1 text-sm text-muted">
-          Sample reviews while we roll out verified ratings.
-        </p>
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {sampleReviews.map((review) => (
-            <div
-              key={review.name}
-              className="rounded-2xl border border-line bg-surface/80 p-4"
-            >
-              <p className="text-sm font-semibold text-ink">{review.name}</p>
-              <p className="mt-1 text-xs text-[#8a6418]">
-                {social.ratingLabel} ★
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                {review.text}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <ProductReviewsSection
+        reviews={reviews}
+        avgRating={ratingSummary?.avgRating ?? null}
+        reviewCount={ratingSummary?.reviewCount ?? 0}
+        existingReview={existingReview}
+        canReview={
+          !existingReview && reviewOrderId
+            ? {
+                productId: product.id,
+                orderId: reviewOrderId,
+              }
+            : null
+        }
+        onReviewSaved={() => loadReviews(product.id)}
+      />
     </div>
   );
 }
