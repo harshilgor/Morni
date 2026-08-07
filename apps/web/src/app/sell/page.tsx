@@ -10,7 +10,7 @@ const steps = [
   },
   {
     title: "Brand your boutique",
-    body: "Add your name, location, logo, banner, hours, and delivery promise.",
+    body: "Add your name, location, logo, banner, and store hours.",
   },
   {
     title: "List a product & launch",

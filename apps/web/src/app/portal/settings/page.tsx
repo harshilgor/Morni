@@ -13,8 +13,8 @@ import {
   type StoreBrandingValue,
 } from "@/components/store-branding-fields";
 import {
-  DeliverySetupFields,
-  type DeliverySetupValue,
+  StoreHoursFields,
+  type StoreHoursValue,
 } from "@/components/delivery-setup-fields";
 import { uploadStoreMedia } from "@/lib/media-upload";
 
@@ -33,8 +33,7 @@ export default function PortalSettingsPage() {
     lat: null,
     lng: null,
   });
-  const [delivery, setDelivery] = useState<DeliverySetupValue>({
-    delivery_eta_minutes: "60",
+  const [storeHours, setStoreHours] = useState<StoreHoursValue>({
     opens_at: "10:00",
     closes_at: "22:00",
   });
@@ -68,8 +67,7 @@ export default function PortalSettingsPage() {
         lat: store.lat,
         lng: store.lng,
       });
-      setDelivery({
-        delivery_eta_minutes: String(store.delivery_eta_minutes),
+      setStoreHours({
         opens_at: store.opens_at?.slice(0, 5) ?? "10:00",
         closes_at: store.closes_at?.slice(0, 5) ?? "22:00",
       });
@@ -126,9 +124,8 @@ export default function PortalSettingsPage() {
           address: location.address.trim(),
           lat: location.lat,
           lng: location.lng,
-          delivery_eta_minutes: Number(delivery.delivery_eta_minutes),
-          opens_at: delivery.opens_at,
-          closes_at: delivery.closes_at,
+          opens_at: storeHours.opens_at,
+          closes_at: storeHours.closes_at,
           pause_note: form.pause_note || null,
           logo_url,
           cover_url,
@@ -247,7 +244,7 @@ export default function PortalSettingsPage() {
     <div className="max-w-xl">
       <h1 className="font-display text-3xl text-ink">Store settings</h1>
       <p className="mt-1 text-sm text-muted">
-        Set your branding, location, and delivery details so shoppers know what to
+        Set your branding, location, and store hours so shoppers know what to
         expect.
       </p>
 
@@ -288,7 +285,7 @@ export default function PortalSettingsPage() {
 
         <StoreBrandingFields value={branding} onChange={setBranding} />
         <StoreLocationFields value={location} onChange={setLocation} />
-        <DeliverySetupFields value={delivery} onChange={setDelivery} />
+        <StoreHoursFields value={storeHours} onChange={setStoreHours} />
 
         {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
         <button

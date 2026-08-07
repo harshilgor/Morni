@@ -22,7 +22,6 @@ export default function PortalOrdersPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [customEta, setCustomEta] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!store) return;
@@ -68,13 +67,7 @@ export default function PortalOrdersPage() {
     const next = NEXT_STATUS[order.status];
     if (!next) return;
     const supabase = createClient();
-    const maybeEta = customEta[order.id]?.trim();
-    const updatePayload: { status: OrderStatus; delivery_eta_minutes?: number } = {
-      status: next,
-    };
-    if (maybeEta) {
-      updatePayload.delivery_eta_minutes = Number(maybeEta);
-    }
+    const updatePayload: { status: OrderStatus } = { status: next };
     const { error: err } = await supabase
       .from("orders")
       .update(updatePayload)
@@ -89,10 +82,6 @@ export default function PortalOrdersPage() {
           ? {
               ...o,
               status: next,
-              delivery_eta_minutes:
-                maybeEta && !Number.isNaN(Number(maybeEta))
-                  ? Number(maybeEta)
-                  : o.delivery_eta_minutes,
             }
           : o,
       ),
@@ -205,17 +194,6 @@ export default function PortalOrdersPage() {
                     </button>
                     {NEXT_STATUS[order.status] ? (
                       <>
-                        <input
-                          type="number"
-                          min="10"
-                          max="180"
-                          value={customEta[order.id] ?? ""}
-                          onChange={(e) =>
-                            setCustomEta((prev) => ({ ...prev, [order.id]: e.target.value }))
-                          }
-                          placeholder="ETA"
-                          className="w-20 rounded-lg border border-line bg-background px-2 py-1.5 text-xs"
-                        />
                         <button
                           type="button"
                           onClick={() => advance(order)}
