@@ -160,14 +160,14 @@ export default function PortalOrdersPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-xl">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">
-                Setup in progress · step {resumeStep} of 5
+                Setup in progress · step {resumeStep} of 4
               </p>
               <h2 className="mt-1 font-display text-2xl text-ink">
                 Your store is still hidden
               </h2>
               <p className="mt-2 text-sm text-muted">
-                Finish branding, delivery, and one complete product before shoppers
-                can find {store.name}.
+                Finish branding and add one complete product before shoppers can find
+                {store.name}.
               </p>
             </div>
             <Link

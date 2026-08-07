@@ -354,6 +354,10 @@ export default function SellSetupPage() {
     }
   }
 
+  function skipFirstProduct() {
+    router.push("/portal/products");
+  }
+
   async function saveFirstProduct(e: FormEvent) {
     e.preventDefault();
     if (!store) {
@@ -732,6 +736,8 @@ export default function SellSetupPage() {
                 busy={busy}
                 onBack={() => setStep(2)}
                 continueLabel="Save product & continue"
+                secondaryLabel="Skip for now"
+                onSecondaryAction={skipFirstProduct}
               />
             </form>
           ) : null}
@@ -806,11 +812,15 @@ function WizardNav({
   onBack,
   canBack = true,
   continueLabel,
+  secondaryLabel,
+  onSecondaryAction,
 }: {
   busy: boolean;
   onBack?: () => void;
   canBack?: boolean;
   continueLabel: string;
+  secondaryLabel?: string;
+  onSecondaryAction?: () => void;
 }) {
   return (
     <div className="flex flex-wrap gap-2 pt-2">
@@ -821,6 +831,16 @@ function WizardNav({
           className="rounded-full border border-line px-5 py-2.5 text-sm text-ink"
         >
           Back
+        </button>
+      ) : null}
+      {secondaryLabel && onSecondaryAction ? (
+        <button
+          type="button"
+          onClick={onSecondaryAction}
+          disabled={busy}
+          className="rounded-full border border-line px-5 py-2.5 text-sm text-ink disabled:opacity-50"
+        >
+          {secondaryLabel}
         </button>
       ) : null}
       <button
