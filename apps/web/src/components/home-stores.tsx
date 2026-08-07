@@ -29,19 +29,26 @@ export function HomeStores({
     setSelected(deliveryEmirate);
   }, [deliveryEmirate]);
 
+  const registeredEmirates = new Set(stores.map((store) => store.emirate));
+  const availableEmirates = EMIRATES.filter((emirate) =>
+    registeredEmirates.has(emirate.value),
+  );
+  const activeSelection =
+    selected === "all" || registeredEmirates.has(selected) ? selected : "all";
+
   const filtered =
-    selected === "all"
+    activeSelection === "all"
       ? stores
-      : stores.filter((store) => store.emirate === selected);
+      : stores.filter((store) => store.emirate === activeSelection);
 
   return (
     <section id="stores" className="mx-auto max-w-6xl px-4 pb-8 pt-10 sm:px-6">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="font-display text-3xl text-ink">
-            {selected === "all"
+            {activeSelection === "all"
               ? "Stores near you"
-              : `Stores in ${emirateLabel(selected)}`}
+              : `Stores in ${emirateLabel(activeSelection)}`}
           </h2>
           <p className="mt-1 text-sm text-muted">
             Same-hour delivery from local retail floors.
@@ -52,20 +59,20 @@ export function HomeStores({
             type="button"
             onClick={() => setSelected("all")}
             className={`rounded-full px-3 py-1.5 text-xs transition ${
-              selected === "all"
+              activeSelection === "all"
                 ? "bg-ink text-white"
                 : "border border-line bg-surface text-muted hover:border-ink/30"
             }`}
           >
             All
           </button>
-          {EMIRATES.map((e) => (
+          {availableEmirates.map((e) => (
             <button
               key={e.value}
               type="button"
               onClick={() => setSelected(e.value)}
               className={`rounded-full px-3 py-1.5 text-xs transition ${
-                selected === e.value
+                activeSelection === e.value
                   ? "bg-ink text-white"
                   : "border border-line bg-surface text-muted hover:border-ink/30"
               }`}
