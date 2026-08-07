@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { MouseDragScroll } from "@/components/mouse-drag-scroll";
 import {
   useCallback,
   useEffect,
@@ -191,8 +190,8 @@ export function HeroCarousel() {
       aria-roledescription="carousel"
       aria-label="Featured collections"
     >
-      <MouseDragScroll
-        scrollRef={scrollerRef}
+      <div
+        ref={scrollerRef}
         className="relative flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-smooth px-3 pb-1 sm:gap-3 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {SLIDES.map((slide, index) => (
@@ -232,7 +231,7 @@ export function HeroCarousel() {
             </div>
           </Link>
         ))}
-      </MouseDragScroll>
+      </div>
 
       <div className="mt-4 flex items-center justify-center gap-2 pb-7 sm:pb-9">
         {SLIDES.map((slide, index) => {
