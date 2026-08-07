@@ -46,7 +46,7 @@ export default function WishlistPage() {
       }
 
       const { data: productRows } = await supabase
-        .from("products")
+        .from("storefront_products")
         .select("*, stores!inner(slug, name, is_active)")
         .in("id", ids)
         .eq("is_available", true)

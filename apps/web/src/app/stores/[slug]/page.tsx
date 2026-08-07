@@ -14,6 +14,15 @@ type StoreProduct = Product & {
   categories: { name: string; slug: string } | null;
 };
 
+type StoreCampaign = {
+  id: string;
+  title: string;
+  description: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+};
+
 function toMinutes(value: string | null) {
   if (!value) return null;
   const [h, m] = value.split(":").map(Number);
@@ -48,9 +57,9 @@ export default async function StorePage({
   if (!store) notFound();
   const s = store as Store;
 
-  const [{ data: products }, { data: browseCategories }] = await Promise.all([
+  const [{ data: products }, { data: browseCategories }, { data: campaigns }] = await Promise.all([
     supabase
-      .from("products")
+      .from("storefront_products")
       .select("*, categories(name, slug)")
       .eq("store_id", s.id)
       .eq("is_available", true)
@@ -61,6 +70,7 @@ export default async function StorePage({
       .select("name, slug, search_terms")
       .neq("slug", "more")
       .order("sort_order"),
+    supabase.rpc("active_store_campaign", { p_store_id: s.id }),
   ]);
 
   const list = (products ?? []) as StoreProduct[];
@@ -69,6 +79,7 @@ export default async function StorePage({
     slug: string;
     search_terms: string[] | null;
   }[];
+  const activeCampaign = ((campaigns ?? []) as StoreCampaign[])[0] ?? null;
 
   // Owners can't tag products with a category in the portal yet, so fall back to
   // matching the catalog's search terms against the title.
@@ -189,6 +200,14 @@ export default async function StorePage({
           </a>
         </div>
       </section>
+
+      {activeCampaign ? (
+        <section className="mt-5 border border-accent-deep/20 bg-[#fff4f6] px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep">From {s.name}</p>
+          <h2 className="mt-1 font-display text-2xl text-ink">{activeCampaign.title}</h2>
+          {activeCampaign.description ? <p className="mt-1 text-sm text-muted">{activeCampaign.description}</p> : null}
+        </section>
+      ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {facts.map((fact) => (

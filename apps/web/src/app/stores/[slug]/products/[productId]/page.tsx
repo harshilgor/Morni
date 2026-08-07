@@ -12,6 +12,14 @@ import { ProductReviewsSection } from "@/components/product-reviews-section";
 import { formatRatingLabel } from "@/lib/product-ratings";
 import { StarRating } from "@/components/star-rating";
 
+type StoreCampaign = {
+  id: string;
+  title: string;
+  description: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+};
+
 export default function ProductPage() {
   const params = useParams<{ slug: string; productId: string }>();
   const router = useRouter();
@@ -20,6 +28,7 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [store, setStore] = useState<Store | null>(null);
+  const [campaign, setCampaign] = useState<StoreCampaign | null>(null);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [existingReview, setExistingReview] = useState<ProductReview | null>(null);
   const [reviewOrderId, setReviewOrderId] = useState<string | null>(null);
@@ -81,8 +90,12 @@ export default function ProductPage() {
         .maybeSingle();
       if (!storeData) return;
       setStore(storeData as Store);
+      const { data: campaignRows } = await supabase.rpc("active_store_campaign", {
+        p_store_id: storeData.id,
+      });
+      setCampaign(((campaignRows ?? []) as StoreCampaign[])[0] ?? null);
       const { data: productData } = await supabase
-        .from("products")
+        .from("storefront_products")
         .select("*, product_variants(*)")
         .eq("id", params.productId)
         .eq("store_id", storeData.id)
@@ -207,6 +220,14 @@ export default function ProductPage() {
           <p className="text-xs uppercase tracking-[0.18em] text-accent-deep">
             {store.name} · {deliveryPromise(store.delivery_eta_minutes)}
           </p>
+          {campaign ? (
+            <div className="border border-accent-deep/20 bg-[#fff4f6] px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep">Store campaign</p>
+              <p className="mt-1 font-medium text-ink">{campaign.title}</p>
+              {campaign.description ? <p className="mt-1 text-sm text-muted">{campaign.description}</p> : null}
+            </div>
+          ) : null}
+
           <div className="flex items-start justify-between gap-4">
             <h1 className="font-display text-4xl text-ink sm:text-5xl">
               {product.title}

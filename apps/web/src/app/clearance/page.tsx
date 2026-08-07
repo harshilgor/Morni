@@ -8,7 +8,7 @@ export default async function ClearancePage() {
 
   const [{ data: productsData }, { data: categoryList }] = await Promise.all([
     supabase
-      .from("products")
+      .from("storefront_products")
       .select(
         "*, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
       )

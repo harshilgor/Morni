@@ -65,7 +65,7 @@ export function SearchTypeahead({
           .or(`name.ilike.%${q}%,area.ilike.%${q}%`)
           .limit(4),
         supabase
-          .from("products")
+          .from("storefront_products")
           .select("id, title, price_aed, stores!inner(slug, name, is_active)")
           .eq("is_available", true)
           .eq("stores.is_active", true)

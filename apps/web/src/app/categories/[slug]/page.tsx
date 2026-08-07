@@ -29,7 +29,7 @@ export default async function CategoryPage({
     .filter(Boolean);
 
   let productsQuery = supabase
-    .from("products")
+    .from("storefront_products")
     .select(
       "*, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
     )

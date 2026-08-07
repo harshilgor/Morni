@@ -19,7 +19,7 @@ export default async function ForYouPage() {
       .neq("slug", "more")
       .order("sort_order"),
     supabase
-      .from("products")
+      .from("storefront_products")
       .select("*, stores!inner(slug, name, is_active)")
       .eq("is_available", true)
       .eq("stores.is_active", true)

@@ -39,7 +39,7 @@ export default async function HomePage({
         .eq("is_featured", true)
         .order("sort_order"),
       supabase
-        .from("products")
+        .from("storefront_products")
         .select("*, stores!inner(slug, name, is_active)")
         .eq("is_available", true)
         .eq("stores.is_active", true)
