@@ -17,7 +17,7 @@ export function StoreCard({ store }: { store: Store }) {
   return (
     <Link
       href={`/stores/${store.slug}`}
-      className="group block overflow-hidden rounded-2xl border border-line bg-surface transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-30px_rgba(28,20,24,0.45)]"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-30px_rgba(28,20,24,0.45)]"
     >
       <div
         className="relative h-40 bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
@@ -33,19 +33,22 @@ export function StoreCard({ store }: { store: Store }) {
           </span>
         ) : null}
       </div>
-      <div className="space-y-2 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-display text-xl text-ink">{store.name}</h3>
+      <div className="flex min-h-[190px] flex-1 flex-col p-5">
+        <div className="flex min-h-14 items-start justify-between gap-3">
+          <h3 className="line-clamp-2 font-display text-xl leading-snug text-ink">{store.name}</h3>
           <span className="shrink-0 rounded-full bg-[#fff0f4] px-2.5 py-1 text-xs text-accent-deep">
             {deliveryPromise(store.delivery_eta_minutes)}
           </span>
         </div>
-        <p className="text-sm text-muted">
+        <p
+          className="mt-2 truncate text-sm text-muted"
+          title={store.area + ", " + emirateLabel(store.emirate)}
+        >
           {store.area}, {emirateLabel(store.emirate)}
         </p>
-        {store.description ? (
-          <p className="line-clamp-2 text-sm text-ink/80">{store.description}</p>
-        ) : null}
+        <p className="mt-3 min-h-10 line-clamp-2 text-sm leading-5 text-ink/80">
+          {store.description || "A local boutique on Morni."}
+        </p>
       </div>
     </Link>
   );
