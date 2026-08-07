@@ -10,6 +10,7 @@ import { useAuthUser } from "@/lib/use-auth-user";
 import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
 import { SearchTypeahead } from "@/components/search-typeahead";
+import { SavedAddressPicker } from "@/components/saved-address-picker";
 
 function PinIcon({ className }: { className?: string }) {
   return (
@@ -157,7 +158,14 @@ export function SiteHeader() {
             </button>
 
             {locationOpen ? (
-              <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[min(92vw,22rem)] rounded-xl border border-line bg-surface p-4 text-ink shadow-[0_20px_50px_-20px_rgba(28,20,24,0.55)]">
+              <div className="absolute left-0 top-[calc(100%+8px)] z-50 max-h-[calc(100vh-5rem)] w-[min(92vw,22rem)] overflow-y-auto rounded-xl border border-line bg-surface p-4 text-ink shadow-[0_20px_50px_-20px_rgba(28,20,24,0.55)]">
+                <SavedAddressPicker
+                  userId={auth?.user.id}
+                  defaultLabel={auth?.firstName ?? "Home"}
+                  currentEmirate={emirate}
+                  currentArea={area}
+                  onSelect={(address) => applyLocation(address.emirate, address.area)}
+                />
                 <p className="font-display text-lg">Choose delivery location</p>
                 <p className="mt-1 text-xs text-muted">
                   Pick your emirate and type any area — not limited to the suggestions.

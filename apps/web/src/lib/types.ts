@@ -24,6 +24,22 @@ export type Profile = {
   role: UserRole;
 };
 
+export type DeliveryAddress = {
+  id: string;
+  user_id: string;
+  label: string;
+  emirate: UaeEmirate;
+  area: string;
+  street: string;
+  building: string | null;
+  apartment: string | null;
+  notes: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at?: string;
+};
+
+
 export type Store = {
   id: string;
   name: string;
