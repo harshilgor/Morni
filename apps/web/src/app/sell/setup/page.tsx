@@ -4,10 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  DeliverySetupFields,
-  type DeliverySetupValue,
-} from "@/components/delivery-setup-fields";
-import {
   emptyProductForm,
   ProductFormFields,
   type CategoryOption,
@@ -45,9 +41,8 @@ import {
 const STEPS = [
   { n: 1 as const, label: "Basics", title: "Boutique basics" },
   { n: 2 as const, label: "Brand", title: "Brand identity" },
-  { n: 3 as const, label: "Delivery", title: "Delivery setup" },
-  { n: 4 as const, label: "Product", title: "First product" },
-  { n: 5 as const, label: "Launch", title: "Review and launch" },
+  { n: 3 as const, label: "Product", title: "First product" },
+  { n: 4 as const, label: "Launch", title: "Review and launch" },
 ];
 
 type Step = (typeof STEPS)[number]["n"];
@@ -85,11 +80,6 @@ export default function SellSetupPage() {
     coverFile: null,
     logoUrl: null,
     coverUrl: null,
-  });
-  const [delivery, setDelivery] = useState<DeliverySetupValue>({
-    delivery_eta_minutes: "60",
-    opens_at: "10:00",
-    closes_at: "22:00",
   });
   const [productForm, setProductForm] = useState<ProductFormValue>(emptyProductForm());
 
@@ -157,11 +147,6 @@ export default function SellSetupPage() {
           coverFile: null,
           logoUrl: store.logo_url,
           coverUrl: store.cover_url,
-        });
-        setDelivery({
-          delivery_eta_minutes: String(store.delivery_eta_minutes ?? 60),
-          opens_at: store.opens_at?.slice(0, 5) ?? "10:00",
-          closes_at: store.closes_at?.slice(0, 5) ?? "22:00",
         });
         setStep(getResumeOnboardingStep(store) as Step);
         void loadProducts(store.id).then((loaded) => {
@@ -268,9 +253,9 @@ export default function SellSetupPage() {
         p_address: location.address.trim(),
         p_lat: location.lat,
         p_lng: location.lng,
-        p_delivery_eta_minutes: Number(delivery.delivery_eta_minutes) || 60,
-        p_opens_at: delivery.opens_at,
-        p_closes_at: delivery.closes_at,
+        p_delivery_eta_minutes: 60,
+        p_opens_at: "10:00",
+        p_closes_at: "22:00",
       });
 
       if (createError) throw new Error(createError.message);
@@ -367,48 +352,6 @@ export default function SellSetupPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  async function saveDelivery(e: FormEvent) {
-    e.preventDefault();
-    if (!store) {
-      setMessage("Create your boutique basics first.");
-      setStep(1);
-      return;
-    }
-
-    const eta = Number(delivery.delivery_eta_minutes);
-    if (!Number.isFinite(eta) || eta < 15 || eta > 180) {
-      setMessage("Delivery ETA must be between 15 and 180 minutes.");
-      return;
-    }
-    if (!delivery.opens_at || !delivery.closes_at) {
-      setMessage("Set opening and closing hours.");
-      return;
-    }
-
-    setBusy(true);
-    setMessage(null);
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("stores")
-      .update({
-        delivery_eta_minutes: eta,
-        opens_at: delivery.opens_at,
-        closes_at: delivery.closes_at,
-        onboarding_step: Math.max(store.onboarding_step ?? 3, 4),
-      })
-      .eq("id", store.id);
-
-    setBusy(false);
-    if (updateError) {
-      setMessage(updateError.message);
-      return;
-    }
-
-    await refresh();
-    flashSaved();
-    setStep(4);
   }
 
   async function saveFirstProduct(e: FormEvent) {
@@ -529,7 +472,7 @@ export default function SellSetupPage() {
       await loadProducts(store.id);
       await refresh();
       flashSaved();
-      setStep(5);
+      setStep(4);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Could not save product.");
     } finally {
@@ -582,12 +525,9 @@ export default function SellSetupPage() {
     address: location.address || store?.address || "",
     logoUrl: logoPreview || branding.logoUrl || store?.logo_url,
     coverUrl: coverPreview || branding.coverUrl || store?.cover_url,
-    deliveryEtaMinutes:
-      Number(delivery.delivery_eta_minutes) ||
-      store?.delivery_eta_minutes ||
-      60,
-    opensAt: delivery.opens_at || store?.opens_at?.slice(0, 5) || "10:00",
-    closesAt: delivery.closes_at || store?.closes_at?.slice(0, 5) || "22:00",
+    deliveryEtaMinutes: store?.delivery_eta_minutes || 60,
+    opensAt: store?.opens_at?.slice(0, 5) || "10:00",
+    closesAt: store?.closes_at?.slice(0, 5) || "22:00",
     product: {
       title: productForm.title || primaryProduct?.title || "First product",
       priceAed:
@@ -654,14 +594,14 @@ export default function SellSetupPage() {
 
   const current = STEPS.find((item) => item.n === step) ?? STEPS[0];
   const previewMode =
-    step >= 5 ? "launch" : step >= 4 ? "product" : ("store" as const);
+    step >= 4 ? "launch" : step >= 3 ? "product" : ("store" as const);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-accent-deep">
-            Store setup · Step {step} of 5 · about 8 minutes
+            Store setup · Step {step} of 4 · about 6 minutes
           </p>
           <h1 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
             {current.title}
@@ -671,10 +611,8 @@ export default function SellSetupPage() {
             {step === 2 &&
               "Add a logo and banner so your storefront looks complete."}
             {step === 3 &&
-              "Set a delivery promise and hours shoppers can rely on."}
-            {step === 4 &&
               "Create one sellable product with photos, sizes, and category."}
-            {step === 5 &&
+            {step === 4 &&
               "Check everything looks right, then launch when you are ready."}
           </p>
         </div>
@@ -685,7 +623,7 @@ export default function SellSetupPage() {
         ) : null}
       </div>
 
-      <div className="mt-6 grid gap-2 sm:grid-cols-5">
+      <div className="mt-6 grid gap-2 sm:grid-cols-4">
         {STEPS.map((item) => (
           <button
             key={item.n}
@@ -779,21 +717,6 @@ export default function SellSetupPage() {
 
           {step === 3 ? (
             <form
-              onSubmit={saveDelivery}
-              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-6"
-            >
-              <DeliverySetupFields value={delivery} onChange={setDelivery} />
-              {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
-              <WizardNav
-                busy={busy}
-                onBack={() => setStep(2)}
-                continueLabel="Save & continue"
-              />
-            </form>
-          ) : null}
-
-          {step === 4 ? (
-            <form
               onSubmit={saveFirstProduct}
               className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-6"
             >
@@ -807,13 +730,13 @@ export default function SellSetupPage() {
               {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
               <WizardNav
                 busy={busy}
-                onBack={() => setStep(3)}
+                onBack={() => setStep(2)}
                 continueLabel="Save product & continue"
               />
             </form>
           ) : null}
 
-          {step === 5 ? (
+          {step === 4 ? (
             <div className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-6">
               <h2 className="font-display text-2xl text-ink">Launch checklist</h2>
               <ul className="space-y-2">
@@ -852,7 +775,7 @@ export default function SellSetupPage() {
               <div className="flex flex-wrap gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setStep(4)}
+                  onClick={() => setStep(3)}
                   className="rounded-full border border-line px-5 py-2.5 text-sm text-ink"
                 >
                   Back

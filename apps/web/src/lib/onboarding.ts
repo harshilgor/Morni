@@ -18,11 +18,6 @@ export function getOnboardingChecklist(
       store?.address?.trim(),
   );
   const hasBrand = Boolean(store?.logo_url && store?.cover_url);
-  const hasDelivery = Boolean(
-    store?.opens_at &&
-      store?.closes_at &&
-      Number(store?.delivery_eta_minutes) >= 15,
-  );
   const completeProduct = products.find(
     (product) =>
       product.title?.trim() &&
@@ -46,22 +41,16 @@ export function getOnboardingChecklist(
       step: 2,
     },
     {
-      id: "delivery",
-      label: "Delivery time and opening hours",
-      done: hasDelivery,
-      step: 3,
-    },
-    {
       id: "product",
       label: "First complete product with photos",
       done: Boolean(completeProduct),
-      step: 4,
+      step: 3,
     },
     {
       id: "launch",
       label: "Review and launch storefront",
       done: Boolean(store?.onboarding_completed_at) && Boolean(store?.is_active),
-      step: 5,
+      step: 4,
     },
   ];
 }

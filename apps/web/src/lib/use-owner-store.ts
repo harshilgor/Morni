@@ -14,8 +14,11 @@ export function isOnboardingComplete(store: Store | null | undefined) {
 
 export function getResumeOnboardingStep(store: Store | null | undefined) {
   if (!store) return 1;
-  if (isOnboardingComplete(store)) return 5;
-  return Math.min(5, Math.max(1, store.onboarding_step || 1));
+  if (isOnboardingComplete(store)) return 4;
+  const persistedStep = store.onboarding_step || 1;
+  if (persistedStep >= 5) return 4;
+  if (persistedStep >= 3) return 3;
+  return persistedStep;
 }
 
 export function useOwnerStore() {
