@@ -55,6 +55,8 @@ type Step = (typeof STEPS)[number]["n"];
 export default function SellSetupPage() {
   const router = useRouter();
   const { store, loading, error, refresh } = useOwnerStore();
+  const [creatingNew, setCreatingNew] = useState(false);
+  const [modeReady, setModeReady] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -117,9 +119,24 @@ export default function SellSetupPage() {
   }, []);
 
   useEffect(() => {
-    if (loading || hydrated) return;
+    const syncMode = () => {
+      const search = new URLSearchParams(window.location.search);
+      setCreatingNew(search.get("new") === "1");
+      setModeReady(true);
+    };
+    if (typeof queueMicrotask === "function") queueMicrotask(syncMode);
+    else window.setTimeout(syncMode, 0);
+  }, []);
+
+  useEffect(() => {
+    if (loading || !modeReady || hydrated) return;
 
     const sync = () => {
+      if (creatingNew) {
+        setHydrated(true);
+        return;
+      }
+
       if (store && isOnboardingComplete(store) && store.is_active) {
         router.replace("/portal");
         return;
@@ -173,7 +190,7 @@ export default function SellSetupPage() {
 
     if (typeof queueMicrotask === "function") queueMicrotask(sync);
     else window.setTimeout(sync, 0);
-  }, [loading, store, hydrated, router]);
+  }, [loading, store, hydrated, router, creatingNew, modeReady]);
 
   async function loadProducts(storeId: string) {
     const supabase = createClient();
@@ -216,7 +233,7 @@ export default function SellSetupPage() {
     const supabase = createClient();
 
     try {
-      if (store) {
+      if (store && !creatingNew) {
         const { error: updateError } = await supabase
           .from("stores")
           .update({
@@ -261,7 +278,9 @@ export default function SellSetupPage() {
       const created = (Array.isArray(data) ? data[0] : data) as Store | null;
       if (!created) throw new Error("Could not create store.");
 
-      await refresh();
+      await refresh(created.id);
+      setCreatingNew(false);
+      router.replace("/sell/setup");
       flashSaved();
       setStep(2);
     } catch (err) {
@@ -598,7 +617,7 @@ export default function SellSetupPage() {
     );
   }
 
-  if (loading || !hydrated) {
+  if (loading || !modeReady || !hydrated) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-muted">Loading setup…</div>
     );
@@ -732,7 +751,7 @@ export default function SellSetupPage() {
               <WizardNav
                 busy={busy}
                 canBack={false}
-                continueLabel={store ? "Save & continue" : "Create boutique"}
+                continueLabel={store && !creatingNew ? "Save & continue" : "Create boutique"}
               />
             </form>
           ) : null}

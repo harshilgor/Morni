@@ -18,7 +18,7 @@ const links = [
 export function PortalNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { store } = useOwnerStore();
+  const { store, stores, loading, selectStore } = useOwnerStore();
 
   async function signOut() {
     const supabase = createClient();
@@ -33,8 +33,24 @@ export function PortalNav() {
           Morni Portal
         </Link>
         <p className="mt-1 text-xs text-muted">Store owner</p>
-        {store ? (
-          <p className="mt-2 text-sm font-medium text-ink">{store.name}</p>
+        {stores.length > 0 ? (
+          <label className="mt-4 block text-xs font-medium text-muted">
+            Active store
+            <select
+              value={store?.id ?? ""}
+              onChange={(event) => selectStore(event.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-line bg-background px-2.5 py-2 text-sm font-medium text-ink outline-none focus:border-accent"
+              aria-label="Active store"
+            >
+              {stores.map((ownerStore) => (
+                <option key={ownerStore.id} value={ownerStore.id}>
+                  {ownerStore.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : !loading ? (
+          <p className="mt-2 text-sm text-muted">No stores yet</p>
         ) : null}
       </div>
       <nav className="flex flex-wrap gap-1 px-3 pb-4 lg:flex-col">
@@ -63,6 +79,12 @@ export function PortalNav() {
           className="rounded-xl px-3 py-2 text-sm text-accent-deep hover:bg-background"
         >
           Browse Morni
+        </Link>
+        <Link
+          href="/sell/setup?new=1"
+          className="rounded-xl px-3 py-2 text-sm text-accent-deep hover:bg-background"
+        >
+          Add a new store
         </Link>
         {store ? (
           isOnboardingComplete(store) && store.is_active ? (

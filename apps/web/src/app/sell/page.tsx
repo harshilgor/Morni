@@ -49,6 +49,8 @@ export default function SellPage() {
       ? "Go to store portal"
       : "Continue store setup";
 
+  const additionalStoreHref = auth?.hasStore ? "/sell/setup?new=1" : null;
+
   return (
     <div>
       <section className="relative overflow-hidden border-b border-line">
@@ -78,6 +80,14 @@ export default function SellPage() {
               >
                 Browse as a shopper
               </Link>
+              {additionalStoreHref ? (
+                <Link
+                  href={additionalStoreHref}
+                  className="rounded-full border border-line bg-surface px-6 py-3 text-sm text-ink"
+                >
+                  Add another store
+                </Link>
+              ) : null}
             </div>
           </div>
           <div className="animate-rise-delay relative min-h-[260px] overflow-hidden rounded-[2rem] bg-sand">
@@ -131,6 +141,14 @@ export default function SellPage() {
           >
             {loading ? "Loading…" : ctaLabel}
           </Link>
+          {additionalStoreHref ? (
+            <Link
+              href={additionalStoreHref}
+              className="mt-3 inline-flex rounded-full border border-line bg-surface px-6 py-3 text-sm text-ink"
+            >
+              Add another store
+            </Link>
+          ) : null}
         </div>
       </section>
     </div>
