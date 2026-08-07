@@ -55,7 +55,7 @@ const SLIDES: Slide[] = [
     eyebrow: "Last chance",
     title: "Clearance sale",
     subtitle: "Final markdowns before they’re gone",
-    href: "/categories",
+    href: "/clearance",
     image:
       "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1400&q=80",
     accent: "#f4a261",
