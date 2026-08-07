@@ -25,7 +25,7 @@ const SLIDES: Slide[] = [
     eyebrow: "Budget picks",
     title: "Under 99 DHS",
     subtitle: "Looks that don’t break the budget",
-    href: "/categories",
+    href: "/under-99",
     image:
       "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1400&q=80",
     accent: "#f5d76e",

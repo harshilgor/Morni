@@ -166,7 +166,7 @@ export default async function HomePage({
         title="Under AED 99"
         subtitle="Budget-friendly picks with same-hour delivery."
         products={under99}
-        href="/search?max=99"
+        href="/under-99"
       />
 
       <HomeCollections />
