@@ -398,7 +398,6 @@ export default function ProductPage() {
                     <span className="ml-2 text-muted">· {selectedSize}</span>
                   ) : null}
                 </p>
-                <span className="border-b border-ink pb-0.5 text-xs text-ink">Size guide</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {availableSizes.map((size) => (
