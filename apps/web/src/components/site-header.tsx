@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart";
-import { EMIRATES } from "@/lib/format";
-import { UAE_AREAS, useLocation } from "@/lib/location";
+import { useLocation } from "@/lib/location";
 import { useAuthUser } from "@/lib/use-auth-user";
 import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
@@ -103,8 +102,6 @@ export function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [occasionsOpen, setOccasionsOpen] = useState(false);
-  const [draftEmirate, setDraftEmirate] = useState<UaeEmirate>(emirate);
-  const [draftArea, setDraftArea] = useState(area);
   const accountRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
@@ -148,21 +145,7 @@ export function SiteHeader() {
   }
 
   function toggleLocationPanel() {
-    const nextOpen = !locationOpen;
-    if (nextOpen) {
-      setDraftEmirate(emirate);
-      setDraftArea(area);
-    }
-    setLocationOpen(nextOpen);
-  }
-
-  function changeDraftEmirate(nextEmirate: UaeEmirate) {
-    setDraftEmirate(nextEmirate);
-    setDraftArea((current) => {
-      const suggestions = UAE_AREAS[nextEmirate] ?? [];
-      if (suggestions.includes(current) || current.trim()) return current;
-      return suggestions[0] ?? "";
-    });
+    setLocationOpen((current) => !current);
   }
 
   function applyLocation(nextEmirate: UaeEmirate, nextArea: string) {
@@ -208,7 +191,6 @@ export function SiteHeader() {
     router.refresh();
   }
 
-  const areas = UAE_AREAS[draftEmirate] ?? [];
   const firstName = auth?.firstName;
   const isStoreOwner = auth?.hasStore ?? false;
 
@@ -573,47 +555,6 @@ export function SiteHeader() {
                 onNavigate={() => setLocationOpen(false)}
               />
 
-              <section className="mt-5 border-t border-line pt-5">
-                <p className="text-sm font-semibold text-ink">Deliver to a different area</p>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  You can still browse local stores without saving an address.
-                </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <label className="space-y-1.5 text-sm">
-                    <span className="text-muted">Emirate</span>
-                    <select
-                      className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-                      value={draftEmirate}
-                      onChange={(event) => changeDraftEmirate(event.target.value as UaeEmirate)}
-                    >
-                      {EMIRATES.map((item) => (
-                        <option key={item.value} value={item.value}>{item.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="space-y-1.5 text-sm">
-                    <span className="text-muted">Area / neighborhood</span>
-                    <input
-                      list="morni-delivery-areas"
-                      className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-                      value={draftArea}
-                      onChange={(event) => setDraftArea(event.target.value)}
-                      placeholder="Dubai Marina"
-                    />
-                    <datalist id="morni-delivery-areas">
-                      {areas.map((item) => <option key={item} value={item} />)}
-                    </datalist>
-                  </label>
-                </div>
-                <button
-                  type="button"
-                  disabled={!draftArea.trim()}
-                  onClick={() => applyLocation(draftEmirate, draftArea.trim())}
-                  className="mt-4 w-full rounded-full bg-ink py-3 text-sm font-semibold text-white transition hover:bg-accent-deep disabled:opacity-50"
-                >
-                  Use this delivery area
-                </button>
-              </section>
             </div>
           </div>
         </div>
