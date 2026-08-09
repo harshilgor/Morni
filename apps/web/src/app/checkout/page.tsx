@@ -18,14 +18,14 @@ import { ProductRail, type RailProduct } from "@/components/product-rail";
 function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   return {
     label: address.label,
-    phone: address.phone ?? "",
+    phone: "phone" in address && typeof address.phone === "string" ? address.phone : "",
     emirate: address.emirate,
     area: address.area,
     street: address.street,
     building: address.building ?? "",
     apartment: address.apartment ?? "",
     notes: address.notes ?? "",
-  };
+  } as DeliveryAddressDraft;
 }
 
 export default function CheckoutPage() {
@@ -133,7 +133,6 @@ export default function CheckoutPage() {
     const supabase = createClient();
     const payload = {
       label: form.label.trim(),
-      phone: form.phone.trim() || null,
       emirate: form.emirate,
       area: form.area.trim(),
       street: form.street.trim(),
@@ -202,7 +201,6 @@ export default function CheckoutPage() {
         p_delivery_building: form.building.trim() || null,
         p_delivery_apartment: form.apartment.trim() || null,
         p_delivery_notes: form.notes.trim() || null,
-        p_delivery_phone: form.phone.trim(),
         p_delivery_eta_minutes: store?.delivery_eta_minutes ?? 60,
         p_items: items.map((item) => ({
           product_id: item.productId,
@@ -347,9 +345,6 @@ export default function CheckoutPage() {
                   <span className="mt-1 block text-xs leading-relaxed text-muted">
                     {address.street}, {address.area}
                   </span>
-                  {address.phone ? (
-                    <span className="mt-1 block text-xs text-muted">{address.phone}</span>
-                  ) : null}
                 </button>
               ))}
             </div>
