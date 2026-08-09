@@ -132,7 +132,8 @@ export default async function StorePage({
   ];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="min-h-screen bg-[#f8f7f4]">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <nav className="flex items-center gap-1.5 text-xs text-muted">
         <Link href="/" className="hover:text-ink">
           Home
@@ -265,6 +266,7 @@ export default async function StorePage({
         ) : (
           <ProductBrowser products={browsable} ratings={ratings} />
         )}
+      </div>
       </div>
     </div>
   );
