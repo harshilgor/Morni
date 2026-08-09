@@ -5,7 +5,7 @@ const PRICE_CHIPS = [
   { label: "Under AED 199", href: "/search?max=199" },
   { label: "Luxury picks", href: "/search?min=500" },
   { label: "New in", href: "/search?sort=new" },
-  { label: "Best rated", href: "/#top-rated" },
+  { label: "Best rated", href: "/search?sort=rated" },
   { label: "In stock", href: "/search?instock=1" },
 ];
 

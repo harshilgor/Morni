@@ -33,7 +33,7 @@ export default function CartPage() {
                 item.lineId ??
                 cartLineId(item.productId, item.size, item.variantId)
               }
-              className="flex gap-4 rounded-2xl border border-line bg-surface p-4"
+              className="flex gap-3 rounded-2xl border border-line bg-surface p-3 sm:gap-4 sm:p-4"
             >
               <div className="h-24 w-20 overflow-hidden rounded-xl bg-sand">
                 {item.imageUrl ? (
@@ -74,7 +74,7 @@ export default function CartPage() {
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    className="h-8 w-8 rounded-full border border-line"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-lg"
                     onClick={() =>
                       setQuantity(
                         item.lineId ??
@@ -88,7 +88,7 @@ export default function CartPage() {
                   <span className="text-sm">{item.quantity}</span>
                   <button
                     type="button"
-                    className="h-8 w-8 rounded-full border border-line"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-lg"
                     onClick={() =>
                       setQuantity(
                         item.lineId ??

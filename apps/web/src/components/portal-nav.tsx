@@ -53,7 +53,7 @@ export function PortalNav() {
           <p className="mt-2 text-sm text-muted">No stores yet</p>
         ) : null}
       </div>
-      <nav className="flex flex-wrap gap-1 px-3 pb-4 lg:flex-col">
+      <nav className="flex gap-1 overflow-x-auto px-3 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 lg:flex-col lg:overflow-visible">
         {links.map((link) => {
           const active =
             pathname === link.href ||

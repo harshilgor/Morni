@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/cart";
-import { deliveryPromise, formatAed } from "@/lib/format";
+import { formatAed } from "@/lib/format";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
 import type { Product, ProductReview, ProductVariant, Store } from "@/lib/types";
 import { WishlistToggle } from "@/components/wishlist-toggle";
@@ -20,6 +21,54 @@ type StoreCampaign = {
   ends_at: string | null;
 };
 
+type RelatedProduct = Product & {
+  stores: { slug: string; name: string };
+};
+
+function RelatedProductCard({
+  product,
+  storeSlug,
+}: {
+  product: Product;
+  storeSlug: string;
+}) {
+  const image = product.image_urls?.[0];
+
+  return (
+    <Link
+      href={`/stores/${storeSlug}/products/${product.id}`}
+      className="group relative block transition duration-300 hover:-translate-y-1"
+    >
+      <div className="relative aspect-[4/5] overflow-hidden bg-sand">
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt={product.title}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+          />
+        ) : null}
+        <div className="absolute right-2.5 top-2.5">
+          <WishlistToggle productId={product.id} size="sm" />
+        </div>
+      </div>
+      <div className="pt-3">
+        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-ink">
+          {product.title}
+        </h3>
+        <div className="mt-1.5 flex items-center gap-2 text-sm font-medium text-ink">
+          <span>{formatAed(product.price_aed)}</span>
+          {product.compare_at_price_aed ? (
+            <span className="text-xs font-normal text-muted line-through">
+              {formatAed(product.compare_at_price_aed)}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 export default function ProductPage() {
   const params = useParams<{ slug: string; productId: string }>();
   const router = useRouter();
@@ -30,6 +79,7 @@ export default function ProductPage() {
   const [store, setStore] = useState<Store | null>(null);
   const [campaign, setCampaign] = useState<StoreCampaign | null>(null);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
   const [existingReview, setExistingReview] = useState<ProductReview | null>(null);
   const [reviewOrderId, setReviewOrderId] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -82,28 +132,29 @@ export default function ProductPage() {
 
   useEffect(() => {
     const supabase = createClient();
+    let active = true;
     (async () => {
-      const { data: storeData } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("slug", params.slug)
-        .maybeSingle();
-      if (!storeData) return;
-      setStore(storeData as Store);
-      const { data: campaignRows } = await supabase.rpc("active_store_campaign", {
-        p_store_id: storeData.id,
-      });
-      setCampaign(((campaignRows ?? []) as StoreCampaign[])[0] ?? null);
-      const { data: productData } = await supabase
-        .from("storefront_products")
-        .select("*, product_variants(*)")
-        .eq("id", params.productId)
-        .eq("store_id", storeData.id)
-        .maybeSingle();
-      if (!productData) {
+      const [{ data: storeData }, { data: productData }] = await Promise.all([
+        supabase
+          .from("stores")
+          .select("*")
+          .eq("slug", params.slug)
+          .maybeSingle(),
+        supabase
+          .from("storefront_products")
+          .select("*, product_variants(*)")
+          .eq("id", params.productId)
+          .maybeSingle(),
+      ]);
+
+      if (!active) return;
+      if (!storeData || !productData || productData.store_id !== storeData.id) {
+        setStore(null);
         setProduct(null);
         return;
       }
+
+      setStore(storeData as Store);
       const row = productData as Product & {
         product_variants?: ProductVariant[] | null;
       };
@@ -115,8 +166,45 @@ export default function ProductPage() {
       setSelectedVariantId(nextVariants[0]?.id ?? null);
       setSelectedSize(null);
       setActiveImage(0);
-      await loadReviews(row.id);
+
+      // Campaigns, reviews, and related items should not hold the core product
+      // screen behind a client-side waterfall.
+      const campaignRequest = supabase.rpc("active_store_campaign", {
+        p_store_id: row.store_id,
+      });
+      const relatedRequest = supabase
+        .from("storefront_products")
+        .select("*, stores!inner(slug, name, is_active)")
+        .eq("is_available", true)
+        .eq("stores.is_active", true)
+        .neq("id", row.id)
+        .limit(24);
+
+      void campaignRequest.then(({ data: campaignRows }) => {
+        if (active) {
+          setCampaign(((campaignRows ?? []) as StoreCampaign[])[0] ?? null);
+        }
+      });
+      void relatedRequest.then(({ data: relatedRows }) => {
+        if (!active) return;
+        const related = (relatedRows as RelatedProduct[] | null) ?? [];
+        setRelatedProducts(
+          [...related]
+            .sort(
+              (a, b) =>
+                Number(b.category_id === row.category_id) -
+                  Number(a.category_id === row.category_id) ||
+                Number(b.store_id === row.store_id) - Number(a.store_id === row.store_id),
+            )
+            .slice(0, 5),
+        );
+      });
+      void loadReviews(row.id);
     })();
+
+    return () => {
+      active = false;
+    };
   }, [params.slug, params.productId]);
 
   const selectedVariant = useMemo(
@@ -185,9 +273,30 @@ export default function ProductPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="grid gap-10 lg:grid-cols-2">
-        <div className="space-y-3">
-          <div className="aspect-[4/5] overflow-hidden rounded-[2rem] bg-sand">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(22rem,0.9fr)]">
+        <div className="flex flex-col gap-3 lg:flex-row">
+          {gallery.length > 1 ? (
+            <div className="order-2 flex gap-2 overflow-x-auto pb-1 lg:order-1 lg:max-h-[46rem] lg:w-20 lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:pb-0">
+              {gallery.map((url, index) => (
+                <button
+                  key={`${url}-${index}`}
+                  type="button"
+                  onClick={() => setActiveImage(index)}
+                  aria-label={`View image ${index + 1}`}
+                  aria-pressed={activeImage === index}
+                  className={`h-24 w-[4.75rem] shrink-0 overflow-hidden border transition lg:h-28 lg:w-full ${
+                    activeImage === index
+                      ? "border-ink opacity-100"
+                      : "border-line opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="order-1 aspect-[4/5] w-full overflow-hidden bg-sand lg:order-2">
             {gallery[activeImage] ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -197,28 +306,11 @@ export default function ProductPage() {
               />
             ) : null}
           </div>
-          {gallery.length > 1 ? (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {gallery.map((url, index) => (
-                <button
-                  key={`${url}-${index}`}
-                  type="button"
-                  onClick={() => setActiveImage(index)}
-                  className={`h-20 w-16 shrink-0 overflow-hidden rounded-xl border ${
-                    activeImage === index ? "border-ink" : "border-line"
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="h-full w-full object-cover" />
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         <div className="flex flex-col justify-center space-y-5">
           <p className="text-xs uppercase tracking-[0.18em] text-accent-deep">
-            {store.name} · {deliveryPromise(store.delivery_eta_minutes)}
+            {store.name}
           </p>
           {campaign ? (
             <div className="border border-accent-deep/20 bg-[#fff4f6] px-4 py-3">
@@ -282,7 +374,7 @@ export default function ProductPage() {
                       className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
                         selected
                           ? "border-ink bg-ink text-white"
-                          : "border-line bg-surface text-ink hover:border-ink/40"
+                          : "border-[#706a66] bg-surface text-ink hover:border-ink"
                       } ${variant.stock <= 0 ? "opacity-40" : ""}`}
                     >
                       <span
@@ -306,7 +398,7 @@ export default function ProductPage() {
                     <span className="ml-2 text-muted">· {selectedSize}</span>
                   ) : null}
                 </p>
-                <span className="text-xs text-muted">Available sizes</span>
+                <span className="border-b border-ink pb-0.5 text-xs text-ink">Size guide</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {availableSizes.map((size) => (
@@ -318,10 +410,10 @@ export default function ProductPage() {
                       setAdded(false);
                     }}
                     aria-pressed={selectedSize === size}
-                    className={`min-w-12 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                    className={`min-w-12 border px-4 py-2.5 text-sm font-medium transition ${
                       selectedSize === size
                         ? "border-ink bg-ink text-white"
-                        : "border-line bg-surface text-ink hover:border-ink/40"
+                        : "border-[#706a66] bg-surface text-ink hover:border-ink"
                     }`}
                   >
                     {size}
@@ -379,6 +471,34 @@ export default function ProductPage() {
         </div>
       </div>
 
+      {relatedProducts.length > 0 ? (
+        <section className="mt-16 border-t border-line pt-10">
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-deep">
+                Curated for you
+              </p>
+              <h2 className="mt-1 font-display text-3xl text-ink">You may also like</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push(`/stores/${store.slug}`)}
+              className="border-b border-ink pb-0.5 text-sm font-medium text-ink"
+            >
+              View boutique
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
+            {relatedProducts.map((relatedProduct) => (
+              <RelatedProductCard
+                key={relatedProduct.id}
+                product={relatedProduct}
+                storeSlug={relatedProduct.stores.slug}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
       <ProductReviewsSection
         reviews={reviews}
         avgRating={ratingSummary?.avgRating ?? null}

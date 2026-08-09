@@ -47,7 +47,7 @@ export function ProductRail({
         {products.map((product) => (
           <div
             key={product.id}
-            className="w-[min(58vw,220px)] shrink-0 snap-start sm:w-[230px]"
+            className="w-[min(64vw,240px)] shrink-0 snap-start sm:w-[230px]"
           >
             <ProductCard product={product} href={product.href} rating={product.rating} />
           </div>

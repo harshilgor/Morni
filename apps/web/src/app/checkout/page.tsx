@@ -189,7 +189,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1.2fr_0.8fr]">
-      <form onSubmit={onSubmit} className="space-y-5 rounded-[1.5rem] border border-line bg-surface p-6">
+      <form onSubmit={onSubmit} className="space-y-5 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6">
         <div>
           <h1 className="font-display text-3xl text-ink">Checkout</h1>
           <p className="mt-1 text-sm text-muted">
@@ -305,7 +305,7 @@ export default function CheckoutPage() {
         </button>
       </form>
 
-      <aside className="h-fit rounded-[1.5rem] border border-line bg-surface p-6">
+      <aside className="h-fit rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6">
         <h2 className="font-display text-2xl">Order summary</h2>
         <ul className="mt-4 space-y-3 text-sm">
           {items.map((item) => (

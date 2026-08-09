@@ -521,17 +521,19 @@ export default function SellSetupPage() {
     primaryProduct?.image_urls?.[0] ??
     null;
 
+  // A new-store flow must never borrow display data from the currently selected store.
+  const previewStore = creatingNew ? null : store;
   const previewData = {
-    name: name || store?.name || "Your boutique",
-    description: description || store?.description || "",
+    name: name || previewStore?.name || "Your boutique",
+    description: description || previewStore?.description || "",
     emirate: location.emirate,
-    area: location.area || store?.area || "",
-    address: location.address || store?.address || "",
-    logoUrl: logoPreview || branding.logoUrl || store?.logo_url,
-    coverUrl: coverPreview || branding.coverUrl || store?.cover_url,
-    deliveryEtaMinutes: store?.delivery_eta_minutes || 60,
-    opensAt: store?.opens_at?.slice(0, 5) || "10:00",
-    closesAt: store?.closes_at?.slice(0, 5) || "22:00",
+    area: location.area || previewStore?.area || "",
+    address: location.address || previewStore?.address || "",
+    logoUrl: logoPreview || branding.logoUrl || previewStore?.logo_url,
+    coverUrl: coverPreview || branding.coverUrl || previewStore?.cover_url,
+    deliveryEtaMinutes: previewStore?.delivery_eta_minutes || 60,
+    opensAt: previewStore?.opens_at?.slice(0, 5) || "10:00",
+    closesAt: previewStore?.closes_at?.slice(0, 5) || "22:00",
     product: {
       title: productForm.title || primaryProduct?.title || "First product",
       priceAed:
@@ -662,7 +664,7 @@ export default function SellSetupPage() {
           {step === 1 ? (
             <form
               onSubmit={saveBasics}
-              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-6"
+              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6"
             >
               <label className="block space-y-1.5 text-sm">
                 <span className="text-muted">
@@ -701,7 +703,7 @@ export default function SellSetupPage() {
           {step === 2 ? (
             <form
               onSubmit={saveBrand}
-              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-6"
+              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6"
             >
               <StoreBrandingFields
                 value={branding}
@@ -722,7 +724,7 @@ export default function SellSetupPage() {
           {step === 3 ? (
             <form
               onSubmit={saveFirstProduct}
-              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-6"
+              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6"
             >
               <ProductFormFields
                 value={productForm}
@@ -743,7 +745,7 @@ export default function SellSetupPage() {
           ) : null}
 
           {step === 4 ? (
-            <div className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-6">
+            <div className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6">
               <h2 className="font-display text-2xl text-ink">Launch checklist</h2>
               <ul className="space-y-2">
                 {checklist.map((item) => (

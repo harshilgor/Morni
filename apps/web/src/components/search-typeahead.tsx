@@ -14,6 +14,14 @@ type Suggestion = {
   href: string;
 };
 
+function cleanSearchTerm(value: string) {
+  return value.replace(/[,%().]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function searchHref(value: string) {
+  return `/search?${new URLSearchParams({ q: value.trim() }).toString()}`;
+}
+
 function SearchIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -49,7 +57,7 @@ export function SearchTypeahead({
   }, []);
 
   useEffect(() => {
-    const q = query.trim();
+    const q = cleanSearchTerm(query);
     if (q.length < 2) return;
 
     let cancelled = false;
@@ -132,9 +140,12 @@ export function SearchTypeahead({
   function onSearch(e: FormEvent) {
     e.preventDefault();
     const q = query.trim();
-    if (!q) return;
+    if (!q) {
+      router.push("/search");
+      return;
+    }
     setOpen(false);
-    router.push(`/search?q=${encodeURIComponent(q)}`);
+    router.push(searchHref(q));
   }
 
   return (
@@ -201,7 +212,7 @@ export function SearchTypeahead({
               type="button"
               onClick={() => {
                 setOpen(false);
-                router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+                router.push(searchHref(query));
               }}
               className="w-full border-t border-line px-4 py-2.5 text-left text-sm text-accent-deep hover:bg-background"
             >

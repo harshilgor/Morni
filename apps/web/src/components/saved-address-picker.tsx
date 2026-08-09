@@ -1,47 +1,66 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  DeliveryAddressFields,
-  EMPTY_DELIVERY_ADDRESS,
-  type DeliveryAddressDraft,
-} from "@/components/delivery-address-fields";
 import type { DeliveryAddress, UaeEmirate } from "@/lib/types";
 
-type EditableAddress = DeliveryAddressDraft & { id?: string; isDefault: boolean };
-
-function toDraft(address: DeliveryAddress): EditableAddress {
-  return {
-    id: address.id,
-    label: address.label,
-    emirate: address.emirate,
-    area: address.area,
-    street: address.street,
-    building: address.building ?? "",
-    apartment: address.apartment ?? "",
-    notes: address.notes ?? "",
-    isDefault: address.is_default,
-  };
+function AddressCard({
+  address,
+  selected,
+  onSelect,
+}: {
+  address: DeliveryAddress;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-ink/30 ${
+        selected
+          ? "border-ink bg-sand"
+          : "border-line bg-background hover:border-ink/35 hover:bg-sand/40"
+      }`}
+    >
+      <span className="flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-ink">{address.label}</span>
+        {address.is_default ? (
+          <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white">
+            Default
+          </span>
+        ) : null}
+      </span>
+      <span className="mt-2 block text-xs leading-relaxed text-muted">
+        {address.street}
+        {address.building ? `, ${address.building}` : ""}
+        {address.apartment ? `, ${address.apartment}` : ""}
+        <br />
+        {address.area}, {address.emirate.replace("_", " ")}
+      </span>
+      {selected ? (
+        <span className="mt-2 block text-xs font-medium text-ink">Delivering here</span>
+      ) : null}
+    </button>
+  );
 }
 
 export function SavedAddressPicker({
   userId,
-  defaultLabel,
   currentEmirate,
   currentArea,
   onSelect,
+  onNavigate,
 }: {
   userId: string | undefined;
-  defaultLabel: string;
   currentEmirate: UaeEmirate;
   currentArea: string;
   onSelect: (address: DeliveryAddress) => void;
+  onNavigate?: () => void;
 }) {
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editor, setEditor] = useState<EditableAddress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadAddresses = useCallback(async () => {
@@ -50,6 +69,7 @@ export function SavedAddressPicker({
       return;
     }
     setLoading(true);
+    setError(null);
     const supabase = createClient();
     const { data, error: loadError } = await supabase
       .from("addresses")
@@ -68,200 +88,84 @@ export function SavedAddressPicker({
     return () => window.clearTimeout(timeout);
   }, [loadAddresses]);
 
-  if (!userId) return null;
-
-  const editingDefault = Boolean(
-    editor?.id && addresses.find((address) => address.id === editor.id)?.is_default,
-  );
-
-  function startNew() {
-    setError(null);
-    setEditor({
-      ...EMPTY_DELIVERY_ADDRESS,
-      label: defaultLabel || "Home",
-      emirate: currentEmirate,
-      area: currentArea,
-      isDefault: addresses.length === 0,
-    });
-  }
-
-  async function saveAddress() {
-    if (!editor || !userId) return;
-    if (!editor.label.trim() || !editor.area.trim() || !editor.street.trim()) {
-      setError("Add a name, area, and street address.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    const supabase = createClient();
-    const payload = {
-      label: editor.label.trim(),
-      emirate: editor.emirate,
-      area: editor.area.trim(),
-      street: editor.street.trim(),
-      building: editor.building.trim() || null,
-      apartment: editor.apartment.trim() || null,
-      notes: editor.notes.trim() || null,
-      is_default: editor.isDefault,
-    };
-    const request = editor.id
-      ? supabase.from("addresses").update(payload).eq("id", editor.id)
-      : supabase.from("addresses").insert({ user_id: userId, ...payload });
-    const { error: saveError } = await request;
-    if (saveError) setError(saveError.message);
-    else {
-      setEditor(null);
-      await loadAddresses();
-    }
-    setSaving(false);
-  }
-
-  async function makeDefault(address: DeliveryAddress) {
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("addresses")
-      .update({ is_default: true })
-      .eq("id", address.id);
-    if (updateError) setError(updateError.message);
-    else await loadAddresses();
-  }
-
-  async function removeAddress(address: DeliveryAddress) {
-    const supabase = createClient();
-    const { error: deleteError } = await supabase
-      .from("addresses")
-      .delete()
-      .eq("id", address.id);
-    if (deleteError) setError(deleteError.message);
-    else await loadAddresses();
+  if (!userId) {
+    return (
+      <section className="rounded-xl border border-line bg-background p-4">
+        <p className="text-sm font-semibold text-ink">Save delivery addresses</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          Sign in to keep home, work, and gift addresses ready for checkout.
+        </p>
+        <Link
+          href="/auth?next=/addresses"
+          onClick={onNavigate}
+          className="mt-3 inline-flex text-sm font-semibold text-accent-deep hover:underline"
+        >
+          Sign in to manage addresses
+        </Link>
+      </section>
+    );
   }
 
   return (
-    <div className="border-b border-line pb-4">
-      <div className="flex items-center justify-between gap-3">
+    <section>
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-display text-lg">Saved addresses</p>
-          <p className="mt-0.5 text-xs text-muted">Choose who this delivery is for.</p>
+          <p className="font-display text-xl text-ink">Choose your location</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            Delivery options and local stores update for the address you choose.
+          </p>
         </div>
-        {!editor ? (
-          <button
-            type="button"
-            onClick={startNew}
-            className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink hover:border-ink/40"
-          >
-            Add address
-          </button>
-        ) : null}
+        <Link
+          href="/addresses?new=1"
+          onClick={onNavigate}
+          className="shrink-0 text-sm font-semibold text-accent-deep hover:underline"
+        >
+          Add new
+        </Link>
       </div>
 
-      {loading ? <p className="mt-3 text-xs text-muted">Loading addresses...</p> : null}
-      {!loading && addresses.length === 0 && !editor ? (
-        <p className="mt-3 text-sm text-muted">No saved addresses yet.</p>
+      {loading ? <p className="mt-4 text-sm text-muted">Loading your addresses...</p> : null}
+      {!loading && addresses.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed border-line bg-background p-4">
+          <p className="text-sm font-medium text-ink">No saved addresses yet</p>
+          <p className="mt-1 text-xs text-muted">Add one to make delivery faster next time.</p>
+          <Link
+            href="/addresses?new=1"
+            onClick={onNavigate}
+            className="mt-3 inline-flex text-sm font-semibold text-accent-deep hover:underline"
+          >
+            Add an address
+          </Link>
+        </div>
+      ) : null}
+      {!loading && addresses.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          {addresses.slice(0, 3).map((address) => (
+            <AddressCard
+              key={address.id}
+              address={address}
+              selected={address.emirate === currentEmirate && address.area === currentArea}
+              onSelect={() => onSelect(address)}
+            />
+          ))}
+        </div>
       ) : null}
 
-      {!editor ? (
-        <div className="mt-3 space-y-2">
-          {addresses.map((address) => {
-            const selected =
-              address.emirate === currentEmirate && address.area === currentArea;
-            return (
-              <div
-                key={address.id}
-                className={`rounded-xl border p-3 ${selected ? "border-accent bg-[#fff0f4]" : "border-line bg-background"}`}
-              >
-                <div className="flex items-start gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onSelect(address)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-                      {address.label}
-                      {address.is_default ? (
-                        <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-white">
-                          Default
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="mt-1 block text-xs leading-relaxed text-muted">
-                      {address.street}, {address.area}
-                    </span>
-                  </button>
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setEditor(toDraft(address))}
-                      className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface hover:text-ink"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeAddress(address)}
-                      className="rounded-lg px-2 py-1 text-xs text-accent-deep hover:bg-[#fff0f4]"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                {!address.is_default ? (
-                  <button
-                    type="button"
-                    onClick={() => makeDefault(address)}
-                    className="mt-2 text-xs font-medium text-accent-deep hover:underline"
-                  >
-                    Make default
-                  </button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="mt-4 rounded-xl border border-line bg-background p-3">
-          <DeliveryAddressFields
-            value={editor}
-            onChange={(next) =>
-              setEditor((current) => (current ? { ...current, ...next } : current))
-            }
-            idPrefix="header-saved-address"
-          />
-          {editingDefault ? (
-            <p className="mt-3 text-sm text-muted">This is your default address.</p>
-          ) : (
-            <label className="mt-3 flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={editor.isDefault}
-                onChange={(event) =>
-                  setEditor({ ...editor, isDefault: event.target.checked })
-                }
-              />
-              Make this my default address
-            </label>
-          )}
-          <div className="mt-4 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setEditor(null)}
-              disabled={saving}
-              className="rounded-full border border-line px-4 py-2 text-sm text-ink disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={saveAddress}
-              disabled={saving}
-              className="rounded-full bg-ink px-4 py-2 text-sm text-white disabled:opacity-50"
-            >
-              {saving ? "Saving..." : editor.id ? "Save changes" : "Save address"}
-            </button>
-          </div>
-        </div>
-      )}
-
+      <div className="mt-4 flex items-center gap-3 border-t border-line pt-4 text-sm">
+        <Link
+          href="/addresses"
+          onClick={onNavigate}
+          className="font-semibold text-accent-deep hover:underline"
+        >
+          Manage address book
+        </Link>
+        {addresses.length > 3 ? (
+          <Link href="/addresses" onClick={onNavigate} className="text-muted hover:text-ink hover:underline">
+            See all ({addresses.length})
+          </Link>
+        ) : null}
+      </div>
       {error ? <p className="mt-3 text-sm text-accent-deep">{error}</p> : null}
-    </div>
+    </section>
   );
 }

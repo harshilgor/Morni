@@ -141,8 +141,10 @@ export default async function HomePage({
       <HeroCarousel />
 
       <Suspense fallback={null}>
-        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-          <LocationHomeSync />
+        <div className="border-b border-[#e2dfd8] bg-[#f8f7f4]">
+          <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+            <LocationHomeSync />
+          </div>
         </div>
       </Suspense>
 

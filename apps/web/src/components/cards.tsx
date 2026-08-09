@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Store } from "@/lib/types";
-import { deliveryPromise, emirateLabel, formatAed } from "@/lib/format";
+import { emirateLabel, formatAed } from "@/lib/format";
 import { formatRatingLabel, type ProductRatingSummary } from "@/lib/product-ratings";
 import { StarRating } from "@/components/star-rating";
 import { WishlistToggle } from "@/components/wishlist-toggle";
@@ -17,14 +17,14 @@ export function StoreCard({ store }: { store: Store }) {
   return (
     <Link
       href={`/stores/${store.slug}`}
-      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-30px_rgba(28,20,24,0.45)]"
+      className="group flex h-full flex-col overflow-hidden rounded-xl border border-[#dedbd4] bg-white transition duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_18px_42px_-30px_rgba(28,20,24,0.38)]"
     >
       <div
         className="relative h-40 bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
         style={{
           backgroundImage: store.cover_url
             ? `url(${store.cover_url})`
-            : "linear-gradient(135deg, #f3e4dc, #ffd9e4)",
+            : "linear-gradient(135deg, #e8e4dc, #c9c3b8)",
         }}
       >
         {isNew ? (
@@ -33,13 +33,8 @@ export function StoreCard({ store }: { store: Store }) {
           </span>
         ) : null}
       </div>
-      <div className="flex min-h-[190px] flex-1 flex-col p-5">
-        <div className="flex min-h-14 items-start justify-between gap-3">
-          <h3 className="line-clamp-2 font-display text-xl leading-snug text-ink">{store.name}</h3>
-          <span className="shrink-0 rounded-full bg-[#fff0f4] px-2.5 py-1 text-xs text-accent-deep">
-            {deliveryPromise(store.delivery_eta_minutes)}
-          </span>
-        </div>
+      <div className="flex min-h-[190px] flex-1 flex-col p-4">
+        <h3 className="min-h-14 line-clamp-2 font-display text-xl leading-snug text-ink">{store.name}</h3>
         <p
           className="mt-2 truncate text-sm text-muted"
           title={store.area + ", " + emirateLabel(store.emirate)}

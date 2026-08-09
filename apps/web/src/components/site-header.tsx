@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
 import { SearchTypeahead } from "@/components/search-typeahead";
 import { SavedAddressPicker } from "@/components/saved-address-picker";
+import { OCCASIONS } from "@/lib/occasions";
 
 function PinIcon({ className }: { className?: string }) {
   return (
@@ -41,6 +42,20 @@ function CartIcon({ className }: { className?: string }) {
   );
 }
 
+function AccountIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M4.5 20c.8-3.7 3.5-5.7 7.5-5.7s6.7 2 7.5 5.7"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function HeartIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -54,6 +69,26 @@ function HeartIcon({ className }: { className?: string }) {
   );
 }
 
+const CATEGORY_MENU_GROUPS = [
+  {
+    title: "Featured styles",
+    links: [["Lehengas", "/categories/lehengas"], ["Shararas", "/categories/shararas"], ["Salwar kameez", "/categories/salwar-kameez"], ["Kurtis", "/categories/kurtis"]],
+  },
+  {
+    title: "Shop the occasion",
+    links: [["Party wear", "/categories/party-wear"], ["Indo-western", "/categories/indo-western"], ["Dresses", "/categories/dresses"], ["Evening edit", "/categories/evening"]],
+  },
+  {
+    title: "Complete the look",
+    links: [["Bags", "/categories/bags"], ["Shoes", "/categories/shoes"], ["Jewelry", "/categories/jewelry"], ["Accessories", "/categories/accessories"]],
+  },
+] as const;
+
+const CATEGORY_MENU_FEATURES = [
+  { name: "Lehengas", href: "/categories/lehengas", image: "/categories/lehengas.png" },
+  { name: "Party wear", href: "/categories/party-wear", image: "/categories/party-wear.jpg" },
+  { name: "Kurtis", href: "/categories/kurtis", image: "/categories/kurtis.jpg" },
+] as const;
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
@@ -66,25 +101,48 @@ export function SiteHeader() {
 
   const [locationOpen, setLocationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [occasionsOpen, setOccasionsOpen] = useState(false);
   const [draftEmirate, setDraftEmirate] = useState<UaeEmirate>(emirate);
   const [draftArea, setDraftArea] = useState(area);
-  const panelRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
+  const menuCloseTimer = useRef<number | null>(null);
 
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (!panelRef.current?.contains(e.target as Node)) {
-        setLocationOpen(false);
-      }
       if (!accountRef.current?.contains(e.target as Node)) {
         setAccountOpen(false);
+      }
+      if (!categoryMenuRef.current?.contains(e.target as Node)) {
+        setCategoriesOpen(false);
+        setOccasionsOpen(false);
       }
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!locationOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setLocationOpen(false);
+    }
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [locationOpen]);
   if (pathname?.startsWith("/portal")) {
     return null;
   }
@@ -117,6 +175,31 @@ export function SiteHeader() {
     }
   }
 
+  function openCategories() {
+    if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
+    setCategoriesOpen(true);
+    setOccasionsOpen(false);
+  }
+
+  function openOccasions() {
+    if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
+    setCategoriesOpen(false);
+    setOccasionsOpen(true);
+  }
+
+  function scheduleMenusClose() {
+    if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
+    menuCloseTimer.current = window.setTimeout(() => {
+      setCategoriesOpen(false);
+      setOccasionsOpen(false);
+    }, 120);
+  }
+
+  function closeMenus() {
+    setCategoriesOpen(false);
+    setOccasionsOpen(false);
+  }
+
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -132,7 +215,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50">
       <div className="bg-ink text-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-5">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-2.5">
           <Link
             href="/"
             className="shrink-0 font-display text-2xl tracking-tight text-white sm:text-[1.7rem]"
@@ -140,13 +223,14 @@ export function SiteHeader() {
             Morni
           </Link>
 
-          <div className="relative shrink-0" ref={panelRef}>
+          <div className="shrink-0">
             <button
               type="button"
               onClick={toggleLocationPanel}
-              className="flex max-w-[10.5rem] items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-left transition hover:border-white/35 hover:bg-white/5 sm:max-w-[13rem]"
+              className="flex max-w-[7.5rem] items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-left transition hover:border-white/35 hover:bg-white/5 sm:max-w-[13rem]"
               aria-expanded={locationOpen}
               aria-haspopup="dialog"
+              aria-controls="delivery-location-dialog"
             >
               <PinIcon className="h-5 w-5 shrink-0 text-white/90" />
               <span className="min-w-0 leading-tight">
@@ -156,93 +240,17 @@ export function SiteHeader() {
                 <span className="block truncate text-sm font-semibold">{locationLabel}</span>
               </span>
             </button>
-
-            {locationOpen ? (
-              <div className="absolute left-0 top-[calc(100%+8px)] z-50 max-h-[calc(100vh-5rem)] w-[min(92vw,22rem)] overflow-y-auto rounded-xl border border-line bg-surface p-4 text-ink shadow-[0_20px_50px_-20px_rgba(28,20,24,0.55)]">
-                <SavedAddressPicker
-                  userId={auth?.user.id}
-                  defaultLabel={auth?.firstName ?? "Home"}
-                  currentEmirate={emirate}
-                  currentArea={area}
-                  onSelect={(address) => applyLocation(address.emirate, address.area)}
-                />
-                <p className="font-display text-lg">Choose delivery location</p>
-                <p className="mt-1 text-xs text-muted">
-                  Pick your emirate and type any area — not limited to the suggestions.
-                </p>
-
-                <label className="mt-4 block space-y-1.5 text-sm">
-                  <span className="text-muted">Emirate</span>
-                  <select
-                    className="w-full rounded-lg border border-line bg-background px-3 py-2"
-                    value={draftEmirate}
-                    onChange={(e) =>
-                      changeDraftEmirate(e.target.value as UaeEmirate)
-                    }
-                  >
-                    {EMIRATES.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="mt-3 block space-y-1.5 text-sm">
-                  <span className="text-muted">Area / neighborhood</span>
-                  <input
-                    list="morni-delivery-areas"
-                    className="w-full rounded-lg border border-line bg-background px-3 py-2"
-                    value={draftArea}
-                    onChange={(e) => setDraftArea(e.target.value)}
-                    placeholder="Type your exact area"
-                  />
-                  <datalist id="morni-delivery-areas">
-                    {areas.map((item) => (
-                      <option key={item} value={item} />
-                    ))}
-                  </datalist>
-                </label>
-
-                <div className="mt-3 max-h-40 space-y-1 overflow-y-auto">
-                  {areas.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setDraftArea(item)}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition hover:bg-background ${
-                        draftArea === item
-                          ? "bg-background font-medium text-accent-deep"
-                          : "text-ink"
-                      }`}
-                    >
-                      {item}
-                      {draftArea === item ? (
-                        <span className="text-xs text-accent-deep">Selected</span>
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  disabled={!draftArea.trim()}
-                  onClick={() => applyLocation(draftEmirate, draftArea.trim())}
-                  className="mt-3 w-full rounded-full bg-ink py-2.5 text-sm text-white disabled:opacity-50"
-                >
-                  Deliver to {draftArea.trim() || "…"}
-                </button>
-              </div>
-            ) : null}
           </div>
 
-          <SearchTypeahead
-            placeholder={
-              firstName
-                ? `Search Morni, ${firstName}`
-                : "Search stores and products"
-            }
-          />
+          <div className="order-3 w-full sm:order-none sm:flex-1">
+            <SearchTypeahead
+              placeholder={
+                firstName
+                  ? `Search Morni, ${firstName}`
+                  : "Search stores and products"
+              }
+            />
+          </div>
 
           <nav className="hidden shrink-0 items-center gap-1 md:flex">
             <div className="relative min-w-[7.5rem]" ref={accountRef}>
@@ -281,6 +289,12 @@ export function SiteHeader() {
                         onClick={() => setAccountOpen(false)}
                       >
                         Your wishlist
+                      </Link>                      <Link
+                        href="/addresses"
+                        className="block rounded-lg px-2 py-2 text-sm hover:bg-background"
+                        onClick={() => setAccountOpen(false)}
+                      >
+                        Your addresses
                       </Link>
                       {isStoreOwner ? (
                         <>
@@ -334,6 +348,15 @@ export function SiteHeader() {
           </nav>
 
           <Link
+            href={auth ? "/orders" : "/auth"}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-white transition hover:border-white/35 hover:bg-white/5 md:hidden"
+            aria-label={auth ? "View account and orders" : "Sign in"}
+            title={auth ? "Account" : "Sign in"}
+          >
+            <AccountIcon className="h-5 w-5" />
+          </Link>
+
+          <Link
             href="/wishlist"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-white transition hover:border-white/35 hover:bg-white/5"
             aria-label="View wishlist"
@@ -358,8 +381,20 @@ export function SiteHeader() {
         </div>
       </div>
 
-      <div className="border-b border-line/60 bg-[#2a1f24] text-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-3 py-2 text-sm sm:gap-4 sm:px-5">
+      <div
+        className="relative border-b border-line/60 bg-[#2a1f24] text-white"
+        ref={categoryMenuRef}
+        onMouseLeave={scheduleMenusClose}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+            closeMenus();
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") closeMenus();
+        }}
+      >
+        <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-3 py-2 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-4 sm:px-5">
           <Link href="/" className="shrink-0 font-medium text-white/90 hover:text-white">
             All stores
           </Link>
@@ -372,9 +407,27 @@ export function SiteHeader() {
           </Link>
           <Link
             href="/categories"
-            className="shrink-0 font-medium text-white/90 hover:text-white"
+            onMouseEnter={openCategories}
+            onFocus={openCategories}
+            aria-expanded={categoriesOpen}
+            aria-haspopup="menu"
+            className={`shrink-0 font-medium transition ${
+              categoriesOpen ? "text-white" : "text-white/90 hover:text-white"
+            }`}
           >
             Categories
+          </Link>
+          <Link
+            href="/categories"
+            onMouseEnter={openOccasions}
+            onFocus={openOccasions}
+            aria-expanded={occasionsOpen}
+            aria-haspopup="menu"
+            className={`shrink-0 font-medium transition ${
+              occasionsOpen ? "text-white" : "text-white/90 hover:text-white"
+            }`}
+          >
+            Occasions
           </Link>
           {isStoreOwner ? (
             <Link href="/portal" className="shrink-0 text-white/85 hover:text-white">
@@ -385,13 +438,186 @@ export function SiteHeader() {
               Sell on Morni
             </Link>
           )}
-          <span className="ml-auto hidden shrink-0 text-xs text-white/60 sm:inline">
-            {firstName
-              ? `Welcome back, ${firstName} · Delivery within 1 hour`
-              : "Delivery within 1 hour"}
-          </span>
+          {firstName ? (
+            <span className="ml-auto hidden shrink-0 text-xs text-white/60 sm:inline">
+              Welcome back, {firstName}
+            </span>
+          ) : null}
         </div>
+        {categoriesOpen ? (
+          <div
+            className="absolute inset-x-0 top-full z-50 hidden border-b border-line bg-surface text-ink shadow-[0_24px_48px_-30px_rgba(28,20,24,0.7)] md:block"
+            onMouseEnter={openCategories}
+            role="menu"
+            aria-label="Shop by category"
+          >
+            <div className="mx-auto grid max-w-7xl grid-cols-[repeat(3,minmax(0,1fr))_1.25fr] gap-8 px-5 py-7">
+              {CATEGORY_MENU_GROUPS.map((group) => (
+                <div key={group.title}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">{group.title}</p>
+                  <div className="mt-3 space-y-2">
+                    {group.links.map(([label, href]) => (
+                      <Link key={href} href={href} role="menuitem" onClick={() => setCategoriesOpen(false)} className="block w-fit text-sm text-ink/80 transition hover:text-accent-deep hover:underline">
+                        {label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="border-l border-line pl-7">
+                <div className="grid grid-cols-3 gap-3">
+                  {CATEGORY_MENU_FEATURES.map((feature) => (
+                    <Link key={feature.href} href={feature.href} role="menuitem" onClick={() => setCategoriesOpen(false)} className="group">
+                      <div className="aspect-[3/4] overflow-hidden rounded-xl bg-sand">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={feature.image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                      </div>
+                      <p className="mt-2 text-center text-xs font-medium text-ink group-hover:text-accent-deep">{feature.name}</p>
+                    </Link>
+                  ))}
+                </div>
+                <Link href="/categories" role="menuitem" onClick={() => setCategoriesOpen(false)} className="mt-5 flex items-center justify-center rounded-full border border-ink px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition hover:bg-ink hover:text-white">
+                  Explore all categories
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {occasionsOpen ? (
+          <div
+            className="absolute inset-x-0 top-full z-50 hidden border-b border-line bg-surface text-ink shadow-[0_24px_48px_-30px_rgba(28,20,24,0.7)] md:block"
+            onMouseEnter={openOccasions}
+            role="menu"
+            aria-label="Shop by occasion"
+          >
+            <div className="mx-auto max-w-7xl px-5 py-6">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">
+                    Curated edits
+                  </p>
+                  <p className="mt-1 font-display text-2xl text-ink">
+                    Shop by occasion
+                  </p>
+                </div>
+                <Link
+                  href="/categories"
+                  role="menuitem"
+                  onClick={closeMenus}
+                  className="hidden rounded-full border border-ink px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition hover:bg-ink hover:text-white sm:inline-flex"
+                >
+                  Explore all edits
+                </Link>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {OCCASIONS.map((occasion) => (
+                  <Link
+                    key={occasion.title}
+                    href={occasion.href}
+                    role="menuitem"
+                    onClick={closeMenus}
+                    className="group min-w-0"
+                  >
+                    <div className="aspect-[4/5] overflow-hidden rounded-xl bg-sand">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={occasion.image}
+                        alt=""
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                    </div>
+                    <p className="mt-2 truncate text-center text-xs font-medium text-ink transition group-hover:text-accent-deep">
+                      {occasion.title}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
+
+      {locationOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-ink/55 px-3 py-6 backdrop-blur-[2px] sm:items-center sm:px-5"
+          onMouseDown={() => setLocationOpen(false)}
+        >
+          <div
+            id="delivery-location-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delivery-location-title"
+            className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-surface text-ink shadow-[0_28px_80px_-28px_rgba(18,12,15,0.8)]"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div>
+                <p id="delivery-location-title" className="font-display text-2xl text-ink">Delivery location</p>
+                <p className="mt-0.5 text-xs text-muted">Choose where you want Morni to deliver.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLocationOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-xl text-ink transition hover:bg-background"
+                aria-label="Close delivery location"
+              >
+                ×
+              </button>
+            </div>
+            <div className="max-h-[calc(100dvh-7rem)] overflow-y-auto px-5 py-5">
+              <SavedAddressPicker
+                userId={auth?.user.id}
+                currentEmirate={emirate}
+                currentArea={area}
+                onSelect={(address) => applyLocation(address.emirate, address.area)}
+                onNavigate={() => setLocationOpen(false)}
+              />
+
+              <section className="mt-5 border-t border-line pt-5">
+                <p className="text-sm font-semibold text-ink">Deliver to a different area</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  You can still browse local stores without saving an address.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-sm">
+                    <span className="text-muted">Emirate</span>
+                    <select
+                      className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+                      value={draftEmirate}
+                      onChange={(event) => changeDraftEmirate(event.target.value as UaeEmirate)}
+                    >
+                      {EMIRATES.map((item) => (
+                        <option key={item.value} value={item.value}>{item.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1.5 text-sm">
+                    <span className="text-muted">Area / neighborhood</span>
+                    <input
+                      list="morni-delivery-areas"
+                      className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+                      value={draftArea}
+                      onChange={(event) => setDraftArea(event.target.value)}
+                      placeholder="Dubai Marina"
+                    />
+                    <datalist id="morni-delivery-areas">
+                      {areas.map((item) => <option key={item} value={item} />)}
+                    </datalist>
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  disabled={!draftArea.trim()}
+                  onClick={() => applyLocation(draftEmirate, draftArea.trim())}
+                  className="mt-4 w-full rounded-full bg-ink py-3 text-sm font-semibold text-white transition hover:bg-accent-deep disabled:opacity-50"
+                >
+                  Use this delivery area
+                </button>
+              </section>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

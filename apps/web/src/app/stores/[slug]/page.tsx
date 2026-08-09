@@ -5,7 +5,7 @@ import {
   type BrowsableProduct,
 } from "@/components/product-browser";
 import { createClient } from "@/lib/supabase/server";
-import { deliveryPromise, emirateLabel } from "@/lib/format";
+import { emirateLabel } from "@/lib/format";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
 import type { Product, Store } from "@/lib/types";
 
@@ -125,7 +125,6 @@ export default async function StorePage({
   const ratings = Object.fromEntries(ratingMap);
 
   const facts = [
-    { label: "Delivery", value: deliveryPromise(s.delivery_eta_minutes) },
     { label: "Today's hours", value: hours },
     { label: "Located in", value: `${s.area}, ${emirateLabel(s.emirate)}` },
     { label: "Pieces in stock", value: `${list.length} listed` },
@@ -159,7 +158,7 @@ export default async function StorePage({
         <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-4 p-5 sm:p-7">
           <div className="flex items-end gap-4">
             {s.logo_url ? (
-              <div className="hidden h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-white/80 bg-white sm:block">
+              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 border-white/80 bg-white sm:h-20 sm:w-20 sm:rounded-2xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={s.logo_url}
@@ -169,22 +168,17 @@ export default async function StorePage({
               </div>
             ) : null}
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-accent-deep">
-                  {deliveryPromise(s.delivery_eta_minutes)}
+              {openNow !== null ? (
+                <span
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                    openNow
+                      ? "bg-[#eaf6f1] text-[#2f6f66]"
+                      : "bg-white/80 text-muted"
+                  }`}
+                >
+                  {openNow ? "Open now" : "Closed now"}
                 </span>
-                {openNow !== null ? (
-                  <span
-                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                      openNow
-                        ? "bg-[#eaf6f1] text-[#2f6f66]"
-                        : "bg-white/80 text-muted"
-                    }`}
-                  >
-                    {openNow ? "Open now" : "Closed now"}
-                  </span>
-                ) : null}
-              </div>
+              ) : null}
               <h1 className="mt-2 font-display text-3xl text-white sm:text-5xl">
                 {s.name}
               </h1>
@@ -193,12 +187,6 @@ export default async function StorePage({
               </p>
             </div>
           </div>
-          <a
-            href="#shop"
-            className="rounded-full bg-white px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink transition hover:bg-accent hover:text-white"
-          >
-            Shop now
-          </a>
         </div>
       </section>
 
@@ -210,7 +198,7 @@ export default async function StorePage({
         </section>
       ) : null}
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {facts.map((fact) => (
           <div
             key={fact.label}

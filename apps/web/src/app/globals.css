@@ -29,10 +29,7 @@
 }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 10% -10%, #ffd9e4 0%, transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #f3e4dc 0%, transparent 50%),
-    var(--background);
+  background: #f8f7f4;
   color: var(--foreground);
   font-family: var(--font-body), system-ui, sans-serif;
 }
@@ -99,5 +96,28 @@ h3,
   .animate-rise-delay,
   .animate-pulse-soft {
     animation: none;
+  }
+}
+@media (max-width: 639px) {
+  html {
+    scroll-padding-top: 8.5rem;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
 }

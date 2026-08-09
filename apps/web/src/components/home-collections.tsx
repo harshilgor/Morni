@@ -2,60 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { OCCASIONS } from "@/lib/occasions";
 
 const AUTOPLAY_MS = 2000;
 const CARD_GAP = 16;
-
-const OCCASIONS = [
-  {
-    title: "Wedding",
-    subtitle: "Statement lehengas and festive sets for the big day.",
-    href: "/categories/lehengas",
-    image:
-      "https://images.unsplash.com/photo-1654764746225-e63f5e90facd?w=1200&q=85",
-    tone: "#f2b7c8",
-  },
-  {
-    title: "Party night",
-    subtitle: "Bold silhouettes for dinners, birthdays, and nights out.",
-    href: "/categories/party-wear",
-    image:
-      "https://images.unsplash.com/photo-1716504628204-47f2df8d2634?w=1200&q=85",
-    tone: "#f0c07a",
-  },
-  {
-    title: "Office",
-    subtitle: "Polished workwear kurtis, delivered within the hour.",
-    href: "/categories/kurtis",
-    image:
-      "https://images.unsplash.com/photo-1769063382610-6be8acb7552f?w=1200&q=85",
-    tone: "#9fd4cc",
-  },
-  {
-    title: "Eid & festive",
-    subtitle: "Shararas and suits with celebration-ready embroidery.",
-    href: "/categories/shararas",
-    image:
-      "https://images.unsplash.com/photo-1724412665971-114bd351a42d?w=1200&q=85",
-    tone: "#e7c39b",
-  },
-  {
-    title: "Gifting",
-    subtitle: "Jewellery and accessories that always land well.",
-    href: "/categories/jewelry",
-    image:
-      "https://images.unsplash.com/photo-1758995116383-f51775896add?w=1200&q=85",
-    tone: "#f4d58d",
-  },
-  {
-    title: "Brunch & everyday",
-    subtitle: "Easy casual pieces for weekends and coffee runs.",
-    href: "/categories/casual-wear",
-    image:
-      "https://images.unsplash.com/photo-1763559301384-32971cd65ccb?w=1200&q=85",
-    tone: "#f0b9a8",
-  },
-];
 
 export function HomeCollections() {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -103,7 +53,7 @@ export function HomeCollections() {
           <Link
             key={occasion.title}
             href={occasion.href}
-            className="group relative h-[400px] w-[280px] shrink-0 snap-start overflow-hidden rounded-3xl sm:w-[330px] lg:w-[380px]"
+            className="group relative h-[360px] w-[76vw] shrink-0 snap-start overflow-hidden rounded-2xl sm:h-[400px] sm:w-[330px] sm:rounded-3xl lg:w-[380px]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

@@ -10,8 +10,12 @@ export function RecentlyViewedRail() {
   if (items.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <section className="border-y border-[#e2dfd8] bg-[#f8f7f4]">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-5">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b5a60]">
+          Continue shopping
+        </p>
         <h2 className="font-display text-3xl text-ink">Recently viewed</h2>
         <p className="mt-1 text-sm text-muted">
           Pick up where you left off — looks you already explored.
@@ -21,7 +25,7 @@ export function RecentlyViewedRail() {
         {items.map((item) => (
           <div
             key={item.id}
-            className="w-[min(58vw,220px)] shrink-0 snap-start sm:w-[230px]"
+            className="w-[min(64vw,240px)] shrink-0 snap-start sm:w-[230px]"
           >
             <ProductCard
               product={{
@@ -37,9 +41,10 @@ export function RecentlyViewedRail() {
         ))}
       </div>
       <div className="mt-4">
-        <Link href="/for-you" className="text-sm text-accent-deep hover:underline">
+        <Link href="/for-you" className="text-sm font-medium text-ink hover:underline">
           Get personal picks on For you →
         </Link>
+      </div>
       </div>
     </section>
   );

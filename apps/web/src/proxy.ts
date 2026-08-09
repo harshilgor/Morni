@@ -1,7 +1,22 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const needsSessionRefresh = [
+    "/account",
+    "/addresses",
+    "/cart",
+    "/checkout",
+    "/orders",
+    "/portal",
+    "/sell",
+    "/wishlist",
+  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+
+  // Storefront pages use public data. Avoid an auth-network round trip before
+  // every browse/product navigation; protected areas still refresh sessions.
+  if (!needsSessionRefresh) return NextResponse.next({ request });
   return updateSession(request);
 }
 

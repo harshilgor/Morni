@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   useCallback,
@@ -14,65 +15,64 @@ type Slide = {
   eyebrow: string;
   title: string;
   subtitle: string;
+  cta: string;
   href: string;
   image: string;
-  accent: string;
+  imagePosition?: string;
+  titleTone?: "light" | "sun";
 };
 
 const SLIDES: Slide[] = [
   {
-    id: "under-99",
-    eyebrow: "Budget picks",
-    title: "Under 99 DHS",
-    subtitle: "Looks that don’t break the budget",
-    href: "/under-99",
-    image:
-      "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1400&q=80",
-    accent: "#f5d76e",
+    id: "new-arrivals",
+    eyebrow: "Just landed",
+    title: "New this week",
+    subtitle: "Fresh silhouettes from boutiques near you.",
+    cta: "Explore new arrivals",
+    href: "/search?sort=new",
+    image: "/categories/party-wear.webp",
+    titleTone: "sun",
   },
   {
-    id: "flat-50",
-    eyebrow: "Hot deal",
-    title: "Flat 50%",
-    subtitle: "Half off select styles today",
-    href: "/categories/party-wear",
-    image:
-      "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1400&q=80",
-    accent: "#ff8fab",
+    id: "office-edit",
+    eyebrow: "The work edit",
+    title: "Polished days",
+    subtitle: "Modern officewear, ready for your next meeting.",
+    cta: "Shop officewear",
+    href: "/categories/office-wear",
+    image: "/categories/office-wear.webp",
+    imagePosition: "center 30%",
   },
   {
-    id: "bogo",
-    eyebrow: "Limited offer",
-    title: "Buy 1 get 1",
-    subtitle: "Double the looks, same checkout",
-    href: "/categories/kurtis",
-    image:
-      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1400&q=80",
-    accent: "#ffb4a2",
+    id: "brunch-edit",
+    eyebrow: "Weekend dressing",
+    title: "Brunch & everyday",
+    subtitle: "Easy pieces for coffee runs and plans that follow.",
+    cta: "Shop the edit",
+    href: "/categories/casual-wear",
+    image: "/categories/brunch-everyday.jpg",
   },
   {
-    id: "clearance",
-    eyebrow: "Last chance",
-    title: "Clearance sale",
-    subtitle: "Final markdowns before they’re gone",
-    href: "/clearance",
-    image:
-      "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1400&q=80",
-    accent: "#f4a261",
+    id: "gifting-edit",
+    eyebrow: "A thoughtful gesture",
+    title: "The gifting edit",
+    subtitle: "Celebrate beautifully with a look they will keep.",
+    cta: "Discover gifting",
+    href: "/categories/jewelry",
+    image: "/categories/gifting.jpg",
   },
   {
-    id: "premium",
-    eyebrow: "Elevated edit",
-    title: "Premium collection",
-    subtitle: "Statement pieces worth the keep",
+    id: "wedding-edit",
+    eyebrow: "For the celebrations",
+    title: "Wedding season",
+    subtitle: "Statement lehengas for every invitation on your calendar.",
+    cta: "Shop wedding looks",
     href: "/categories/lehengas",
-    image:
-      "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=1400&q=80",
-    accent: "#c9a87c",
+    image: "/categories/lehengas.webp",
   },
 ];
 
-const AUTOPLAY_MS = 4000;
+const AUTOPLAY_MS = 4600;
 const RESUME_AFTER_INTERACT_MS = 6000;
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -99,8 +99,7 @@ export function HeroCarousel() {
         index
       ];
       if (!slide) return;
-      const left =
-        slide.offsetLeft - (scroller.clientWidth - slide.clientWidth) / 2;
+      const left = slide.offsetLeft - (scroller.clientWidth - slide.clientWidth) / 2;
       scroller.scrollTo({ left: Math.max(0, left), behavior });
       setActiveIndex(index);
     },
@@ -132,21 +131,28 @@ export function HeroCarousel() {
     if (!scroller) return;
 
     const onScroll = () => {
+      if (scroller.scrollLeft <= 1) {
+        setActiveIndex(0);
+        return;
+      }
+
       const slides = Array.from(
         scroller.querySelectorAll<HTMLElement>("[data-carousel-slide]"),
       );
       if (slides.length === 0) return;
       const center = scroller.scrollLeft + scroller.clientWidth / 2;
       let closest = 0;
-      let closestDist = Number.POSITIVE_INFINITY;
-      slides.forEach((slide, i) => {
-        const mid = slide.offsetLeft + slide.clientWidth / 2;
-        const dist = Math.abs(center - mid);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closest = i;
+      let closestDistance = Number.POSITIVE_INFINITY;
+
+      slides.forEach((slide, index) => {
+        const midpoint = slide.offsetLeft + slide.clientWidth / 2;
+        const distance = Math.abs(center - midpoint);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closest = index;
         }
       });
+
       setActiveIndex(closest);
     };
 
@@ -168,13 +174,13 @@ export function HeroCarousel() {
   useEffect(() => {
     if (reduceMotion || !inView) return;
 
-    const id = window.setInterval(() => {
+    const intervalId = window.setInterval(() => {
       if (interactingRef.current) return;
       const next = (activeRef.current + 1) % SLIDES.length;
-      scrollToIndex(next);
+      scrollToIndex(next, next === 0 ? "auto" : "smooth");
     }, AUTOPLAY_MS);
 
-    return () => window.clearInterval(id);
+    return () => window.clearInterval(intervalId);
   }, [inView, reduceMotion, scrollToIndex]);
 
   useEffect(() => {
@@ -186,54 +192,61 @@ export function HeroCarousel() {
   return (
     <section
       ref={sectionRef}
-      className="animate-rise relative w-full pt-3 sm:pt-5"
+      className="animate-rise relative w-full bg-white py-3 sm:py-4"
       aria-roledescription="carousel"
-      aria-label="Featured collections"
+      aria-label="Featured Morni edits"
     >
       <div
         ref={scrollerRef}
-        className="relative flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-smooth px-3 pb-1 sm:gap-3 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="relative flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth px-3 pb-1 sm:gap-3 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
+
         {SLIDES.map((slide, index) => (
           <Link
             key={slide.id}
             href={slide.href}
             data-carousel-slide
-            className="group relative h-[min(68vh,560px)] w-[min(88vw,440px)] shrink-0 snap-center overflow-hidden rounded-[1.25rem] bg-ink sm:h-[min(72vh,620px)] sm:w-[min(78vw,540px)] sm:rounded-[1.6rem] lg:w-[min(62vw,580px)]"
+            className="group relative h-[min(64vh,560px)] w-[88vw] shrink-0 snap-center overflow-hidden bg-ink sm:h-[min(76vh,700px)] sm:w-[min(58vw,620px)] lg:w-[min(46vw,720px)]"
             aria-label={`${slide.title}. ${slide.subtitle}`}
             aria-current={index === active ? "true" : undefined}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={slide.image}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover object-top transition duration-700 ease-out group-hover:scale-[1.045]"
-              draggable={false}
+              fill
+              priority={index === 0}
+              sizes="(max-width: 639px) 88vw, (max-width: 1023px) 58vw, 46vw"
+              className="object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+              style={{ objectPosition: slide.imagePosition ?? "center" }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/15" />
-            <div className="absolute inset-x-0 bottom-0 flex flex-col items-start p-5 sm:p-8">
-              <p
-                className="text-[11px] font-semibold uppercase tracking-[0.3em] sm:text-xs"
-                style={{ color: slide.accent }}
-              >
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/18 to-black/5" />
+            <div className="absolute inset-x-0 bottom-0 flex flex-col items-start p-5 sm:p-7 lg:p-9">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80 sm:text-xs">
                 {slide.eyebrow}
               </p>
-              <h2 className="mt-2 max-w-[14ch] font-display text-[2.15rem] leading-[0.92] text-white sm:text-5xl">
+              <h2
+                className={`mt-2 max-w-[8ch] font-sans text-[2.8rem] font-semibold uppercase leading-[0.83] tracking-[-0.07em] sm:text-[clamp(3.6rem,6vw,6.8rem)] ${
+                  slide.titleTone === "sun" ? "text-[#f4ed68]" : "text-white"
+                }`}
+              >
                 {slide.title}
               </h2>
-              <p className="mt-2.5 max-w-[18rem] text-sm text-white/88 sm:text-base">
+              <p className="mt-4 max-w-[22rem] text-sm leading-relaxed text-white/88 sm:text-base">
                 {slide.subtitle}
               </p>
-              <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/18 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md transition group-hover:bg-white/28">
-                Shop now
-                <span aria-hidden>→</span>
+              <span className="mt-5 rounded-full border border-white/75 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white transition group-hover:bg-white group-hover:text-ink sm:px-5 sm:text-[11px]">
+                {slide.cta}
               </span>
             </div>
           </Link>
         ))}
+        <div
+          aria-hidden
+          className="w-[calc(6vw-0.75rem)] shrink-0 sm:w-[calc(21vw-1rem)] lg:w-[calc(27vw-1rem)]"
+        />
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-2 pb-7 sm:pb-9">
+      <div className="absolute inset-x-0 bottom-7 z-10 flex items-center justify-center gap-2 sm:bottom-8">
         {SLIDES.map((slide, index) => {
           const isActive = index === active;
           return (
@@ -247,7 +260,7 @@ export function HeroCarousel() {
                 scrollToIndex(index);
               }}
               className={`h-1.5 rounded-full transition-all duration-300 ${
-                isActive ? "w-7 bg-ink" : "w-1.5 bg-ink/25 hover:bg-ink/45"
+                isActive ? "w-7 bg-white" : "w-1.5 bg-white/55 hover:bg-white"
               }`}
             />
           );
@@ -267,9 +280,9 @@ function usePrefersReducedMotion() {
 
 function subscribeReducedMotion(onStoreChange: () => void) {
   if (typeof window === "undefined") return () => {};
-  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
-  mq.addEventListener("change", onStoreChange);
-  return () => mq.removeEventListener("change", onStoreChange);
+  const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+  mediaQuery.addEventListener("change", onStoreChange);
+  return () => mediaQuery.removeEventListener("change", onStoreChange);
 }
 
 function getReducedMotionSnapshot() {

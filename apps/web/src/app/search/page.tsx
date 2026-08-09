@@ -5,6 +5,32 @@ import { fetchProductRatingMap } from "@/lib/product-ratings";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import type { Product, Store } from "@/lib/types";
 
+type BrowseCategoryMatch = {
+  search_terms: string[] | null;
+};
+
+function searchTerms(value: string) {
+  const phrase = value
+    .replace(/[,%().]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!phrase) return [];
+
+  return [
+    ...new Set([
+      phrase,
+      ...phrase.split(" ").filter((word) => word.length > 1),
+    ]),
+  ];
+}
+
+function ilikeAny(fields: string[], terms: string[]) {
+  return terms
+    .flatMap((term) => fields.map((field) => `${field}.ilike.%${term}%`))
+    .join(",");
+}
+
 export default async function SearchPage({
   searchParams,
 }: {
@@ -19,9 +45,23 @@ export default async function SearchPage({
 }) {
   const { q = "", emirate, max, min, sort, instock } = await searchParams;
   const query = q.trim();
+  const queryTerms = searchTerms(query);
   const maxPrice = max ? Number(max) : null;
   const minPrice = min ? Number(min) : null;
   const supabase = await createClient();
+
+  const { data: matchingCategories } =
+    queryTerms.length > 0
+      ? await supabase
+          .from("browse_categories")
+          .select("search_terms")
+          .or(ilikeAny(["name", "slug"], queryTerms))
+      : { data: [] as BrowseCategoryMatch[] };
+
+  const categoryTerms = ((matchingCategories ?? []) as BrowseCategoryMatch[])
+    .flatMap((category) => category.search_terms ?? [])
+    .flatMap(searchTerms);
+  const productTerms = [...new Set([...queryTerms, ...categoryTerms])];
 
   let storesQuery = supabase.from("stores").select("*").eq("is_active", true);
   let productsQuery = supabase
@@ -31,12 +71,17 @@ export default async function SearchPage({
     .eq("stores.is_active", true);
 
   if (query) {
-    storesQuery = storesQuery.or(
-      `name.ilike.%${query}%,area.ilike.%${query}%,description.ilike.%${query}%`,
-    );
-    productsQuery = productsQuery.or(
-      `title.ilike.%${query}%,description.ilike.%${query}%`,
-    );
+    if (queryTerms.length === 0) {
+      storesQuery = storesQuery.is("id", null);
+      productsQuery = productsQuery.is("id", null);
+    } else {
+      storesQuery = storesQuery.or(
+        ilikeAny(["name", "area", "description"], queryTerms),
+      );
+      productsQuery = productsQuery.or(
+        ilikeAny(["title", "description"], productTerms),
+      );
+    }
   }
 
   if (emirate) {
@@ -53,11 +98,7 @@ export default async function SearchPage({
     productsQuery = productsQuery.gt("stock", 0);
   }
 
-  if (sort === "new") {
-    productsQuery = productsQuery.order("created_at", { ascending: false });
-  } else {
-    productsQuery = productsQuery.order("created_at", { ascending: false });
-  }
+  productsQuery = productsQuery.order("created_at", { ascending: false });
 
   const [{ data: stores }, { data: products }] = await Promise.all([
     storesQuery.order("name").limit(24),
@@ -99,7 +140,9 @@ export default async function SearchPage({
           ? "Best rated"
           : sort === "new"
             ? "New in"
-            : "Search Morni";
+            : instock === "1"
+              ? "In stock"
+              : "Search Morni";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
