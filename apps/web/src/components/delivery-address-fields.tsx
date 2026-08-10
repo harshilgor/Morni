@@ -6,6 +6,7 @@ import type { UaeEmirate } from "@/lib/types";
 
 export type DeliveryAddressDraft = {
   label: string;
+  phone: string;
   emirate: UaeEmirate;
   area: string;
   street: string;
@@ -16,6 +17,7 @@ export type DeliveryAddressDraft = {
 
 export const EMPTY_DELIVERY_ADDRESS: DeliveryAddressDraft = {
   label: "",
+  phone: "",
   emirate: "dubai",
   area: "",
   street: "",
@@ -46,6 +48,8 @@ export function DeliveryAddressFields({
       <label className="block space-y-1.5 text-sm">
         <span className="text-muted">Name this address</span>
         <input
+          name={`${idPrefix}-label`}
+          autoComplete="off"
           className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
           value={value.label}
           onChange={(event) => patch({ label: event.target.value })}
@@ -54,8 +58,26 @@ export function DeliveryAddressFields({
         />
       </label>
       <label className="block space-y-1.5 text-sm">
+        <span className="text-muted">Contact number</span>
+        <input
+          type="tel"
+          inputMode="tel"
+          name={`${idPrefix}-phone`}
+          autoComplete="shipping tel"
+          className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+          value={value.phone}
+          onChange={(event) => patch({ phone: event.target.value })}
+          placeholder="+971 50 123 4567"
+          pattern="[+0-9() -]{7,}"
+          title="Enter a valid phone number"
+          required
+        />
+      </label>
+      <label className="block space-y-1.5 text-sm">
         <span className="text-muted">Emirate</span>
         <select
+          name={`${idPrefix}-emirate`}
+          autoComplete="shipping address-level1"
           className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
           value={value.emirate}
           onChange={(event) => patch({ emirate: event.target.value as UaeEmirate })}
@@ -70,6 +92,8 @@ export function DeliveryAddressFields({
       <label className="block space-y-1.5 text-sm">
         <span className="text-muted">Area / neighborhood</span>
         <input
+          name={`${idPrefix}-area`}
+          autoComplete="shipping address-level2"
           list={`${idPrefix}-areas`}
           className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
           value={value.area}
@@ -86,6 +110,8 @@ export function DeliveryAddressFields({
       <label className="block space-y-1.5 text-sm">
         <span className="text-muted">Street address</span>
         <input
+          name={`${idPrefix}-street`}
+          autoComplete="shipping street-address"
           className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
           value={value.street}
           onChange={(event) => patch({ street: event.target.value })}
@@ -97,6 +123,8 @@ export function DeliveryAddressFields({
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted">Building</span>
           <input
+            name={`${idPrefix}-building`}
+            autoComplete="shipping address-line2"
             className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
             value={value.building}
             onChange={(event) => patch({ building: event.target.value })}
@@ -105,6 +133,8 @@ export function DeliveryAddressFields({
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted">Apartment / villa</span>
           <input
+            name={`${idPrefix}-apartment`}
+            autoComplete="shipping address-line3"
             className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
             value={value.apartment}
             onChange={(event) => patch({ apartment: event.target.value })}
@@ -114,6 +144,8 @@ export function DeliveryAddressFields({
       <label className="block space-y-1.5 text-sm">
         <span className="text-muted">Delivery notes</span>
         <textarea
+          name={`${idPrefix}-notes`}
+          autoComplete="off"
           className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
           rows={2}
           value={value.notes}

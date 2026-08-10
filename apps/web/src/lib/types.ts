@@ -28,6 +28,7 @@ export type DeliveryAddress = {
   id: string;
   user_id: string;
   label: string;
+  phone: string | null;
   emirate: UaeEmirate;
   area: string;
   street: string;
@@ -101,6 +102,7 @@ export type Order = {
   delivery_emirate: UaeEmirate;
   delivery_area: string;
   delivery_street: string;
+  delivery_phone: string | null;
   delivery_building: string | null;
   delivery_apartment: string | null;
   delivery_notes: string | null;

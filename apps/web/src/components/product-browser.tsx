@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/cards";
 import { emirateLabel } from "@/lib/format";
+import { profileFromSwipes, type TasteProfile, type TasteSwipe } from "@/lib/for-you";
+import { readStoredForYouTaste } from "@/lib/for-you-storage";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import {
   COLOR_FACETS,
@@ -19,6 +21,7 @@ import {
   sortSizes,
 } from "@/lib/product-facets";
 import type { UaeEmirate } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 
 export type BrowsableProduct = {
   id: string;
@@ -113,6 +116,24 @@ function annotate(
       Number(product.compare_at_price_aed) > Number(product.price_aed),
     inStock: product.stock > 0,
   };
+}
+
+function personalScore(product: Annotated, profile: TasteProfile, activeSlug?: string) {
+  const text = `${product.title} ${product.description ?? ""}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ");
+  let score = activeSlug ? (profile.categoryScores[activeSlug] ?? 0) * 4 : 0;
+  for (const word of text) score += profile.tagScores[word] ?? 0;
+  for (const color of product.colors) score += profile.tagScores[color] ?? 0;
+  for (const fabric of product.fabrics) score += profile.tagScores[fabric] ?? 0;
+
+  if (profile.likedPriceCount > 0) {
+    const average = profile.likedPriceSum / profile.likedPriceCount;
+    const difference = Math.abs(Number(product.price_aed) - average) / Math.max(average, 1);
+    score += Math.max(0, 2 - difference * 2);
+  }
+  return score;
 }
 
 function matchesDimension(
@@ -281,10 +302,60 @@ export function ProductBrowser({
   activeSlug?: string;
   ratings?: Record<string, ProductRatingSummary>;
 }) {
+  const supabase = useMemo(() => createClient(), []);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState("recommended");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [tasteProfile, setTasteProfile] = useState<TasteProfile | null>(null);
+  const [dismissedProductIds, setDismissedProductIds] = useState<string[]>([]);
+  const [forYouActive, setForYouActive] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadTaste() {
+      const stored = readStoredForYouTaste();
+      const { data: auth } = await supabase.auth.getUser();
+      if (!mounted) return;
+
+      if (!auth.user) {
+        setTasteProfile(stored.profile);
+        setDismissedProductIds(stored.dismissedProductIds);
+        return;
+      }
+
+      const [{ data: swipes }, { data: feedback }] = await Promise.all([
+        supabase
+          .from("taste_swipes")
+          .select("product_id, category_slug, decision, tags, price_aed")
+          .eq("shopper_id", auth.user.id)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("product_feedback")
+          .select("product_id")
+          .eq("shopper_id", auth.user.id)
+          .eq("feedback_type", "not_interested"),
+      ]);
+      if (!mounted) return;
+
+      const remoteSwipes: TasteSwipe[] = (swipes ?? []).map((swipe) => ({
+        productId: swipe.product_id,
+        categorySlug: swipe.category_slug,
+        decision: swipe.decision as TasteSwipe["decision"],
+        tags: swipe.tags ?? [],
+        priceAed: Number(swipe.price_aed ?? 0),
+      }));
+      setTasteProfile(remoteSwipes.length ? profileFromSwipes(remoteSwipes) : stored.profile);
+      setDismissedProductIds([
+        ...new Set([...(feedback ?? []).map((item) => item.product_id), ...stored.dismissedProductIds]),
+      ]);
+    }
+
+    void loadTaste();
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
 
   const annotated = useMemo(
     () => products.map((product) => annotate(product, ratings)),
@@ -338,12 +409,22 @@ export function ProductBrowser({
   }, [annotated]);
 
   const filtered = useMemo(
-    () => annotated.filter((p) => matches(p, filters)),
-    [annotated, filters],
+    () =>
+      annotated.filter(
+        (product) =>
+          matches(product, filters) &&
+          (!forYouActive || !dismissedProductIds.includes(product.id)),
+      ),
+    [annotated, dismissedProductIds, filters, forYouActive],
   );
 
   const sorted = useMemo(() => {
     const list = [...filtered];
+    if (forYouActive && tasteProfile) {
+      return list.sort(
+        (a, b) => personalScore(b, tasteProfile, activeSlug) - personalScore(a, tasteProfile, activeSlug),
+      );
+    }
     switch (sort) {
       case "price-asc":
         return list.sort((a, b) => Number(a.price_aed) - Number(b.price_aed));
@@ -367,7 +448,11 @@ export function ProductBrowser({
       default:
         return list;
     }
-  }, [filtered, sort]);
+  }, [activeSlug, filtered, forYouActive, sort, tasteProfile]);
+
+  const categoryIsPreferred = Boolean(
+    activeSlug && tasteProfile && (tasteProfile.categoryScores[activeSlug] ?? 0) > 0,
+  );
 
   const activeCount =
     (Object.keys(EMPTY_FILTERS) as (keyof Filters)[]).reduce((sum, key) => {
@@ -446,6 +531,34 @@ export function ProductBrowser({
 
   const panel = (
     <div>
+      {categoryIsPreferred ? (
+        <div className="border-b border-line/70 pb-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-deep">
+            Your taste
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {forYouActive
+              ? "Showing the pieces that best match your choices."
+              : "See this category in the order that suits you."}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setForYouActive((active) => !active);
+              setVisible(PAGE_SIZE);
+            }}
+            className={`mt-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+              forYouActive
+                ? "bg-ink text-white hover:bg-accent-deep"
+                : "border border-line bg-surface text-ink hover:border-ink/40"
+            }`}
+            aria-pressed={forYouActive}
+          >
+            {forYouActive ? "Showing for you" : "For you"}
+          </button>
+        </div>
+      ) : null}
+
       {categoryOptions.length > 1 ? (
         <FilterSection
           title="Category"
@@ -667,6 +780,7 @@ export function ProductBrowser({
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted">
+            {forYouActive ? "For you - " : ""}
             {sorted.length} {sorted.length === 1 ? "product" : "products"}
           </p>
           <div className="flex items-center gap-2">

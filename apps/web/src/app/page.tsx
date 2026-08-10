@@ -1,15 +1,16 @@
-import { Suspense } from "react";
 import { FeaturedCategories } from "@/components/featured-categories";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { HomeCollections } from "@/components/home-collections";
-import { HomeDiscovery } from "@/components/home-discovery";
+import { HomeDiscovery, type IntentRail } from "@/components/home-discovery";
 import { HomeStores } from "@/components/home-stores";
-import { LocationHomeSync } from "@/components/location-home-sync";
 import { NewAndPopular, type PopularTab } from "@/components/new-and-popular";
 import { ProductRail } from "@/components/product-rail";
 import { RecentlyViewedRail } from "@/components/recently-viewed-rail";
 import { createClient } from "@/lib/supabase/server";
-import type { BrowseCategory } from "@/lib/browse-categories";
+import {
+  mergeFeaturedCategories,
+  type BrowseCategory,
+} from "@/lib/browse-categories";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
 import type { Product, Store, UaeEmirate } from "@/lib/types";
@@ -48,7 +49,9 @@ export default async function HomePage({
     ]);
 
   const list = (stores ?? []) as Store[];
-  const featured = (categories ?? []) as BrowseCategory[];
+  const featured = mergeFeaturedCategories(
+    (categories ?? []) as BrowseCategory[],
+  );
   const initialEmirate = emirate as UaeEmirate | undefined;
   const productList = (products ?? []) as ProductWithStore[];
   const ratingMap = await fetchProductRatingMap(
@@ -60,17 +63,39 @@ export default async function HomePage({
     ProductRatingSummary
   >;
 
+  const toRailProduct = (product: ProductWithStore, includeRating = false) => ({
+    id: product.id,
+    title: product.title,
+    price_aed: Number(product.price_aed),
+    compare_at_price_aed: product.compare_at_price_aed,
+    image_urls: product.image_urls,
+    href: `/stores/${product.stores.slug}/products/${product.id}`,
+    rating: includeRating ? ratingRecord[product.id] ?? null : undefined,
+  });
+
   const under99 = productList
-    .filter((p) => Number(p.price_aed) <= 99)
+    .filter((product) => Number(product.price_aed) <= 99)
     .slice(0, 10)
-    .map((p) => ({
-      id: p.id,
-      title: p.title,
-      price_aed: Number(p.price_aed),
-      compare_at_price_aed: p.compare_at_price_aed,
-      image_urls: p.image_urls,
-      href: `/stores/${p.stores.slug}/products/${p.id}`,
-    }));
+    .map((product) => toRailProduct(product));
+
+  const under199 = productList
+    .filter((product) => Number(product.price_aed) <= 199)
+    .slice(0, 10)
+    .map((product) => toRailProduct(product));
+
+  const luxuryPicks = productList
+    .filter((product) => Number(product.price_aed) >= 500)
+    .slice(0, 10)
+    .map((product) => toRailProduct(product));
+
+  const inStock = productList
+    .filter((product) => product.stock > 0)
+    .slice(0, 10)
+    .map((product) => toRailProduct(product));
+
+  const newIn = productList
+    .slice(0, 10)
+    .map((product) => toRailProduct(product));
 
   const topRated = [...productList]
     .map((product) => ({
@@ -84,24 +109,58 @@ export default async function HomePage({
         (b.rating?.reviewCount ?? 0) - (a.rating?.reviewCount ?? 0),
     )
     .slice(0, 10)
-    .map(({ product: p }) => ({
-      id: p.id,
-      title: p.title,
-      price_aed: Number(p.price_aed),
-      compare_at_price_aed: p.compare_at_price_aed,
-      image_urls: p.image_urls,
-      href: `/stores/${p.stores.slug}/products/${p.id}`,
-      rating: ratingRecord[p.id] ?? null,
-    }));
+    .map(({ product }) => toRailProduct(product, true));
 
-  const newIn = productList.slice(0, 10).map((p) => ({
-    id: p.id,
-    title: p.title,
-    price_aed: Number(p.price_aed),
-    compare_at_price_aed: p.compare_at_price_aed,
-    image_urls: p.image_urls,
-    href: `/stores/${p.stores.slug}/products/${p.id}`,
-  }));
+  const intentRails: IntentRail[] = [
+    {
+      id: "under-99",
+      label: "Under AED 99",
+      title: "Under AED 99",
+      subtitle: "Budget-friendly picks from local boutiques.",
+      href: "/search?max=99",
+      products: under99,
+    },
+    {
+      id: "under-199",
+      label: "Under AED 199",
+      title: "Under AED 199",
+      subtitle: "More to love, still easy on the budget.",
+      href: "/search?max=199",
+      products: under199,
+    },
+    {
+      id: "luxury",
+      label: "Luxury picks",
+      title: "Luxury picks",
+      subtitle: "Statement pieces made for special plans.",
+      href: "/search?min=500",
+      products: luxuryPicks,
+    },
+    {
+      id: "new-in",
+      label: "New in",
+      title: "New in",
+      subtitle: "Fresh drops from boutiques across the UAE.",
+      href: "/search?sort=new",
+      products: newIn,
+    },
+    {
+      id: "best-rated",
+      label: "Best rated",
+      title: "Best rated",
+      subtitle: "Looks shoppers love, sorted by verified ratings.",
+      href: "/search?sort=rated",
+      products: topRated.length > 0 ? topRated : newIn,
+    },
+    {
+      id: "in-stock",
+      label: "In stock",
+      title: "In stock",
+      subtitle: "Available now from boutiques near you.",
+      href: "/search?instock=1",
+      products: inStock,
+    },
+  ];
 
   const categoryTabs: PopularTab[] = featured
     .filter((category) => category.slug !== "more")
@@ -140,19 +199,11 @@ export default async function HomePage({
     <div>
       <HeroCarousel />
 
-      <Suspense fallback={null}>
-        <div className="border-b border-[#e2dfd8] bg-[#f8f7f4]">
-          <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-            <LocationHomeSync />
-          </div>
-        </div>
-      </Suspense>
-
-      <HomeStores stores={list} initialEmirate={initialEmirate} />
-
       <FeaturedCategories categories={featured} />
 
-      <HomeDiscovery />
+      <HomeDiscovery intents={intentRails} />
+
+      <HomeStores stores={list} initialEmirate={initialEmirate} />
 
       {topRated.length > 0 ? (
         <ProductRail
@@ -163,13 +214,6 @@ export default async function HomePage({
           href="/search?sort=rated"
         />
       ) : null}
-
-      <ProductRail
-        title="Under AED 99"
-        subtitle="Budget-friendly picks with same-hour delivery."
-        products={under99}
-        href="/under-99"
-      />
 
       <HomeCollections />
 

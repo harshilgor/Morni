@@ -9,9 +9,11 @@ import type { Store, UaeEmirate } from "@/lib/types";
 export function HomeStores({
   stores,
   initialEmirate,
+  layout = "rail",
 }: {
   stores: Store[];
   initialEmirate?: UaeEmirate;
+  layout?: "rail" | "grid";
 }) {
   const deliveryEmirate = useLocation((s) => s.emirate);
   const [selected, setSelected] = useState<UaeEmirate | "all">(
@@ -42,7 +44,7 @@ export function HomeStores({
       : stores.filter((store) => store.emirate === activeSelection);
 
   return (
-    <section id="stores" className="border-y border-[#e2dfd8] bg-[#f8f7f4]">
+    <section id="stores" className="scroll-mt-28 border-y border-[#e2dfd8] bg-[#f8f7f4]">
       <div className="mx-auto max-w-6xl px-4 pb-9 pt-10 sm:px-6">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -92,6 +94,12 @@ export function HomeStores({
             No stores in this emirate yet. Try another delivery location in the
             top bar.
           </p>
+        ) : layout === "grid" ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((store) => (
+              <StoreCard key={store.id} store={store} />
+            ))}
+          </div>
         ) : (
           <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {filtered.map((store) => (

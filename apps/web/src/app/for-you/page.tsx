@@ -20,7 +20,7 @@ export default async function ForYouPage() {
       .order("sort_order"),
     supabase
       .from("storefront_products")
-      .select("*, stores!inner(slug, name, is_active)")
+      .select("*, stores!inner(slug, name, is_active, emirate)")
       .eq("is_available", true)
       .eq("stores.is_active", true)
       .order("created_at", { ascending: false })
@@ -31,7 +31,7 @@ export default async function ForYouPage() {
     (c) => c.slug !== "more",
   );
   const productList = (products ?? []) as (Product & {
-    stores: { slug: string; name: string };
+    stores: { slug: string; name: string; is_active: boolean; emirate: string };
   })[];
 
   return (

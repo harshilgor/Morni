@@ -3,7 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
-import type { BrowseCategory } from "@/lib/browse-categories";
+import {
+  getBrowseCategory,
+  mergeBrowseCategories,
+  type BrowseCategory,
+} from "@/lib/browse-categories";
 
 export default async function CategoryPage({
   params,
@@ -19,8 +23,12 @@ export default async function CategoryPage({
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!categoryData) notFound();
-  const category = categoryData as BrowseCategory;
+  const category = getBrowseCategory(
+    slug,
+    categoryData ? [categoryData as BrowseCategory] : [],
+  );
+
+  if (!category) notFound();
 
   if (category.slug === "more") redirect("/categories");
 
@@ -56,7 +64,9 @@ export default async function CategoryPage({
   ]);
 
   const products = (productsData ?? []) as BrowsableProduct[];
-  const categories = (categoryList ?? []) as { name: string; slug: string }[];
+  const categories = mergeBrowseCategories(
+    (categoryList ?? []) as BrowseCategory[],
+  ).map(({ name, slug: categorySlug }) => ({ name, slug: categorySlug }));
   const ratingMap = await fetchProductRatingMap(
     supabase,
     products.map((product) => product.id),

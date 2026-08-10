@@ -215,6 +215,9 @@ export default function PortalOrdersPage() {
                         {order.delivery_building ? `, ${order.delivery_building}` : ""}
                         {order.delivery_apartment ? `, ${order.delivery_apartment}` : ""}
                       </p>
+                      {order.delivery_phone ? (
+                        <p className="mt-1 text-xs text-muted">Contact: {order.delivery_phone}</p>
+                      ) : null}
                       {order.delivery_notes ? (
                         <p className="mt-1 text-xs text-muted">Notes: {order.delivery_notes}</p>
                       ) : null}
@@ -246,4 +249,3 @@ export default function PortalOrdersPage() {
     </div>
   );
 }
-

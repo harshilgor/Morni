@@ -4,12 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import {
-  deliveryPromise,
-  emirateLabel,
-  formatAed,
-  orderStatusLabel,
-} from "@/lib/format";
+import { emirateLabel, formatAed, orderStatusLabel } from "@/lib/format";
 import type { Order, OrderItem, ProductReview } from "@/lib/types";
 import { ProductReviewForm } from "@/components/product-review-form";
 import { StarRating } from "@/components/star-rating";
@@ -78,9 +73,7 @@ export default function OrderDetailPage() {
         ← All orders
       </Link>
       <h1 className="mt-4 font-display text-4xl text-ink">{order.order_number}</h1>
-      <p className="mt-2 text-muted">
-        {orderStatusLabel(order.status)} · {deliveryPromise(order.delivery_eta_minutes)}
-      </p>
+      <p className="mt-2 text-muted">{orderStatusLabel(order.status)}</p>
 
       {order.status !== "cancelled" ? (
         <div className="mt-8 grid grid-cols-5 gap-2">
@@ -180,6 +173,9 @@ export default function OrderDetailPage() {
         <p className="text-muted">
           {order.delivery_area}, {emirateLabel(order.delivery_emirate)}
         </p>
+        {order.delivery_phone ? (
+          <p className="mt-2 text-muted">Contact: {order.delivery_phone}</p>
+        ) : null}
         {order.delivery_notes ? (
           <p className="mt-2 text-muted">Notes: {order.delivery_notes}</p>
         ) : null}

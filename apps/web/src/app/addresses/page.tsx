@@ -15,11 +15,13 @@ function formatEmirate(emirate: string) {
 
 function AddressCard({
   address,
+  onEdit,
   onDefault,
   onRemove,
   busy,
 }: {
   address: DeliveryAddress;
+  onEdit: () => void;
   onDefault: () => void;
   onRemove: () => void;
   busy: boolean;
@@ -39,9 +41,13 @@ function AddressCard({
         {address.building ? <p>{address.building}</p> : null}
         {address.apartment ? <p>{address.apartment}</p> : null}
         <p>{address.area}, {formatEmirate(address.emirate)}</p>
+        {address.phone ? <p className="mt-2 text-muted">{address.phone}</p> : null}
         {address.notes ? <p className="mt-3 text-xs text-muted">{address.notes}</p> : null}
       </div>
       <div className="mt-auto flex flex-wrap gap-x-4 gap-y-2 border-t border-line pt-4 text-sm font-semibold">
+        <button type="button" onClick={onEdit} disabled={busy} className="text-accent-deep hover:underline disabled:opacity-50">
+          Edit
+        </button>
         {!address.is_default ? (
           <button type="button" onClick={onDefault} disabled={busy} className="text-accent-deep hover:underline disabled:opacity-50">
             Set as default
@@ -72,6 +78,7 @@ function AddressesPageContent() {
   const [loading, setLoading] = useState(true);
   const [editorOpen, setEditorOpen] = useState(() => searchParams.get("new") === "1");
   const [editor, setEditor] = useState<AddressEditor>({ ...EMPTY_DELIVERY_ADDRESS, isDefault: true });
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,12 +110,34 @@ function AddressesPageContent() {
 
   function openEditor() {
     setError(null);
+    setEditingId(null);
     setEditor({ ...EMPTY_DELIVERY_ADDRESS, isDefault: addresses.length === 0 });
     setEditorOpen(true);
   }
 
+  function editAddress(address: DeliveryAddress) {
+    setError(null);
+    setEditingId(address.id);
+    setEditor({
+      label: address.label,
+      phone: address.phone ?? "",
+      emirate: address.emirate,
+      area: address.area,
+      street: address.street,
+      building: address.building ?? "",
+      apartment: address.apartment ?? "",
+      notes: address.notes ?? "",
+      isDefault: address.is_default,
+    });
+    setEditorOpen(true);
+    window.requestAnimationFrame(() => {
+      document.getElementById("address-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   function closeEditor() {
     setEditorOpen(false);
+    setEditingId(null);
     setError(null);
     if (searchParams.get("new") === "1") router.replace("/addresses");
   }
@@ -116,16 +145,16 @@ function AddressesPageContent() {
   async function saveAddress(event: FormEvent) {
     event.preventDefault();
     if (!userId) return;
-    if (!editor.label.trim() || !editor.area.trim() || !editor.street.trim()) {
-      setError("Add a name, area, and street address before saving.");
+    if (!editor.label.trim() || !editor.phone.trim() || !editor.area.trim() || !editor.street.trim()) {
+      setError("Add a name, contact number, area, and street address before saving.");
       return;
     }
     setSaving(true);
     setError(null);
     const supabase = createClient();
-    const { error: saveError } = await supabase.from("addresses").insert({
-      user_id: userId,
+    const payload = {
       label: editor.label.trim(),
+      phone: editor.phone.trim(),
       emirate: editor.emirate,
       area: editor.area.trim(),
       street: editor.street.trim(),
@@ -133,7 +162,11 @@ function AddressesPageContent() {
       apartment: editor.apartment.trim() || null,
       notes: editor.notes.trim() || null,
       is_default: editor.isDefault,
-    });
+    };
+    const request = editingId
+      ? supabase.from("addresses").update(payload).eq("id", editingId).eq("user_id", userId)
+      : supabase.from("addresses").insert({ user_id: userId, ...payload });
+    const { error: saveError } = await request;
     if (saveError) setError(saveError.message);
     else {
       closeEditor();
@@ -203,22 +236,26 @@ function AddressesPageContent() {
       {error ? <p className="mt-5 rounded-xl border border-accent/30 bg-sand px-4 py-3 text-sm text-accent-deep">{error}</p> : null}
 
       {editorOpen ? (
-        <form onSubmit={saveAddress} className="mt-7 rounded-2xl border border-ink bg-surface p-5 shadow-[0_20px_50px_-35px_rgba(28,20,24,0.6)] sm:p-6">
+        <form id="address-editor" onSubmit={saveAddress} className="scroll-mt-32 mt-7 rounded-2xl border border-ink bg-surface p-5 shadow-[0_20px_50px_-35px_rgba(28,20,24,0.6)] sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="font-display text-3xl text-ink">Add a new address</h2>
+              <h2 className="font-display text-3xl text-ink">{editingId ? "Edit address" : "Add a new address"}</h2>
               <p className="mt-1 text-sm text-muted">Use a clear name like Home, Work, or a recipient&apos;s name.</p>
             </div>
             <button type="button" onClick={closeEditor} disabled={saving} className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink hover:bg-background disabled:opacity-50">Cancel</button>
           </div>
           <div className="mt-5 max-w-2xl">
             <DeliveryAddressFields value={editor} onChange={(next) => setEditor((current) => ({ ...current, ...next }))} idPrefix="address-book" />
-            <label className="mt-4 flex items-center gap-2 text-sm text-ink">
-              <input type="checkbox" checked={editor.isDefault} onChange={(event) => setEditor((current) => ({ ...current, isDefault: event.target.checked }))} />
-              Make this my default delivery address
-            </label>
+            {editingId && addresses.find((address) => address.id === editingId)?.is_default ? (
+              <p className="mt-4 text-sm text-muted">This is your default delivery address.</p>
+            ) : (
+              <label className="mt-4 flex items-center gap-2 text-sm text-ink">
+                <input type="checkbox" checked={editor.isDefault} onChange={(event) => setEditor((current) => ({ ...current, isDefault: event.target.checked }))} />
+                Make this my default delivery address
+              </label>
+            )}
             <button type="submit" disabled={saving} className="mt-5 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white hover:bg-accent-deep disabled:opacity-50">
-              {saving ? "Saving..." : "Save address"}
+              {saving ? "Saving..." : editingId ? "Save changes" : "Save address"}
             </button>
           </div>
         </form>
@@ -230,7 +267,7 @@ function AddressesPageContent() {
           <span className="mt-4 font-display text-2xl text-ink">Add address</span>
           <span className="mt-1 text-sm text-muted">Home, work, or someone else</span>
         </button>
-        {addresses.map((address) => <AddressCard key={address.id} address={address} busy={busyId === address.id} onDefault={() => void setDefault(address)} onRemove={() => void removeAddress(address)} />)}
+        {addresses.map((address) => <AddressCard key={address.id} address={address} busy={busyId === address.id} onEdit={() => editAddress(address)} onDefault={() => void setDefault(address)} onRemove={() => void removeAddress(address)} />)}
       </section>
       {addresses.length === 0 ? <p className="mt-5 text-sm text-muted">Your saved addresses will appear here.</p> : null}
     </main>

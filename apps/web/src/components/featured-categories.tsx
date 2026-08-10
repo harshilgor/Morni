@@ -12,7 +12,7 @@ export function FeaturedCategories({
     category.slug === "shararas"
       ? "/categories/shararas.jpg"
       : category.slug === "kurtis"
-        ? "/categories/kurtis.webp"
+        ? "/categories/kurtis-featured.png"
         : category.slug === "party-wear"
           ? "/categories/party-wear.webp"
           : category.slug === "salwar-kameez"

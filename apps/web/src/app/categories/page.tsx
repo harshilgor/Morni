@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import type { BrowseCategory } from "@/lib/browse-categories";
+import {
+  mergeBrowseCategories,
+  type BrowseCategory,
+} from "@/lib/browse-categories";
 
 export default async function CategoriesIndexPage() {
   const supabase = await createClient();
@@ -11,7 +14,7 @@ export default async function CategoriesIndexPage() {
     .order("sort_order")
     .order("name");
 
-  const categories = (data ?? []) as BrowseCategory[];
+  const categories = mergeBrowseCategories((data ?? []) as BrowseCategory[]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">

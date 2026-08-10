@@ -39,6 +39,9 @@ function AddressCard({
         <br />
         {address.area}, {address.emirate.replace("_", " ")}
       </span>
+      {address.phone ? (
+        <span className="mt-1 block text-xs text-muted">{address.phone}</span>
+      ) : null}
       {selected ? (
         <span className="mt-2 block text-xs font-medium text-ink">Delivering here</span>
       ) : null}
