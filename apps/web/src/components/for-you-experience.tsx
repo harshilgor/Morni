@@ -157,11 +157,13 @@ export function ForYouExperience({
     if (!shopperId) return null;
     if (sessionIdRef.current) return sessionIdRef.current;
     if (!sessionPromiseRef.current) {
-      sessionPromiseRef.current = supabase
-        .from("taste_sessions")
-        .insert({ shopper_id: shopperId })
-        .select("id")
-        .single()
+      sessionPromiseRef.current = Promise.resolve(
+        supabase
+          .from("taste_sessions")
+          .insert({ shopper_id: shopperId })
+          .select("id")
+          .single(),
+      )
         .then(({ data }) => {
           sessionIdRef.current = data?.id ?? null;
           return sessionIdRef.current;
