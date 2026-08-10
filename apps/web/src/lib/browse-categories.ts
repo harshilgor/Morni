@@ -80,7 +80,7 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
   featuredCategory(
     "Pakistani Suits",
     "pakistani-suits",
-    "/categories/pakistani-suits.jpg",
+    "/categories/pakistani-suits.png",
     ["pakistani suit", "pakistani", "lawn suit", "three piece suit"],
     8,
   ),
@@ -94,14 +94,14 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
   featuredCategory(
     "Co-ord Sets",
     "sets",
-    "/categories/co-ord-sets.jpg",
+    "/categories/co-ord-sets.png",
     ["co-ord", "coord", "matching set", "two piece set"],
     10,
   ),
   featuredCategory(
     "Party Wear",
     "party-wear",
-    "/categories/party-wear.webp",
+    "/categories/party-wear.png",
     ["party", "evening", "sequin", "cocktail", "occasion"],
     11,
     "Party",

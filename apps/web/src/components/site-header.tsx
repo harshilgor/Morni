@@ -380,9 +380,6 @@ export function SiteHeader() {
           <Link href="/" className="shrink-0 font-medium text-white/90 hover:text-white">
             Home
           </Link>
-          <Link href="/stores" className="shrink-0 font-medium text-white/90 hover:text-white">
-            Stores
-          </Link>
           <Link
             href="/for-you"
             className="shrink-0 rounded-full bg-white px-3.5 py-1 text-sm font-medium shadow-sm transition hover:bg-[#fff6f8]"
@@ -413,6 +410,9 @@ export function SiteHeader() {
             }`}
           >
             Occasions
+          </Link>
+          <Link href="/stores" className="shrink-0 font-medium text-white/90 hover:text-white">
+            Stores
           </Link>
           {isStoreOwner ? (
             <Link href="/portal" className="shrink-0 text-white/85 hover:text-white">
