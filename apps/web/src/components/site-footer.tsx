@@ -16,16 +16,14 @@ export function SiteFooter() {
     ? [
         { href: "/orders", label: "Your orders" },
         { href: "/wishlist", label: "Your wishlist" },
-        { href: "/cart", label: "Your cart" },
-        { href: "/checkout", label: "Checkout" },
+        { href: "/checkout", label: "Your cart" },
         { href: "/auth", label: "Account" },
       ]
     : [
         { href: "/auth", label: "Sign in" },
         { href: "/orders", label: "Orders" },
         { href: "/wishlist", label: "Wishlist" },
-        { href: "/cart", label: "Cart" },
-        { href: "/checkout", label: "Checkout" },
+        { href: "/checkout", label: "Cart" },
       ];
 
   const columns = [
@@ -90,7 +88,7 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-white/45 sm:px-5">
           <span>© {new Date().getFullYear()} Morni</span>
-          <span>Pay on delivery · Gateway coming soon</span>
+          <span>Secure online payments coming soon</span>
         </div>
       </div>
     </footer>

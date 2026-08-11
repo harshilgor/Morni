@@ -259,7 +259,7 @@ export function SiteHeader() {
                         Your orders
                       </Link>
                       <Link
-                        href="/cart"
+                        href="/checkout"
                         className="block rounded-lg px-2 py-2 text-sm hover:bg-background"
                         onClick={() => setAccountOpen(false)}
                       >
@@ -348,7 +348,7 @@ export function SiteHeader() {
           </Link>
 
           <Link
-            href="/cart"
+            href="/checkout"
             className="relative flex shrink-0 items-end gap-1 rounded-md border border-transparent px-1.5 py-1 transition hover:border-white/35 hover:bg-white/5"
             aria-label={`Cart, ${count} items`}
           >
@@ -413,6 +413,18 @@ export function SiteHeader() {
           </Link>
           <Link href="/stores" className="shrink-0 font-medium text-white/90 hover:text-white">
             Stores
+          </Link>
+          <Link
+            href="/under-99"
+            className="shrink-0 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium text-white transition hover:border-white/50 hover:bg-white/20"
+          >
+            Under AED 99
+          </Link>
+          <Link
+            href="/under-149"
+            className="shrink-0 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium text-white transition hover:border-white/50 hover:bg-white/20"
+          >
+            Under AED 149
           </Link>
           {isStoreOwner ? (
             <Link href="/portal" className="shrink-0 text-white/85 hover:text-white">

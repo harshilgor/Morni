@@ -12,6 +12,7 @@ import { WishlistToggle } from "@/components/wishlist-toggle";
 import { ProductReviewsSection } from "@/components/product-reviews-section";
 import { formatRatingLabel } from "@/lib/product-ratings";
 import { StarRating } from "@/components/star-rating";
+import { SizeGuide } from "@/components/size-guide";
 
 type StoreCampaign = {
   id: string;
@@ -350,6 +351,8 @@ export default function ProductPage() {
           {product.description ? (
             <p className="max-w-md text-muted">{product.description}</p>
           ) : null}
+
+          <SizeGuide />
 
           {variants.length > 0 ? (
             <div>

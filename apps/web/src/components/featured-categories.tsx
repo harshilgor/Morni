@@ -14,13 +14,15 @@ export function FeaturedCategories({
       : category.slug === "kurtis"
         ? "/categories/kurtis-featured.png"
         : category.slug === "party-wear"
-          ? "/categories/party-wear.webp"
+          ? "/categories/party-wear-featured.png"
           : category.slug === "salwar-kameez"
             ? "/categories/salwar-kameez.webp"
             : category.slug === "indo-western"
               ? "/categories/indo-western.jpeg"
               : category.slug === "lehengas"
                 ? "/categories/lehengas.webp"
+                : category.slug === "office-wear"
+                  ? "/categories/office-wear-featured.png"
                 : category.image_url;
 
   return (

@@ -307,21 +307,25 @@ export function ForYouExperience({
     return (
       <main className="mx-auto max-w-3xl px-4 py-7 sm:px-6 sm:py-10">
         <div className="sticky top-0 z-20 -mx-4 border-b border-line/70 bg-background/95 px-4 pb-4 pt-1 backdrop-blur sm:-mx-6 sm:px-6">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-deep">Your edit</p>
-              <h1 className="mt-1 font-display text-3xl text-ink">Tell us what feels like you</h1>
+          <div className="rounded-lg border border-line/80 bg-surface/90 px-4 py-4 shadow-sm sm:px-5">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-deep">Your edit</p>
+                <h1 className="mt-1 font-display text-3xl leading-tight text-ink">Tell us what feels like you</h1>
+              </div>
+              <p className="shrink-0 rounded-full bg-sand px-3 py-1 text-sm font-medium text-muted">
+                {Math.min(completedSwipes + 1, deck.length)} of {deck.length}
+              </p>
             </div>
-            <p className="shrink-0 text-sm text-muted">{Math.min(completedSwipes + 1, deck.length)} of {deck.length}</p>
-          </div>
-          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-line">
-            <div className="h-full rounded-full bg-accent-deep transition-all duration-300" style={{ width: `${Math.max(5, progress * 100)}%` }} />
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-line/80">
+              <div className="h-full rounded-full bg-accent-deep transition-all duration-300" style={{ width: `${Math.max(5, progress * 100)}%` }} />
+            </div>
           </div>
         </div>
 
-        <section className="animate-rise pt-6">
-          <p className="mx-auto mb-5 max-w-md text-center text-sm text-muted">
-            Swipe right for more like this, or left to pass. Every card is a real piece from a local Morni store.
+        <section className="animate-rise pt-7">
+          <p className="mx-auto mb-6 max-w-md text-center text-sm leading-relaxed text-muted">
+            Swipe right to save the feeling, or left to pass. Every piece is available from a local Morni store.
           </p>
           <div className="relative mx-auto h-[min(48vh,500px)] w-full max-w-md touch-none select-none">
             {deck.slice(activeIndex + 1, activeIndex + 3).map((card, cardIndex) => (
@@ -344,7 +348,7 @@ export function ForYouExperience({
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
-              className="absolute inset-0 z-10 cursor-grab overflow-hidden rounded-lg bg-ink shadow-lg active:cursor-grabbing"
+              className="absolute inset-0 z-10 cursor-grab overflow-hidden rounded-lg bg-ink shadow-xl shadow-ink/15 active:cursor-grabbing"
               style={{
                 transform: `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x * 0.04}deg)`,
                 transition: drag.active ? "none" : "transform 0.25s ease",
@@ -365,7 +369,7 @@ export function ForYouExperience({
               >
                 Pass
               </span>
-              <div className="absolute inset-x-0 bottom-0 space-y-1.5 p-5 text-white">
+              <div className="absolute inset-x-0 bottom-0 space-y-1.5 p-5 text-white sm:p-6">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/75">{current.categoryName} - {current.storeName}</p>
                 <h2 className="font-display text-3xl leading-tight">{current.title}</h2>
                 <p className="pt-1 text-sm font-medium">{formatAed(current.priceAed)}</p>
@@ -373,10 +377,26 @@ export function ForYouExperience({
             </div>
           </div>
 
-          <div className="mt-6 flex items-center justify-center gap-5">
-            <button type="button" onClick={() => vote("passed")} className="flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface text-xl text-ink shadow-sm transition hover:border-rose-300 hover:text-rose-500" aria-label="Pass">X</button>
-            <button type="button" onClick={() => setStep("results")} disabled={!canFinish} className="rounded-full border border-line px-4 py-2 text-xs font-medium uppercase tracking-[0.12em] text-muted transition enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-45">See my edit</button>
-            <button type="button" onClick={() => vote("liked")} className="flex h-14 w-14 items-center justify-center rounded-full bg-ink text-xl text-white shadow-sm transition hover:bg-accent-deep" aria-label="Like">Heart</button>
+          <div className="mt-7 flex items-center justify-center gap-4 sm:gap-6">
+            <button
+              type="button"
+              onClick={() => vote("passed")}
+              className="flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface text-2xl leading-none text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-rose-300 hover:text-rose-500 hover:shadow-md"
+              aria-label="Pass this piece"
+              title="Pass"
+            >
+              &#215;
+            </button>
+            <button type="button" onClick={() => setStep("results")} disabled={!canFinish} className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-medium uppercase tracking-[0.12em] text-muted shadow-sm transition enabled:hover:-translate-y-0.5 enabled:hover:border-accent enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-45">See my edit</button>
+            <button
+              type="button"
+              onClick={() => vote("liked")}
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-ink text-2xl leading-none text-white shadow-md transition hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-lg"
+              aria-label="Like this piece"
+              title="Like"
+            >
+              <span aria-hidden="true">&#10084;&#65039;</span>
+            </button>
           </div>
           <p className="mt-3 text-center text-xs text-muted">
             {canFinish ? "You have enough signals to see your edit whenever you are ready." : `${Math.max(minimumSwipes - completedSwipes, 0)} more choices unlock your edit.`}

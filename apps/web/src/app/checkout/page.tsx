@@ -1,7 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/cart";
@@ -28,11 +27,12 @@ function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   } as DeliveryAddressDraft;
 }
 
+const paymentMethods = [
+  { title: "Apple Pay", detail: "Fast checkout on supported devices" },
+];
+
 export default function CheckoutPage() {
-  const router = useRouter();
-  const { items, subtotal, clear, removeItem, setQuantity } = useCart();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { items, subtotal, removeItem, setQuantity } = useCart();
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<DeliveryAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -40,6 +40,12 @@ export default function CheckoutPage() {
   const [makeDefault, setMakeDefault] = useState(false);
   const [form, setForm] = useState<DeliveryAddressDraft>(EMPTY_DELIVERY_ADDRESS);
   const [recommendations, setRecommendations] = useState<RailProduct[]>([]);
+  const [cardDetailsOpen, setCardDetailsOpen] = useState(false);
+  const orderSubtotal = subtotal();
+  const smallOrderFee = orderSubtotal < 99 ? 15 : 0;
+  const deliveryFee = 7;
+  const serviceFee = 3;
+  const orderTotal = orderSubtotal + smallOrderFee + deliveryFee + serviceFee;
 
   useEffect(() => {
     const supabase = createClient();
@@ -123,107 +129,6 @@ export default function CheckoutPage() {
     });
   }, []);
 
-  async function persistAddress(userId: string) {
-    if (!saveAddress) return true;
-    if (!form.label.trim()) {
-      setError("Give this address a name before saving it.");
-      return false;
-    }
-
-    const supabase = createClient();
-    const payload = {
-      label: form.label.trim(),
-      emirate: form.emirate,
-      area: form.area.trim(),
-      street: form.street.trim(),
-      building: form.building.trim() || null,
-      apartment: form.apartment.trim() || null,
-      notes: form.notes.trim() || null,
-      is_default: makeDefault,
-    };
-    const request = selectedAddressId
-      ? supabase.from("addresses").update(payload).eq("id", selectedAddressId)
-      : supabase.from("addresses").insert({ user_id: userId, ...payload });
-    const { error: saveError } = await request;
-    if (saveError) {
-      setError(saveError.message);
-      return false;
-    }
-    return true;
-  }
-
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (items.length === 0) return;
-    setLoading(true);
-    setError(null);
-
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Please sign in to place an order.");
-      setLoading(false);
-      router.push("/auth?next=/checkout");
-      return;
-    }
-
-    const addressSaved = await persistAddress(user.id);
-    if (!addressSaved) {
-      setLoading(false);
-      return;
-    }
-
-    const storeId = items[0].storeId;
-    const orderSubtotal = subtotal();
-    const deliveryFee = 0;
-    const total = orderSubtotal + deliveryFee;
-
-    const { data: store } = await supabase
-      .from("stores")
-      .select("delivery_eta_minutes")
-      .eq("id", storeId)
-      .single();
-
-    const { data: order, error: orderError } = await supabase.rpc(
-      "place_order_with_items",
-      {
-        p_store_id: storeId,
-        p_payment_method: "cod",
-        p_subtotal_aed: orderSubtotal,
-        p_delivery_fee_aed: deliveryFee,
-        p_total_aed: total,
-        p_delivery_emirate: form.emirate,
-        p_delivery_area: form.area.trim(),
-        p_delivery_street: form.street.trim(),
-        p_delivery_building: form.building.trim() || null,
-        p_delivery_apartment: form.apartment.trim() || null,
-        p_delivery_notes: form.notes.trim() || null,
-        p_delivery_eta_minutes: store?.delivery_eta_minutes ?? 60,
-        p_items: items.map((item) => ({
-          product_id: item.productId,
-          variant_id: item.variantId ?? null,
-          title: item.title,
-          size: item.size || null,
-          color_name: item.colorName || null,
-          unit_price_aed: item.priceAed,
-          quantity: item.quantity,
-        })),
-      },
-    );
-
-    if (orderError || !order) {
-      setError(orderError?.message ?? "Could not place order.");
-      setLoading(false);
-      return;
-    }
-
-    clear();
-    router.push(`/orders/${(order as { id: string }).id}`);
-  }
-
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">
@@ -237,7 +142,6 @@ export default function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
-      <form onSubmit={onSubmit}>
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-14">
       <div className="min-w-0 space-y-8">
         <header>
@@ -393,18 +297,111 @@ export default function CheckoutPage() {
           </div>
         ) : null}
 
-        <div className="border border-line bg-background px-4 py-3 text-sm">
-          <p className="font-medium text-ink">Payment</p>
-          <p className="mt-1 text-muted">
-            Cash / card on delivery. Online payments will be added after infrastructure.
-          </p>
-          <p className="mt-2 text-xs uppercase tracking-wide text-mint">
-            Payment on delivery
-          </p>
-        </div>
-        </section>
+        <section aria-labelledby="payment-heading" className="border-t border-line pt-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Payment</p>
+              <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Pay securely online</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+                We are preparing a secure online payment experience for Morni.
+              </p>
+            </div>
+            <span className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-muted">
+              Coming soon
+            </span>
+          </div>
 
-        {error ? <p className="text-sm text-accent-deep">{error}</p> : null}
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              aria-expanded={cardDetailsOpen}
+              aria-controls="card-payment-details"
+              onClick={() => setCardDetailsOpen((open) => !open)}
+              className={`rounded-xl border p-4 text-left transition ${
+                cardDetailsOpen
+                  ? "border-ink bg-background ring-1 ring-ink"
+                  : "border-line bg-surface hover:border-ink/40"
+              }`}
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="font-medium text-ink">Card</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">
+                  {cardDetailsOpen ? "Selected" : "Select"}
+                </span>
+              </span>
+              <span className="mt-1 block text-xs leading-relaxed text-muted">Visa, Mastercard and more</span>
+            </button>
+            {paymentMethods.map((method) => (
+              <div key={method.title} aria-disabled="true" className="rounded-xl border border-line bg-surface p-4 opacity-70">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium text-ink">{method.title}</p>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">Soon</span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{method.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          {cardDetailsOpen ? (
+            <div id="card-payment-details" className="mt-3 rounded-xl border border-line bg-background p-4 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-medium text-ink">Card details</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">Your details will be entered securely through our payment partner.</p>
+                </div>
+                <span className="rounded-full bg-sand px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">Preview</span>
+              </div>
+              <fieldset disabled className="mt-5 grid gap-4 sm:grid-cols-2">
+                <label className="sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-medium text-ink">Card number</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="cc-number"
+                    placeholder="1234  5678  9012  3456"
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-3 text-sm text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-70"
+                  />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-xs font-medium text-ink">Expiry date</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="cc-exp"
+                    placeholder="MM / YY"
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-3 text-sm text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-70"
+                  />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-xs font-medium text-ink">Security code</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="cc-csc"
+                    placeholder="CVV"
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-3 text-sm text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-70"
+                  />
+                </label>
+                <label className="sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-medium text-ink">Name on card</span>
+                  <input
+                    type="text"
+                    autoComplete="cc-name"
+                    placeholder="As shown on your card"
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-3 text-sm text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-70"
+                  />
+                </label>
+              </fieldset>
+              <p className="mt-4 text-xs leading-relaxed text-muted">This is a design preview only — do not enter card information. These secure fields will be enabled when the payment provider is connected.</p>
+            </div>
+          ) : null}
+
+          <p className="mt-4 flex items-center gap-2 text-xs leading-relaxed text-muted">
+            <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full border border-line text-[11px] text-ink">✓</span>
+            Payment details will be handled by a certified payment provider and never stored by Morni.
+          </p>
+        </section>
+        </section>
 
       </div>
 
@@ -412,24 +409,27 @@ export default function CheckoutPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Order total</p>
         <h2 className="mt-1 font-display text-3xl text-ink">Price details</h2>
         <div className="mt-6 space-y-3 border-y border-line py-5 text-sm">
-          <div className="flex justify-between gap-4"><span className="text-muted">Subtotal</span><span>{formatAed(subtotal())}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-muted">Delivery</span><span className="font-medium text-mint">Free</span></div>
+          <div className="flex justify-between gap-4"><span className="text-muted">Subtotal</span><span>{formatAed(orderSubtotal)}</span></div>
+          {smallOrderFee > 0 ? (
+            <div className="flex justify-between gap-4"><span className="text-muted">Small order fee (under AED 99)</span><span>{formatAed(smallOrderFee)}</span></div>
+          ) : null}
+          <div className="flex justify-between gap-4"><span className="text-muted">Delivery fee</span><span>{formatAed(deliveryFee)}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-muted">Service fee</span><span>{formatAed(serviceFee)}</span></div>
         </div>
         <div className="mt-5 flex justify-between gap-4 text-lg font-semibold text-ink">
           <span>Total</span>
-          <span>{formatAed(subtotal())}</span>
+          <span>{formatAed(orderTotal)}</span>
         </div>
         <button
-          type="submit"
-          disabled={loading || authed === false}
-          className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:opacity-50"
+          type="button"
+          disabled
+          className="mt-6 w-full cursor-not-allowed bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white opacity-50"
         >
-          {loading ? "Placing order..." : authed === false ? "Sign in to continue" : "Place order"}
+          Secure payment coming soon
         </button>
-        <p className="mt-3 text-center text-xs leading-relaxed text-muted">Pay securely by cash or card on delivery. No delivery fee applies to this order.</p>
+        <p className="mt-3 text-center text-xs leading-relaxed text-muted">Online payment will be required to place this order. Delivery and service fees are included above.</p>
       </aside>
       </div>
-      </form>
 
       <div className="mt-8 border-t border-line">
         <ProductRail
