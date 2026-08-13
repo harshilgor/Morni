@@ -60,6 +60,7 @@ function AuthForm() {
         setLoading(false);
         return;
       }
+      void fetch("/api/emails/welcome", { method: "POST" });
       router.push(next.startsWith("/") ? next : "/");
       router.refresh();
       return;
@@ -79,6 +80,7 @@ function AuthForm() {
       return;
     }
 
+    void fetch("/api/emails/welcome", { method: "POST" });
     setMessage("Account created. You can sign in now.");
     setMode("signin");
     setLoading(false);

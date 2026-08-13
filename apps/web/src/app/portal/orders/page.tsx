@@ -66,14 +66,14 @@ export default function PortalOrdersPage() {
   async function advance(order: OrderWithItems) {
     const next = NEXT_STATUS[order.status];
     if (!next) return;
-    const supabase = createClient();
-    const updatePayload: { status: OrderStatus } = { status: next };
-    const { error: err } = await supabase
-      .from("orders")
-      .update(updatePayload)
-      .eq("id", order.id);
-    if (err) {
-      setMessage(err.message);
+    const response = await fetch(`/api/orders/${order.id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      setMessage(payload?.error ?? "Unable to update this order.");
       return;
     }
     setOrders((prev) =>
