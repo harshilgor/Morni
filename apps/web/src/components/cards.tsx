@@ -80,6 +80,8 @@ export function ProductCard({
           <img
             src={image}
             alt={product.title}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
           />
         ) : null}

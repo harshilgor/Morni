@@ -205,7 +205,7 @@ export function SiteHeader() {
             Morni
           </Link>
 
-          <div className="shrink-0">
+          <div className="hidden shrink-0 sm:block">
             <button
               type="button"
               onClick={toggleLocationPanel}
@@ -533,6 +533,21 @@ export function SiteHeader() {
           </div>
         ) : null}
       </div>
+
+      <button
+        type="button"
+        onClick={toggleLocationPanel}
+        className="flex w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 py-2.5 text-left text-white transition hover:bg-[#433038] sm:hidden"
+        aria-expanded={locationOpen}
+        aria-haspopup="dialog"
+        aria-controls="delivery-location-dialog"
+      >
+        <PinIcon className="h-5 w-5 shrink-0 text-white/90" />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {firstName ? `Deliver to ${firstName} - ${locationLabel}` : `Deliver to ${locationLabel}`}
+        </span>
+        <span aria-hidden="true" className="text-lg leading-none text-white/75">&#8964;</span>
+      </button>
 
       {locationOpen ? (
         <div

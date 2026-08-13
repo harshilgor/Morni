@@ -13,6 +13,7 @@ import {
 } from "@/lib/browse-categories";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
+import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
 import type { Product, Store, UaeEmirate } from "@/lib/types";
 
 type ProductWithStore = Product & {
@@ -165,14 +166,9 @@ export default async function HomePage({
   const categoryTabs: PopularTab[] = featured
     .filter((category) => category.slug !== "more")
     .map((category) => {
-      const terms = (category.search_terms ?? []).map((term) =>
-        term.toLowerCase(),
+      const matches = productList.filter((product) =>
+        productMatchesBrowseCategory(category, product),
       );
-      const matches = productList.filter((p) => {
-        if (terms.length === 0) return false;
-        const haystack = `${p.title} ${p.description ?? ""}`.toLowerCase();
-        return terms.some((term) => haystack.includes(term));
-      });
       return {
         slug: category.slug,
         label: category.name,

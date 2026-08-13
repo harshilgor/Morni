@@ -2,7 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
 import { createClient } from "@/lib/supabase/server";
-import { fetchProductRatingMap } from "@/lib/product-ratings";
+import {
+  CATEGORY_PRODUCT_BATCH_SIZE,
+  getCategoryProductPage,
+} from "@/lib/category-product-page";
 import {
   getBrowseCategory,
   mergeBrowseCategories,
@@ -17,6 +20,11 @@ export default async function CategoryPage({
   const { slug } = await params;
   const supabase = await createClient();
 
+  const categoryListPromise = supabase
+    .from("browse_categories")
+    .select("name, slug")
+    .neq("slug", "more")
+    .order("sort_order");
   const { data: categoryData } = await supabase
     .from("browse_categories")
     .select("*")
@@ -32,46 +40,15 @@ export default async function CategoryPage({
 
   if (category.slug === "more") redirect("/categories");
 
-  const terms = (category.search_terms ?? [])
-    .map((term) => term.replace(/[,()]/g, " ").trim())
-    .filter(Boolean);
-
-  let productsQuery = supabase
-    .from("storefront_products")
-    .select(
-      "*, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
-    )
-    .eq("is_available", true)
-    .eq("stores.is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(200);
-
-  if (terms.length > 0) {
-    productsQuery = productsQuery.or(
-      terms
-        .flatMap((term) => [`title.ilike.%${term}%`, `description.ilike.%${term}%`])
-        .join(","),
-    );
-  }
-
-  const [{ data: productsData }, { data: categoryList }] = await Promise.all([
-    productsQuery,
-    supabase
-      .from("browse_categories")
-      .select("name, slug")
-      .neq("slug", "more")
-      .order("sort_order"),
+  const [productPage, { data: categoryList }] = await Promise.all([
+    getCategoryProductPage(supabase, category, 0, CATEGORY_PRODUCT_BATCH_SIZE),
+    categoryListPromise,
   ]);
-
-  const products = (productsData ?? []) as BrowsableProduct[];
+  const products = productPage.products as BrowsableProduct[];
   const categories = mergeBrowseCategories(
     (categoryList ?? []) as BrowseCategory[],
   ).map(({ name, slug: categorySlug }) => ({ name, slug: categorySlug }));
-  const ratingMap = await fetchProductRatingMap(
-    supabase,
-    products.map((product) => product.id),
-  );
-  const ratings = Object.fromEntries(ratingMap);
+  const ratings = productPage.ratings;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8">
@@ -96,7 +73,7 @@ export default async function CategoryPage({
             {category.name}
           </h1>
           <p className="mt-2 text-sm text-muted">
-            {products.length} {products.length === 1 ? "piece" : "pieces"} from local boutiques
+            {products.length}{productPage.hasMore ? "+" : ""} {products.length === 1 ? "piece" : "pieces"} from local boutiques
           </p>
         </div>
         {category.badge ? (
@@ -132,10 +109,13 @@ export default async function CategoryPage({
           </div>
         ) : (
           <ProductBrowser
+            key={category.slug}
             products={products}
             categories={categories}
             activeSlug={category.slug}
             ratings={ratings}
+            hasMore={productPage.hasMore}
+            loadMoreUrl={`/api/categories/${category.slug}/products`}
           />
         )}
       </div>

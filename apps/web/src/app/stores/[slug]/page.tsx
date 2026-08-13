@@ -5,6 +5,7 @@ import {
   type BrowsableProduct,
 } from "@/components/product-browser";
 import { createClient } from "@/lib/supabase/server";
+import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
 import { emirateLabel } from "@/lib/format";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
 import type { Product, Store } from "@/lib/types";
@@ -85,11 +86,8 @@ export default async function StorePage({
   // matching the catalog's search terms against the title.
   function categoryFor(product: StoreProduct) {
     if (product.categories) return product.categories;
-    const text = `${product.title} ${product.description ?? ""}`.toLowerCase();
     const hit = catalog.find((category) =>
-      (category.search_terms ?? []).some((term) =>
-        text.includes(term.toLowerCase()),
-      ),
+      productMatchesBrowseCategory(category, product),
     );
     return hit ? { name: hit.name, slug: hit.slug } : null;
   }

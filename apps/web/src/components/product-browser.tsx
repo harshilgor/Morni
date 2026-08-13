@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/cards";
 import { emirateLabel } from "@/lib/format";
 import { profileFromSwipes, type TasteProfile, type TasteSwipe } from "@/lib/for-you";
@@ -39,6 +39,12 @@ export type BrowsableProduct = {
     area: string;
     delivery_eta_minutes: number;
   };
+};
+
+type ProductPageResponse = {
+  products: BrowsableProduct[];
+  ratings: Record<string, ProductRatingSummary>;
+  hasMore: boolean;
 };
 
 type Annotated = BrowsableProduct & {
@@ -286,13 +292,26 @@ export function ProductBrowser({
   categories,
   activeSlug,
   ratings = {},
+  hasMore: initialHasMore = false,
+  loadMoreUrl,
 }: {
   products: BrowsableProduct[];
   categories?: { name: string; slug: string }[];
   activeSlug?: string;
   ratings?: Record<string, ProductRatingSummary>;
+  hasMore?: boolean;
+  loadMoreUrl?: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const [loadedProducts, setLoadedProducts] = useState(products);
+  const [loadedRatings, setLoadedRatings] = useState(ratings);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+  const nextOffsetRef = useRef(products.length);
+  const prefetchedPageRef = useRef<{ offset: number; page: ProductPageResponse } | null>(null);
+  const pageRequestsRef = useRef(new Map<number, Promise<ProductPageResponse>>());
+  const loadTriggerRef = useRef<HTMLDivElement>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState("recommended");
   const [visible, setVisible] = useState(PAGE_SIZE);
@@ -348,9 +367,92 @@ export function ProductBrowser({
   }, [supabase]);
 
   const annotated = useMemo(
-    () => products.map((product) => annotate(product, ratings)),
-    [products, ratings],
+    () => loadedProducts.map((product) => annotate(product, loadedRatings)),
+    [loadedProducts, loadedRatings],
   );
+
+  const requestPage = useCallback(
+    async (offset: number) => {
+      if (!loadMoreUrl) throw new Error("No product loader is configured.");
+      const existing = pageRequestsRef.current.get(offset);
+      if (existing) return existing;
+
+      const request = fetch(`${loadMoreUrl}?offset=${offset}`, {
+        credentials: "same-origin",
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Unable to load more products.");
+          return (await response.json()) as ProductPageResponse;
+        })
+        .finally(() => pageRequestsRef.current.delete(offset));
+      pageRequestsRef.current.set(offset, request);
+      return request;
+    },
+    [loadMoreUrl],
+  );
+
+  const appendNextPage = useCallback(async () => {
+    if (!loadMoreUrl || !hasMore || isLoadingMore) return;
+    const offset = nextOffsetRef.current;
+    setIsLoadingMore(true);
+    setLoadMoreError(false);
+    try {
+      const cached = prefetchedPageRef.current;
+      const page =
+        cached?.offset === offset ? cached.page : await requestPage(offset);
+      prefetchedPageRef.current = null;
+      const nextLoadedCount = nextOffsetRef.current + page.products.length;
+      setLoadedProducts((current) => [...current, ...page.products]);
+      setLoadedRatings((current) => ({ ...current, ...page.ratings }));
+      setVisible((current) => Math.max(current, nextLoadedCount));
+      nextOffsetRef.current = nextLoadedCount;
+      setHasMore(page.hasMore);
+    } catch {
+      setLoadMoreError(true);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMore, isLoadingMore, loadMoreUrl, requestPage]);
+
+  useEffect(() => {
+    if (!loadMoreUrl || !hasMore || isLoadingMore || prefetchedPageRef.current) return;
+    let cancelled = false;
+    const offset = nextOffsetRef.current;
+    const prefetch = () => {
+      void requestPage(offset)
+        .then((page) => {
+          if (!cancelled && nextOffsetRef.current === offset) {
+            prefetchedPageRef.current = { offset, page };
+          }
+        })
+        .catch(() => undefined);
+    };
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const idleId = idleWindow.requestIdleCallback
+      ? idleWindow.requestIdleCallback(prefetch, { timeout: 1200 })
+      : window.setTimeout(prefetch, 500);
+    return () => {
+      cancelled = true;
+      if (idleWindow.cancelIdleCallback) idleWindow.cancelIdleCallback(idleId);
+      else window.clearTimeout(idleId);
+    };
+  }, [hasMore, isLoadingMore, loadMoreUrl, requestPage]);
+
+  useEffect(() => {
+    const trigger = loadTriggerRef.current;
+    if (!trigger || !loadMoreUrl || !hasMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) void appendNextPage();
+      },
+      { rootMargin: "360px 0px" },
+    );
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, [appendNextPage, hasMore, loadMoreUrl]);
 
   const sizeOptions = useMemo(
     () =>
@@ -892,12 +994,23 @@ export function ProductBrowser({
                     compare_at_price_aed: product.compare_at_price_aed,
                     image_urls: product.image_urls ?? [],
                   }}
-                  rating={ratings[product.id] ?? null}
+                  rating={loadedRatings[product.id] ?? null}
                   href={`/stores/${product.stores.slug}/products/${product.id}`}
                 />
               ))}
             </div>
-            {visible < sorted.length ? (
+            {loadMoreUrl && hasMore ? (
+              <div ref={loadTriggerRef} className="mt-8 flex min-h-12 justify-center">
+                <button
+                  type="button"
+                  onClick={() => void appendNextPage()}
+                  disabled={isLoadingMore}
+                  className="rounded-full border border-ink px-6 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink transition hover:bg-ink hover:text-white disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isLoadingMore ? "Loading pieces…" : "Load more"}
+                </button>
+              </div>
+            ) : visible < sorted.length ? (
               <div className="mt-8 flex justify-center">
                 <button
                   type="button"
@@ -907,6 +1020,11 @@ export function ProductBrowser({
                   Load more
                 </button>
               </div>
+            ) : null}
+            {loadMoreError ? (
+              <p className="mt-3 text-center text-sm text-muted">
+                We could not load more pieces. Please try again.
+              </p>
             ) : null}
             {sorted.length > 0 && sorted.length <= 4 && categories && categories.length > 0 ? (
               <div className="mt-10 border-t border-line pt-7">
