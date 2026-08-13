@@ -19,8 +19,8 @@ export function PortalPageHeader({
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
         {eyebrow ? <p className="portal-eyebrow">{eyebrow}</p> : null}
-        <h1 className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-[#1d2925] sm:text-4xl">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#66736e]">{description}</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-[-0.035em] text-[#17231f] sm:text-[2.15rem]">{title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#596963]">{description}</p>
       </div>
       {children ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null}
     </div>
@@ -50,8 +50,8 @@ export function PortalMetric({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="portal-eyebrow">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#1d2925]">{value}</p>
-          {detail ? <p className="mt-1 text-xs text-[#7b8882]">{detail}</p> : null}
+          <p className="mt-2 text-2xl font-bold tabular-nums tracking-[-0.04em] text-[#17231f]">{value}</p>
+          {detail ? <p className="mt-1 text-xs leading-5 text-[#687770]">{detail}</p> : null}
         </div>
         {icon ? <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf3f0] text-[#3c685c]"><PortalIcon name={icon} /></span> : null}
       </div>
@@ -95,8 +95,8 @@ export function PortalEmpty({
   return (
     <div className="portal-card grid place-items-center px-6 py-12 text-center">
       <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#edf3f0] text-[#3c685c]"><PortalIcon name={icon} className="h-5 w-5" /></span>
-      <h2 className="mt-4 text-base font-semibold text-[#1d2925]">{title}</h2>
-      <p className="mt-1 max-w-sm text-sm leading-6 text-[#66736e]">{description}</p>
+      <h2 className="mt-4 text-base font-semibold text-[#17231f]">{title}</h2>
+      <p className="mt-1 max-w-sm text-sm leading-6 text-[#596963]">{description}</p>
       {action ? <Link href={action.href} className="portal-button-primary mt-5">{action.label}<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link> : null}
     </div>
   );
@@ -114,8 +114,8 @@ export function PortalSectionHeading({
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-base font-semibold text-[#1d2925]">{title}</h2>
-        {description ? <p className="mt-1 text-xs leading-5 text-[#7b8882]">{description}</p> : null}
+        <h2 className="text-base font-semibold text-[#17231f]">{title}</h2>
+        {description ? <p className="mt-1 text-xs leading-5 text-[#687770]">{description}</p> : null}
       </div>
       {action ? <Link href={action.href} className="portal-text-link">{action.label}<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link> : null}
     </div>

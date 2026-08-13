@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { sendWelcomeEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 
+function safeNextPath(value: string | null) {
+  return value && /^\/(?!\/)/.test(value) ? value : "/";
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const next = safeNextPath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();
@@ -21,7 +25,7 @@ export async function GET(request: Request) {
           console.error("Unable to send welcome email", emailError);
         }
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(new URL(next, origin));
     }
   }
 

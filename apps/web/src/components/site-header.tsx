@@ -376,7 +376,7 @@ export function SiteHeader() {
           if (event.key === "Escape") closeMenus();
         }}
       >
-        <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-3 py-2 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-4 sm:px-5">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-3 py-2 pr-8 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-4 sm:px-5">
           <Link href="/" className="shrink-0 font-medium text-white/90 hover:text-white">
             Home
           </Link>

@@ -4,10 +4,14 @@ import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+function safeNextPath(value: string | null) {
+  return value && /^\/(?!\/)/.test(value) ? value : "/";
+}
+
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = safeNextPath(searchParams.get("next"));
   const authError = searchParams.get("error");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -61,7 +65,7 @@ function AuthForm() {
         return;
       }
       void fetch("/api/emails/welcome", { method: "POST" });
-      router.push(next.startsWith("/") ? next : "/");
+      router.push(next);
       router.refresh();
       return;
     }

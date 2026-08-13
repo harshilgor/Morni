@@ -184,7 +184,7 @@ function LaunchCard({ storeActive, complete, checklist }: { storeActive: boolean
 }
 
 function AttentionCard({ icon, title, description, href, urgent = false }: { icon: "orders" | "package" | "warning" | "reviews"; title: string; description: string; href: string; urgent?: boolean }) {
-  return <Link href={href} className={`portal-card group p-4 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-20px_rgba(27,48,39,0.38)] ${urgent ? "border-[#efcfbf] bg-[#fffaf6]" : ""}`}><div className="flex items-start justify-between gap-3"><span className={`grid h-9 w-9 place-items-center rounded-xl ${urgent ? "bg-[#fff0df] text-[#ad6135]" : "bg-[#edf3f0] text-[#3c685c]"}`}><PortalIcon name={icon} /></span><PortalIcon name="arrow" className="h-4 w-4 text-[#a7b4ae] transition group-hover:translate-x-0.5 group-hover:text-[#3c685c]" /></div><p className="mt-4 text-sm font-semibold text-[#263530]">{title}</p><p className="mt-1 text-xs leading-5 text-[#7b8882]">{description}</p></Link>;
+  return <Link href={href} className={`portal-card portal-card-interactive group p-4 ${urgent ? "border-[#e4bda9] bg-[#fff9f4]" : ""}`}><div className="flex items-start justify-between gap-3"><span className={`grid h-9 w-9 place-items-center rounded-lg ${urgent ? "bg-[#ffead7] text-[#a6542e]" : "bg-[#e8efec] text-[#315f54]"}`}><PortalIcon name={icon} /></span><PortalIcon name="arrow" className="h-4 w-4 text-[#7c8d86] transition group-hover:translate-x-0.5 group-hover:text-[#2f6f66]" /></div><p className="mt-4 text-sm font-bold text-[#1f302a]">{title}</p><p className="mt-1 text-xs leading-5 text-[#687770]">{description}</p></Link>;
 }
 
 function SalesChart({ days, maxRevenue }: { days: { label: string; revenue: number }[]; maxRevenue: number }) {

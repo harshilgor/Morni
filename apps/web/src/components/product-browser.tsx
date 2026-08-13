@@ -81,11 +81,11 @@ const EMPTY_FILTERS: Filters = {
 };
 
 const SORTS = [
-  { id: "recommended", label: "Recommended" },
-  { id: "new", label: "New in" },
-  { id: "price-asc", label: "Price: low to high" },
-  { id: "price-desc", label: "Price: high to low" },
-  { id: "rated", label: "Best rated" },
+  { id: "recommended", label: "Recommended", mobileLabel: "Top picks" },
+  { id: "new", label: "New in", mobileLabel: "New in" },
+  { id: "price-asc", label: "Price: low to high", mobileLabel: "Price: low" },
+  { id: "price-desc", label: "Price: high to low", mobileLabel: "Price: high" },
+  { id: "rated", label: "Best rated", mobileLabel: "Top rated" },
 ];
 
 const PAGE_SIZE = 24;
@@ -434,6 +434,7 @@ export function ProductBrowser({
   const categoryIsPreferred = Boolean(
     activeSlug && tasteProfile && (tasteProfile.categoryScores[activeSlug] ?? 0) > 0,
   );
+  const currentSort = SORTS.find((option) => option.id === sort) ?? SORTS[0];
   const activeCount =
     (Object.keys(EMPTY_FILTERS) as (keyof Filters)[]).reduce((sum, key) => {
       const value = filters[key];
@@ -741,7 +742,9 @@ export function ProductBrowser({
         <div className="sticky top-[7.35rem] z-20 -mx-4 border-y border-line/80 bg-background/95 px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
           <div
             className={`grid gap-2 lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-3 ${
-              categoryIsPreferred ? "grid-cols-3" : "grid-cols-2"
+              categoryIsPreferred
+                ? "grid-cols-[repeat(3,minmax(0,1fr))]"
+                : "grid-cols-[repeat(2,minmax(0,1fr))]"
             }`}
           >
             {categoryIsPreferred ? (
@@ -762,17 +765,20 @@ export function ProductBrowser({
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="flex h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink transition hover:border-ink/40 lg:hidden"
+              className="flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink transition hover:border-ink/40 lg:hidden"
             >
               <span aria-hidden="true">&#9881;</span>
               Filters{activeCount > 0 ? ` (${activeCount})` : ""}
             </button>
-            <label className="flex h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-xs text-ink lg:rounded-full lg:px-3 lg:py-1.5">
-              <span className="text-muted">Sort</span>
+            <label className="relative flex h-11 min-w-0 items-center gap-1.5 overflow-hidden rounded-lg border border-line bg-surface px-3 text-xs text-ink lg:justify-center lg:overflow-visible lg:rounded-full lg:px-3 lg:py-1.5">
+              <span className="hidden shrink-0 text-muted lg:inline">Sort</span>
+              <span className="min-w-0 flex-1 truncate font-semibold lg:hidden">
+                {currentSort.mobileLabel}
+              </span>
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value)}
-                className="max-w-[7.5rem] bg-transparent text-xs font-semibold outline-none"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 lg:static lg:h-auto lg:w-auto lg:flex-1 lg:cursor-default lg:opacity-100"
                 aria-label="Sort products"
               >
                 {SORTS.map((option) => (
@@ -781,6 +787,7 @@ export function ProductBrowser({
                   </option>
                 ))}
               </select>
+              <span aria-hidden="true" className="shrink-0 text-muted lg:hidden">&#8964;</span>
             </label>
             <p className={`${categoryIsPreferred ? "col-span-3" : "col-span-2"} text-sm text-muted lg:col-auto`}>
               {forYouActive ? "Picked for you - " : ""}
@@ -874,7 +881,7 @@ export function ProductBrowser({
           </div>
         ) : (
           <>
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
+            <div className="mt-5 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
               {sorted.slice(0, visible).map((product) => (
                 <ProductCard
                   key={product.id}

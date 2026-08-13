@@ -72,7 +72,7 @@ export function ProductCard({
   return (
     <Link
       href={href}
-      className="group relative block overflow-hidden rounded-xl border border-line/70 bg-white/75 p-2 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5"
+      className="group relative block min-w-0 overflow-hidden rounded-xl border border-line/70 bg-white/75 p-2 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5"
     >
       <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-sand sm:rounded-xl">
         {image ? (

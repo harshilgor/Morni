@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { validateImageFile } from "@/lib/media-upload";
 import type { ColorDraft } from "@/lib/product-variants";
 import type { ProductVariant } from "@/lib/types";
 
@@ -13,11 +14,13 @@ async function uploadVariantImages(
 
   for (const image of draft.images) {
     if (image.file) {
+      const validationError = validateImageFile(image.file);
+      if (validationError) throw new Error(validationError);
       const safeName = image.file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
       const path = `${storeId}/${productId}/${colorKey}/${Date.now()}-${safeName}`;
       const { error } = await supabase.storage
         .from("product-images")
-        .upload(path, image.file, { upsert: true });
+        .upload(path, image.file, { upsert: false, contentType: image.file.type });
       if (error) throw new Error(error.message);
       urls.push(
         supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl,

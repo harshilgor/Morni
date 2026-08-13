@@ -57,7 +57,7 @@ export function PortalHeader() {
   const liveStatus = store && isOnboardingComplete(store) && store.is_active ? "live" : store?.is_active ? "draft" : "paused";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#dce5e0] bg-[#f7faf8]/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-[#c6d0cb] bg-white/95 shadow-[0_1px_2px_rgba(20,35,29,0.04)] backdrop-blur">
       <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-9">
         <Link href="/portal" className="mr-auto flex items-center gap-2 text-sm font-semibold text-[#1d2925] lg:hidden">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#21342e] font-display text-lg text-white">M</span>
@@ -79,12 +79,12 @@ export function PortalHeader() {
         </form>
         {store ? <div className="hidden items-center gap-2 lg:flex"><StatusBadge status={liveStatus} /><span className="text-xs text-[#66736e]">{store.is_active ? "Storefront" : "Store status"}</span></div> : null}
         <div className="relative">
-          <button type="button" onClick={() => setActivityOpen((value) => !value)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-[#dce5e0] bg-white text-[#4c5c56] transition hover:border-[#afc2bb] hover:text-[#2f6f66]" aria-label="Open activity centre" aria-expanded={activityOpen}>
+          <button type="button" onClick={() => setActivityOpen((value) => !value)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-[#aebdb6] bg-white text-[#3e514a] shadow-[0_1px_1px_rgba(20,35,29,0.04)] transition hover:border-[#82998f] hover:text-[#2f6f66]" aria-label="Open activity centre" aria-expanded={activityOpen}>
             <PortalIcon name="bell" />
             {activities.length ? <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#d66b4a] px-1 text-[9px] font-bold text-white">{activities.length}</span> : null}
           </button>
           {activityOpen ? (
-            <div className="absolute right-0 top-[calc(100%+10px)] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-[#dce5e0] bg-white p-3 shadow-[0_18px_45px_-22px_rgba(27,48,39,0.35)]">
+            <div className="absolute right-0 top-[calc(100%+10px)] w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-[#b9c6c0] bg-white p-3 shadow-[0_18px_45px_-22px_rgba(27,48,39,0.35)]">
               <div className="flex items-center justify-between px-2 pb-2"><p className="text-sm font-semibold text-[#1d2925]">Store activity</p><span className="text-xs text-[#7b8882]">{activities.length ? "Needs attention" : "All caught up"}</span></div>
               {activities.length ? <ul className="space-y-1">{activities.map((activity) => <li key={activity.id}><Link href={activity.href} onClick={() => setActivityOpen(false)} className="flex items-start gap-3 rounded-xl px-2 py-2.5 hover:bg-[#f5f8f6]"><span className={`mt-1.5 h-2 w-2 rounded-full ${activity.tone === "urgent" ? "bg-[#d66b4a]" : "bg-[#79a79b]"}`} /><span><span className="block text-sm font-medium text-[#263530]">{activity.title}</span><span className="mt-0.5 block text-xs leading-5 text-[#7b8882]">{activity.detail}</span></span></Link></li>)}</ul> : <div className="px-2 py-7 text-center text-sm text-[#66736e]">No urgent actions right now.</div>}
             </div>

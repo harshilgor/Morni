@@ -43,26 +43,55 @@ body.sell-mode {
 }
 
 body.portal-mode {
-  background: #f4f7f5 !important;
+  background: #eef2f0 !important;
 }
 
 .portal-shell {
-  --portal-ink: #1d2925;
-  --portal-muted: #66736e;
-  --portal-line: #dce5e0;
+  --background: #ffffff;
+  --surface: #ffffff;
+  --ink: #17231f;
+  --muted: #5f6c67;
+  --line: #c6d0cb;
+  --portal-ink: #17231f;
+  --portal-muted: #5f6c67;
+  --portal-line: #c6d0cb;
+  --portal-line-strong: #aebdb6;
+  --portal-line-soft: #e2e7e4;
+  --portal-canvas: #eef2f0;
   --portal-green: #2f6f66;
   min-height: 100vh;
   background:
-    radial-gradient(900px 500px at 8% -14%, rgba(184, 220, 207, 0.58), transparent 60%),
-    #f4f7f5;
+    radial-gradient(900px 480px at 8% -14%, rgba(184, 220, 207, 0.28), transparent 58%),
+    var(--portal-canvas);
   color: var(--portal-ink);
 }
 
 .portal-card {
   border: 1px solid var(--portal-line);
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   background: #fff;
-  box-shadow: 0 1px 1px rgba(26, 45, 37, 0.02);
+  box-shadow:
+    0 1px 2px rgba(20, 35, 29, 0.06),
+    0 1px 1px rgba(20, 35, 29, 0.03);
+}
+
+.portal-card-interactive {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.portal-card-interactive:hover {
+  border-color: var(--portal-line-strong);
+  box-shadow: 0 8px 22px -16px rgba(20, 35, 29, 0.42);
+  transform: translateY(-1px);
+}
+
+.portal-card-interactive:focus-visible {
+  border-color: #5f9184;
+  box-shadow: 0 0 0 3px rgba(70, 126, 111, 0.18);
+  outline: none;
 }
 
 .portal-eyebrow {
@@ -87,10 +116,12 @@ body.portal-mode {
 }
 
 .portal-button-primary {
-  border-radius: 0.7rem;
+  border: 1px solid #21342e;
+  border-radius: 0.5rem;
   background: #21342e;
   color: #fff;
   padding: 0.65rem 0.85rem;
+  box-shadow: 0 1px 2px rgba(20, 35, 29, 0.14);
 }
 
 .portal-button-primary:hover {
@@ -98,16 +129,17 @@ body.portal-mode {
 }
 
 .portal-button-secondary {
-  border: 1px solid var(--portal-line);
-  border-radius: 0.7rem;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 0.5rem;
   background: #fff;
-  color: #34423d;
+  color: #283832;
   padding: 0.6rem 0.8rem;
+  box-shadow: 0 1px 1px rgba(20, 35, 29, 0.04);
 }
 
 .portal-button-secondary:hover {
-  border-color: #afc2bb;
-  background: #f7faf8;
+  border-color: #82998f;
+  background: #f5f8f6;
 }
 
 .portal-text-link {
@@ -121,10 +153,10 @@ body.portal-mode {
 
 .portal-input,
 .portal-select {
-  border: 1px solid var(--portal-line);
-  border-radius: 0.65rem;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 0.5rem;
   background: #fff;
-  color: #263530;
+  color: #1e2d28;
   font-size: 0.8125rem;
   outline: none;
   padding: 0.62rem 0.75rem;
@@ -133,8 +165,8 @@ body.portal-mode {
 
 .portal-input:focus,
 .portal-select:focus {
-  border-color: #77a497;
-  box-shadow: 0 0 0 3px rgba(98, 150, 135, 0.15);
+  border-color: #5f9184;
+  box-shadow: 0 0 0 3px rgba(70, 126, 111, 0.18);
 }
 
 .portal-table th {
@@ -147,7 +179,15 @@ body.portal-mode {
 }
 
 .portal-table td {
-  border-top: 1px solid #edf1ef;
+  border-top: 1px solid var(--portal-line-soft);
+}
+
+.portal-table tbody tr {
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.portal-table tbody tr:hover {
+  background: #f5f8f6;
 }
 
 .sell-shell {
