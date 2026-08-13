@@ -20,18 +20,49 @@ type Slide = {
   image: string;
   imagePosition?: string;
   titleTone?: "light" | "sun";
+  visualOnly?: boolean;
 };
 
 const SLIDES: Slide[] = [
   {
-    id: "new-arrivals",
-    eyebrow: "Just landed",
-    title: "New this week",
-    subtitle: "Fresh silhouettes from boutiques near you.",
-    cta: "Explore new arrivals",
-    href: "/search?sort=new",
-    image: "/categories/party-wear.webp",
-    titleTone: "sun",
+    id: "under-99",
+    eyebrow: "Under AED 99",
+    title: "Under AED 99",
+    subtitle: "Everyday boutique finds under AED 99.",
+    cta: "Shop under AED 99",
+    href: "/under-99",
+    image: "/hero/under-99.jpeg",
+    visualOnly: true,
+  },
+  {
+    id: "up-to-50-off",
+    eyebrow: "Limited-time sale",
+    title: "Up to 50% off",
+    subtitle: "Special reductions from boutiques near you.",
+    cta: "Shop the sale",
+    href: "/clearance",
+    image: "/hero/up-to-50-off.jpeg",
+    visualOnly: true,
+  },
+  {
+    id: "premium-collection",
+    eyebrow: "Premium collection",
+    title: "Premium collection",
+    subtitle: "Elevated occasionwear from UAE boutiques.",
+    cta: "Explore premium pieces",
+    href: "/search?min=500",
+    image: "/hero/premium-collection.jpeg",
+    visualOnly: true,
+  },
+  {
+    id: "under-149",
+    eyebrow: "Under AED 149",
+    title: "Under AED 149",
+    subtitle: "Boutique looks at an easy price point.",
+    cta: "Shop under AED 149",
+    href: "/under-149",
+    image: "/hero/under-149.jpeg",
+    visualOnly: true,
   },
   {
     id: "office-edit",
@@ -69,6 +100,7 @@ const SLIDES: Slide[] = [
     cta: "Shop wedding looks",
     href: "/categories/lehengas",
     image: "/categories/lehengas.webp",
+    imagePosition: "center top",
   },
 ];
 
@@ -198,7 +230,7 @@ export function HeroCarousel() {
     >
       <div
         ref={scrollerRef}
-        className="relative flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth px-3 pb-1 sm:gap-3 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="relative flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth pl-3 pr-0 pb-1 sm:gap-3 sm:pl-4 sm:pr-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
 
         {SLIDES.map((slide, index) => (
@@ -219,31 +251,31 @@ export function HeroCarousel() {
               className="object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
               style={{ objectPosition: slide.imagePosition ?? "center" }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/18 to-black/5" />
-            <div className="absolute inset-x-0 bottom-0 flex flex-col items-start p-5 sm:p-7 lg:p-9">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80 sm:text-xs">
-                {slide.eyebrow}
-              </p>
-              <h2
-                className={`mt-2 max-w-[8ch] font-sans text-[2.8rem] font-semibold uppercase leading-[0.83] tracking-[-0.07em] sm:text-[clamp(3.6rem,6vw,6.8rem)] ${
-                  slide.titleTone === "sun" ? "text-[#f4ed68]" : "text-white"
-                }`}
-              >
-                {slide.title}
-              </h2>
-              <p className="mt-4 max-w-[22rem] text-sm leading-relaxed text-white/88 sm:text-base">
-                {slide.subtitle}
-              </p>
-              <span className="mt-5 rounded-full border border-white/75 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white transition group-hover:bg-white group-hover:text-ink sm:px-5 sm:text-[11px]">
-                {slide.cta}
-              </span>
-            </div>
+            {!slide.visualOnly ? (
+              <>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/18 to-black/5" />
+                <div className="absolute inset-x-0 bottom-0 flex flex-col items-start p-5 sm:p-7 lg:p-9">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80 sm:text-xs">
+                    {slide.eyebrow}
+                  </p>
+                  <h2
+                    className={`mt-2 max-w-[8ch] font-sans text-[2.8rem] font-semibold uppercase leading-[0.83] tracking-[-0.07em] sm:text-[clamp(3.6rem,6vw,6.8rem)] ${
+                      slide.titleTone === "sun" ? "text-[#f4ed68]" : "text-white"
+                    }`}
+                  >
+                    {slide.title}
+                  </h2>
+                  <p className="mt-4 max-w-[22rem] text-sm leading-relaxed text-white/88 sm:text-base">
+                    {slide.subtitle}
+                  </p>
+                  <span className="mt-5 rounded-full border border-white/75 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white transition group-hover:bg-white group-hover:text-ink sm:px-5 sm:text-[11px]">
+                    {slide.cta}
+                  </span>
+                </div>
+              </>
+            ) : null}
           </Link>
         ))}
-        <div
-          aria-hidden
-          className="w-[calc(6vw-0.75rem)] shrink-0 sm:w-[calc(21vw-1rem)] lg:w-[calc(27vw-1rem)]"
-        />
       </div>
 
       <div className="absolute inset-x-0 bottom-7 z-10 flex items-center justify-center gap-2 sm:bottom-8">
