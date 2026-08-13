@@ -17,6 +17,7 @@ import {
   type StoreHoursValue,
 } from "@/components/delivery-setup-fields";
 import { uploadStoreMedia } from "@/lib/media-upload";
+import { PortalEmpty, PortalPageHeader, StatusBadge } from "@/components/portal-ui";
 
 export default function PortalSettingsPage() {
   const { store, loading, error, refresh } = useOwnerStore();
@@ -219,39 +220,23 @@ export default function PortalSettingsPage() {
   }
 
   if (error === "unauthenticated") {
-    return (
-      <Link href="/auth?next=/portal/settings" className="text-accent-deep underline">
-        Sign in
-      </Link>
-    );
+    return <PortalEmpty icon="settings" title="Sign in to manage your store" description="Use the owner account linked to your Morni store." action={{ label: "Sign in", href: "/auth?next=/portal/settings" }} />;
   }
   if (loading) return <p className="text-muted">Loading…</p>;
   if (!store) {
-    return (
-      <p className="text-muted">
-        Set up a store on the{" "}
-        <Link href="/portal" className="text-accent-deep underline">
-          Orders
-        </Link>{" "}
-        page first.
-      </p>
-    );
+    return <PortalEmpty icon="store" title="Set up your first store" description="Create a store before you can manage the public storefront and delivery details." action={{ label: "Start store setup", href: "/sell/setup" }} />;
   }
 
   const incomplete = !isOnboardingComplete(store);
 
   return (
-    <div className="max-w-xl">
-      <h1 className="font-display text-3xl text-ink">Store settings</h1>
-      <p className="mt-1 text-sm text-muted">
-        Set your branding, location, and store hours so shoppers know what to
-        expect.
-      </p>
+    <div className="max-w-3xl">
+      <PortalPageHeader eyebrow="Store management" title="Store settings" description="Set your branding, location, delivery hours, and public visibility so shoppers know what to expect." />
 
       {incomplete ? (
-        <div className="mt-4 rounded-2xl border border-accent/30 bg-[#fff0f4] px-4 py-3 text-sm text-ink">
+        <div className="mt-5 rounded-2xl border border-[#bad7cd] bg-[#edf7f3] px-4 py-3 text-sm text-[#315b51]">
           Setup is still incomplete.{" "}
-          <Link href="/sell/setup" className="font-medium text-accent-deep underline">
+          <Link href="/sell/setup" className="font-medium text-[#2f6f66] underline">
             Continue onboarding
           </Link>{" "}
           to launch publicly.
@@ -260,7 +245,7 @@ export default function PortalSettingsPage() {
 
       <form
         onSubmit={onSave}
-        className="mt-8 space-y-4 rounded-[1.5rem] border border-line bg-surface p-6"
+        className="portal-card mt-6 space-y-4 p-6"
       >
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted">Name</span>
@@ -287,30 +272,22 @@ export default function PortalSettingsPage() {
         <StoreLocationFields value={location} onChange={setLocation} />
         <StoreHoursFields value={storeHours} onChange={setStoreHours} />
 
-        {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
+        {message ? <p className="rounded-xl bg-[#edf7f3] px-4 py-3 text-sm text-[#277044]">{message}</p> : null}
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-ink px-6 py-3 text-sm text-white disabled:opacity-50"
+          className="portal-button-primary disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save changes"}
         </button>
       </form>
 
-      <section className="mt-6 rounded-[1.5rem] border border-line bg-surface p-6">
+      <section className="portal-card mt-6 p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-sm">
             <div className="flex items-center gap-2">
-              <h2 className="font-display text-xl text-ink">Store visibility</h2>
-              <span
-                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                  store.is_active
-                    ? "bg-[#e8f5ef] text-mint"
-                    : "bg-[#fff0f4] text-accent-deep"
-                }`}
-              >
-                {store.is_active ? "Listed" : "Unlisted"}
-              </span>
+              <h2 className="text-lg font-semibold text-[#263530]">Store visibility</h2>
+              <StatusBadge status={store.is_active ? "live" : "paused"} />
             </div>
             <p className="mt-2 text-sm leading-relaxed text-muted">
               {store.is_active
@@ -324,7 +301,7 @@ export default function PortalSettingsPage() {
             type="button"
             onClick={toggleStoreVisibility}
             disabled={visibilitySaving || (incomplete && !store.is_active)}
-            className={`rounded-full px-5 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
+            className={`rounded-lg px-5 py-2.5 text-sm font-medium transition disabled:opacity-50 ${
               store.is_active
                 ? "border border-line bg-background text-ink hover:border-ink/30"
                 : "bg-ink text-white hover:bg-ink/90"
@@ -339,8 +316,8 @@ export default function PortalSettingsPage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-[1.5rem] border border-red-200 bg-surface p-6">
-        <h2 className="font-display text-xl text-red-700">Delete store</h2>
+      <section className="mt-6 rounded-2xl border border-red-200 bg-white p-6">
+        <h2 className="text-lg font-semibold text-red-700">Delete store</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           Permanently removes your catalog and access to this store. Completed
           order records are retained for customers and legal records. This

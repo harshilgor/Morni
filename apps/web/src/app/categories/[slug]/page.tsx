@@ -74,8 +74,8 @@ export default async function CategoryPage({
   const ratings = Object.fromEntries(ratingMap);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <nav className="flex items-center gap-1.5 text-xs text-muted">
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8">
+      <nav className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
         <Link href="/" className="hover:text-ink">
           Home
         </Link>
@@ -87,23 +87,26 @@ export default async function CategoryPage({
         <span className="text-ink">{category.name}</span>
       </nav>
 
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
-        <div>
-          <h1 className="font-display text-3xl text-ink sm:text-4xl">
+      <div className="flex items-end justify-between gap-4 border-b border-line pb-4 pt-1 sm:mt-3 sm:flex-wrap sm:pb-5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.17em] text-accent-deep sm:hidden">
+            Category
+          </p>
+          <h1 className="mt-1 font-display text-[2rem] leading-none text-ink sm:mt-0 sm:text-4xl">
             {category.name}
           </h1>
-          <p className="mt-1.5 text-sm text-muted">
-            From local UAE boutiques · Same-hour delivery available
+          <p className="mt-2 text-sm text-muted">
+            {products.length} {products.length === 1 ? "piece" : "pieces"} from local boutiques
           </p>
         </div>
         {category.badge ? (
-          <span className="rounded-full border border-accent/40 px-3 py-1 text-xs font-medium uppercase tracking-wide text-accent-deep">
+          <span className="mb-0.5 shrink-0 rounded-full border border-accent/40 px-3 py-1 text-xs font-medium uppercase tracking-wide text-accent-deep">
             {category.badge}
           </span>
         ) : null}
       </div>
 
-      <div className="mt-6">
+      <div className="mt-5 sm:mt-6">
         {products.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line bg-surface/70 p-10 text-center">
             <p className="text-muted">

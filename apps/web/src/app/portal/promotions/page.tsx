@@ -1,9 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerStore } from "@/lib/use-owner-store";
+import { PortalEmpty, PortalMetric, PortalPageHeader } from "@/components/portal-ui";
 
 type Promotion = {
   id: string;
@@ -221,24 +221,22 @@ export default function PortalPromotionsPage() {
     if (store) await load(store.id);
   }
 
-  if (error === "unauthenticated") return <Link href="/auth?next=/portal/promotions" className="text-accent-deep underline">Sign in</Link>;
-  if (loading) return <p className="text-muted">Loading...</p>;
-  if (!store) return <p className="text-muted">Set up a store first from <Link href="/portal/settings" className="text-accent-deep underline">Store settings</Link>.</p>;
+  if (error === "unauthenticated") return <PortalEmpty icon="promotions" title="Sign in to manage promotions" description="Use the owner account linked to your Morni store." action={{ label: "Sign in", href: "/auth?next=/portal/promotions" }} />;
+  if (loading) return <div className="grid gap-4 sm:grid-cols-3">{Array.from({ length: 3 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-white/65" />)}</div>;
+  if (!store) return <PortalEmpty icon="store" title="Set up a store to create promotions" description="Launch your store first, then make sales and storefront campaigns for shoppers." action={{ label: "Start store setup", href: "/sell/setup" }} />;
 
   return (
     <div className="space-y-7">
-      <div>
-        <h1 className="font-display text-3xl text-ink">Promotions</h1>
-        <p className="mt-1 text-sm text-muted">Build live product sales or a small message for this store&apos;s shoppers.</p>
-      </div>
-      <div className="flex border-b border-line">
-        <button type="button" onClick={() => setTab("sales")} className={"border-b-2 px-4 py-3 text-sm font-medium " + (tab === "sales" ? "border-ink text-ink" : "border-transparent text-muted")}>Sales</button>
-        <button type="button" onClick={() => setTab("campaigns")} className={"border-b-2 px-4 py-3 text-sm font-medium " + (tab === "campaigns" ? "border-ink text-ink" : "border-transparent text-muted")}>Campaigns</button>
+      <PortalPageHeader eyebrow="Growth tools" title="Promotions" description="Build live product sales or a focused message for your storefront shoppers." />
+      <div className="grid gap-3 sm:grid-cols-3"><PortalMetric label="Live promotions" value={String(promotions.filter((promotion) => status(promotion) === "Live").length)} detail="Currently visible to shoppers" icon="promotions" /><PortalMetric label="Scheduled" value={String(promotions.filter((promotion) => status(promotion) === "Upcoming").length)} detail="Ready to start automatically" icon="clock" /><PortalMetric label="Products on sale" value={String(sales.reduce((sum, promotion) => sum + (promotion.promotion_products?.length ?? 0), 0))} detail="Across your sales" icon="products" /></div>
+      <div className="portal-card flex gap-1 p-1">
+        <button type="button" onClick={() => setTab("sales")} className={"rounded-lg px-4 py-2.5 text-sm font-semibold transition " + (tab === "sales" ? "bg-[#21342e] text-white" : "text-[#66736e] hover:text-[#2f6f66]")}>Sales</button>
+        <button type="button" onClick={() => setTab("campaigns")} className={"rounded-lg px-4 py-2.5 text-sm font-semibold transition " + (tab === "campaigns" ? "bg-[#21342e] text-white" : "text-[#66736e] hover:text-[#2f6f66]")}>Campaigns</button>
       </div>
 
       {tab === "sales" ? (
         <>
-          <form onSubmit={saveSale} className="space-y-5 border border-line bg-surface p-5 sm:p-6">
+          <form onSubmit={saveSale} className="portal-card space-y-5 p-5 sm:p-6">
             <div className="flex flex-wrap justify-between gap-3">
               <div><h2 className="font-display text-2xl text-ink">{sale.id ? "Edit sale" : "Create sale"}</h2><p className="mt-1 text-sm text-muted">Select products and preview the exact shopper price before publishing.</p></div>
               {sale.id ? <button type="button" onClick={resetSale} className="border border-line px-3 py-2 text-sm">Cancel edit</button> : null}
@@ -280,7 +278,7 @@ export default function PortalPromotionsPage() {
         </>
       ) : (
         <>
-          <form onSubmit={saveCampaign} className="space-y-4 border border-line bg-surface p-5 sm:p-6">
+          <form onSubmit={saveCampaign} className="portal-card space-y-4 p-5 sm:p-6">
             <div><h2 className="font-display text-2xl text-ink">{campaign.id ? "Edit campaign" : "Create campaign"}</h2><p className="mt-1 text-sm text-muted">Campaigns are a restrained message on this store&apos;s storefront and product pages. They never change prices.</p></div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="text-sm text-muted">Campaign title<input required className="mt-1 w-full border border-line bg-background px-3 py-2.5 text-ink" placeholder="e.g. Eid styles are here" value={campaign.title} onChange={(event) => setCampaign((current) => ({ ...current, title: event.target.value }))} /></label>

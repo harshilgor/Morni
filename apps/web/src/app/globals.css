@@ -42,6 +42,114 @@ body.sell-mode {
     #e6f0ed !important;
 }
 
+body.portal-mode {
+  background: #f4f7f5 !important;
+}
+
+.portal-shell {
+  --portal-ink: #1d2925;
+  --portal-muted: #66736e;
+  --portal-line: #dce5e0;
+  --portal-green: #2f6f66;
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 500px at 8% -14%, rgba(184, 220, 207, 0.58), transparent 60%),
+    #f4f7f5;
+  color: var(--portal-ink);
+}
+
+.portal-card {
+  border: 1px solid var(--portal-line);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 1px rgba(26, 45, 37, 0.02);
+}
+
+.portal-eyebrow {
+  color: #7b8882;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.portal-button-primary,
+.portal-button-secondary,
+.portal-text-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: 160ms ease;
+}
+
+.portal-button-primary {
+  border-radius: 0.7rem;
+  background: #21342e;
+  color: #fff;
+  padding: 0.65rem 0.85rem;
+}
+
+.portal-button-primary:hover {
+  background: #2f6f66;
+}
+
+.portal-button-secondary {
+  border: 1px solid var(--portal-line);
+  border-radius: 0.7rem;
+  background: #fff;
+  color: #34423d;
+  padding: 0.6rem 0.8rem;
+}
+
+.portal-button-secondary:hover {
+  border-color: #afc2bb;
+  background: #f7faf8;
+}
+
+.portal-text-link {
+  color: #2f6f66;
+  white-space: nowrap;
+}
+
+.portal-text-link:hover {
+  color: #1e564e;
+}
+
+.portal-input,
+.portal-select {
+  border: 1px solid var(--portal-line);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #263530;
+  font-size: 0.8125rem;
+  outline: none;
+  padding: 0.62rem 0.75rem;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.portal-input:focus,
+.portal-select:focus {
+  border-color: #77a497;
+  box-shadow: 0 0 0 3px rgba(98, 150, 135, 0.15);
+}
+
+.portal-table th {
+  color: #7b8882;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.portal-table td {
+  border-top: 1px solid #edf1ef;
+}
+
 .sell-shell {
   min-height: 100%;
   background:

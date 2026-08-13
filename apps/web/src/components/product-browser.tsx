@@ -9,11 +9,9 @@ import { readStoredForYouTaste } from "@/lib/for-you-storage";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import {
   COLOR_FACETS,
-  DELIVERY_BUCKETS,
   FABRIC_FACETS,
   FIT_FACETS,
   PRICE_BUCKETS,
-  deliveryBucketId,
   deriveColors,
   deriveFabrics,
   deriveFits,
@@ -48,7 +46,6 @@ type Annotated = BrowsableProduct & {
   fabrics: string[];
   fits: string[];
   priceBucket: string | null;
-  deliveryBucket: string;
   rating: number;
   reviews: number;
   onSale: boolean;
@@ -56,7 +53,6 @@ type Annotated = BrowsableProduct & {
 };
 
 type ListDimension =
-  | "delivery"
   | "sizes"
   | "colors"
   | "fabrics"
@@ -72,7 +68,6 @@ type Filters = Record<ListDimension, string[]> & {
 };
 
 const EMPTY_FILTERS: Filters = {
-  delivery: [],
   sizes: [],
   colors: [],
   fabrics: [],
@@ -91,7 +86,6 @@ const SORTS = [
   { id: "price-asc", label: "Price: low to high" },
   { id: "price-desc", label: "Price: high to low" },
   { id: "rated", label: "Best rated" },
-  { id: "fast", label: "Fastest delivery" },
 ];
 
 const PAGE_SIZE = 24;
@@ -108,7 +102,6 @@ function annotate(
     fabrics: deriveFabrics(text),
     fits: deriveFits(text),
     priceBucket: priceBucketId(Number(product.price_aed)),
-    deliveryBucket: deliveryBucketId(product.stores.delivery_eta_minutes),
     rating: ratingSummary?.avgRating ?? 0,
     reviews: ratingSummary?.reviewCount ?? 0,
     onSale:
@@ -143,8 +136,6 @@ function matchesDimension(
 ) {
   if (!selected || selected.length === 0) return true;
   switch (dimension) {
-    case "delivery":
-      return selected.includes(product.deliveryBucket);
     case "sizes":
       return (product.sizes ?? []).some((s) => selected.includes(s));
     case "colors":
@@ -166,7 +157,6 @@ function matchesDimension(
 
 function matches(product: Annotated, filters: Filters, except?: ListDimension) {
   const dimensions: ListDimension[] = [
-    "delivery",
     "sizes",
     "colors",
     "fabrics",
@@ -397,10 +387,6 @@ export function ProductBrowser({
     });
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [annotated]);
-  const deliveryOptions = useMemo(() => {
-    const present = new Set(annotated.map((p) => p.deliveryBucket));
-    return DELIVERY_BUCKETS.filter((b) => present.has(b.id));
-  }, [annotated]);
   const priceOptions = useMemo(() => {
     const present = new Set(
       annotated.map((p) => p.priceBucket).filter(Boolean) as string[],
@@ -434,11 +420,6 @@ export function ProductBrowser({
         return list.sort(
           (a, b) => b.rating - a.rating || b.reviews - a.reviews,
         );
-      case "fast":
-        return list.sort(
-          (a, b) =>
-            a.stores.delivery_eta_minutes - b.stores.delivery_eta_minutes,
-        );
       case "new":
         return list.sort(
           (a, b) =>
@@ -453,7 +434,6 @@ export function ProductBrowser({
   const categoryIsPreferred = Boolean(
     activeSlug && tasteProfile && (tasteProfile.categoryScores[activeSlug] ?? 0) > 0,
   );
-
   const activeCount =
     (Object.keys(EMPTY_FILTERS) as (keyof Filters)[]).reduce((sum, key) => {
       const value = filters[key];
@@ -484,11 +464,12 @@ export function ProductBrowser({
     setFilters(EMPTY_FILTERS);
   }
 
+  function toggleForYou() {
+    setForYouActive((active) => !active);
+    setVisible(PAGE_SIZE);
+  }
+
   const activePills: { label: string; onRemove: () => void }[] = [
-    ...filters.delivery.map((id) => ({
-      label: DELIVERY_BUCKETS.find((b) => b.id === id)?.label ?? id,
-      onRemove: () => toggle("delivery", id),
-    })),
     ...filters.price.map((id) => ({
       label: PRICE_BUCKETS.find((b) => b.id === id)?.label ?? id,
       onRemove: () => toggle("price", id),
@@ -543,10 +524,7 @@ export function ProductBrowser({
           </p>
           <button
             type="button"
-            onClick={() => {
-              setForYouActive((active) => !active);
-              setVisible(PAGE_SIZE);
-            }}
+            onClick={toggleForYou}
             className={`mt-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition ${
               forYouActive
                 ? "bg-ink text-white hover:bg-accent-deep"
@@ -572,24 +550,6 @@ export function ProductBrowser({
               count={countFor(annotated, filters, "category", slug)}
               checked={filters.category.includes(slug)}
               onToggle={() => toggle("category", slug)}
-            />
-          ))}
-        </FilterSection>
-      ) : null}
-
-      {deliveryOptions.length > 1 ? (
-        <FilterSection
-          title="Delivery time"
-          defaultOpen
-          activeCount={filters.delivery.length}
-        >
-          {deliveryOptions.map((bucket) => (
-            <OptionRow
-              key={bucket.id}
-              label={bucket.label}
-              count={countFor(annotated, filters, "delivery", bucket.id)}
-              checked={filters.delivery.includes(bucket.id)}
-              onToggle={() => toggle("delivery", bucket.id)}
             />
           ))}
         </FilterSection>
@@ -778,25 +738,42 @@ export function ProductBrowser({
       </aside>
 
       <div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted">
-            {forYouActive ? "For you - " : ""}
-            {sorted.length} {sorted.length === 1 ? "product" : "products"}
-          </p>
-          <div className="flex items-center gap-2">
+        <div className="sticky top-[7.35rem] z-20 -mx-4 border-y border-line/80 bg-background/95 px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
+          <div
+            className={`grid gap-2 lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-3 ${
+              categoryIsPreferred ? "grid-cols-3" : "grid-cols-2"
+            }`}
+          >
+            {categoryIsPreferred ? (
+              <button
+                type="button"
+                onClick={toggleForYou}
+                aria-pressed={forYouActive}
+                className={`flex h-11 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition lg:hidden ${
+                  forYouActive
+                    ? "border-ink bg-ink text-white"
+                    : "border-line bg-surface text-ink hover:border-ink/40"
+                }`}
+              >
+                <span aria-hidden="true">&#10084;&#65039;</span>
+                For you
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="rounded-full border border-line bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink lg:hidden"
+              className="flex h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink transition hover:border-ink/40 lg:hidden"
             >
+              <span aria-hidden="true">&#9881;</span>
               Filters{activeCount > 0 ? ` (${activeCount})` : ""}
             </button>
-            <label className="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs text-ink">
+            <label className="flex h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-xs text-ink lg:rounded-full lg:px-3 lg:py-1.5">
               <span className="text-muted">Sort</span>
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value)}
-                className="bg-transparent text-xs font-medium outline-none"
+                className="max-w-[7.5rem] bg-transparent text-xs font-semibold outline-none"
+                aria-label="Sort products"
               >
                 {SORTS.map((option) => (
                   <option key={option.id} value={option.id}>
@@ -805,10 +782,23 @@ export function ProductBrowser({
                 ))}
               </select>
             </label>
+            <p className={`${categoryIsPreferred ? "col-span-3" : "col-span-2"} text-sm text-muted lg:col-auto`}>
+              {forYouActive ? "Picked for you - " : ""}
+              {sorted.length} {sorted.length === 1 ? "piece" : "pieces"}
+            </p>
           </div>
         </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {forYouActive ? (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-accent/20 bg-accent/10 px-3.5 py-3 text-sm text-ink lg:hidden">
+            <p><span aria-hidden="true">&#10024;</span> Ordered around your taste.</p>
+            <button type="button" onClick={toggleForYou} className="shrink-0 text-xs font-semibold text-accent-deep underline underline-offset-2">
+              All pieces
+            </button>
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             onClick={clearAll}
@@ -821,11 +811,6 @@ export function ProductBrowser({
             All
           </button>
           {[
-            {
-              label: "Fast delivery",
-              active: filters.delivery.includes("under-60"),
-              onClick: () => toggle("delivery", "under-60"),
-            },
             {
               label: "On sale",
               active: filters.onSale,
@@ -867,16 +852,17 @@ export function ProductBrowser({
                 className="inline-flex items-center gap-1.5 rounded-full bg-accent/12 px-3 py-1.5 text-xs text-accent-deep transition hover:bg-accent/20"
               >
                 {pill.label}
-                <span aria-hidden>×</span>
+                <span aria-hidden>&#215;</span>
               </button>
             ))}
           </div>
         ) : null}
 
         {sorted.length === 0 ? (
-          <div className="mt-8 rounded-2xl border border-dashed border-line bg-surface/70 p-10 text-center">
-            <p className="text-muted">
-              Nothing matches these filters right now.
+          <div className="mt-8 rounded-lg border border-dashed border-line bg-surface/70 p-8 text-center sm:p-10">
+            <p className="font-display text-2xl text-ink">Nothing quite matches</p>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
+              Try clearing a filter to see the rest of the collection.
             </p>
             <button
               type="button"
@@ -888,7 +874,7 @@ export function ProductBrowser({
           </div>
         ) : (
           <>
-            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
               {sorted.slice(0, visible).map((product) => (
                 <ProductCard
                   key={product.id}
@@ -915,47 +901,70 @@ export function ProductBrowser({
                 </button>
               </div>
             ) : null}
+            {sorted.length > 0 && sorted.length <= 4 && categories && categories.length > 0 ? (
+              <div className="mt-10 border-t border-line pt-7">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">
+                  Keep exploring
+                </p>
+                <h2 className="mt-1 font-display text-2xl text-ink">More local finds</h2>
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {categories.filter((category) => category.slug !== activeSlug).slice(0, 8).map((category) => (
+                    <Link
+                      key={category.slug}
+                      href={`/categories/${category.slug}`}
+                      className="shrink-0 rounded-full border border-line bg-surface px-3.5 py-2 text-xs font-medium text-ink transition hover:border-ink/40"
+                    >
+                      {category.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </>
         )}
       </div>
 
       {drawerOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-[70] lg:hidden">
           <button
             type="button"
             aria-label="Close filters"
             onClick={() => setDrawerOpen(false)}
-            className="absolute inset-0 bg-ink/40"
+            className="absolute inset-0 bg-ink/45 backdrop-blur-[1px]"
           />
-          <div className="absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col bg-background">
-            <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">
-                Filters
-              </p>
+          <div role="dialog" aria-modal="true" aria-label="Filters" className="absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-2xl border-t border-line bg-background shadow-[0_-20px_60px_-25px_rgba(28,20,24,0.45)]">
+            <div className="flex justify-center pt-2.5" aria-hidden="true">
+              <span className="h-1 w-10 rounded-full bg-line" />
+            </div>
+            <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+              <div>
+                <p className="font-display text-2xl text-ink">Filters</p>
+                <p className="mt-0.5 text-xs text-muted">Refine the pieces you see.</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="text-xl leading-none text-muted"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-xl leading-none text-muted transition hover:bg-surface"
                 aria-label="Close"
               >
-                ×
+                <span aria-hidden>&#215;</span>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-4">{panel}</div>
-            <div className="flex gap-3 border-t border-line px-4 py-3">
+            <div className="flex-1 overflow-y-auto px-5">{panel}</div>
+            <div className="flex gap-3 border-t border-line bg-surface px-5 py-4">
               <button
                 type="button"
                 onClick={clearAll}
-                className="flex-1 rounded-full border border-line py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink"
+                className="min-h-12 flex-1 rounded-lg border border-line px-3 text-xs font-semibold uppercase tracking-[0.12em] text-ink transition hover:border-ink/40"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="flex-1 rounded-full bg-ink py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white"
+                className="min-h-12 flex-[1.4] rounded-lg bg-ink px-3 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-accent-deep"
               >
-                Show {sorted.length}
+                Show {sorted.length} {sorted.length === 1 ? "piece" : "pieces"}
               </button>
             </div>
           </div>

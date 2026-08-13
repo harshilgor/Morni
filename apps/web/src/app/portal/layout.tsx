@@ -1,4 +1,6 @@
 import { PortalNav } from "@/components/portal-nav";
+import { PortalHeader } from "@/components/portal-header";
+import { PortalWorkspace } from "@/components/portal-workspace";
 
 export default function PortalLayout({
   children,
@@ -6,9 +8,16 @@ export default function PortalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-6xl flex-col lg:flex-row">
-      <PortalNav />
-      <div className="flex-1 px-4 py-8 sm:px-6">{children}</div>
-    </div>
+    <PortalWorkspace>
+      <div className="flex min-h-screen flex-col lg:flex-row">
+        <PortalNav />
+        <div className="min-w-0 flex-1">
+          <PortalHeader />
+          <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
+            {children}
+          </main>
+        </div>
+      </div>
+    </PortalWorkspace>
   );
 }

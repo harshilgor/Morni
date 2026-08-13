@@ -1,12 +1,16 @@
 "use client";
 
+/* Product thumbnails may originate from seller-controlled Supabase storage URLs. */
+/* eslint-disable @next/next/no-img-element */
+
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import { ColorVariantEditor } from "@/components/color-variant-editor";
 import {
   ImagePreviewDialog,
   type PreviewImage,
 } from "@/components/image-preview-dialog";
+import { PortalIcon } from "@/components/portal-icons";
+import { PortalEmpty, PortalMetric, PortalPageHeader, StatusBadge } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { formatAed } from "@/lib/format";
@@ -85,6 +89,7 @@ export default function PortalProductsPage() {
     images: PreviewImage[];
     title: string;
   } | null>(null);
+  const [addProductOpen, setAddProductOpen] = useState(false);
 
   async function loadProducts(storeId: string) {
     const supabase = createClient();
@@ -104,6 +109,23 @@ export default function PortalProductsPage() {
     if (typeof queueMicrotask === "function") queueMicrotask(run);
     else window.setTimeout(run, 0);
   }, [store]);
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedQuery = params.get("q");
+      if (requestedQuery) setQuery(requestedQuery);
+      if (params.get("new") === "1") {
+        setAddProductOpen(true);
+        window.setTimeout(
+          () => document.getElementById("new-product")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+          80,
+        );
+      }
+    };
+    if (typeof queueMicrotask === "function") queueMicrotask(syncFromUrl);
+    else window.setTimeout(syncFromUrl, 0);
+  }, []);
 
   const visibleProducts = [...products]
     .filter((product) => {
@@ -190,6 +212,7 @@ export default function PortalProductsPage() {
   }
 
   async function removeProduct(product: Product) {
+    if (!window.confirm(`Delete “${product.title}”? This cannot be undone.`)) return;
     const supabase = createClient();
     await supabase.from("products").delete().eq("id", product.id);
     if (store) await loadProducts(store.id);
@@ -403,39 +426,41 @@ export default function PortalProductsPage() {
 
   if (error === "unauthenticated") {
     return (
-      <Link href="/auth?next=/portal/products" className="text-accent-deep underline">
-        Sign in
-      </Link>
+      <PortalEmpty
+        icon="products"
+        title="Sign in to manage your catalog"
+        description="Use the owner account linked to your Morni store."
+        action={{ label: "Sign in", href: "/auth?next=/portal/products" }}
+      />
     );
   }
 
   if (loading) return <p className="text-muted">Loading…</p>;
   if (!store) {
     return (
-      <p className="text-muted">
-        Set up a store on the{" "}
-        <Link href="/portal" className="text-accent-deep underline">
-          Orders
-        </Link>{" "}
-        page first.
-      </p>
+      <PortalEmpty
+        icon="store"
+        title="Set up your first store"
+        description="Create a store before adding products to your marketplace catalog."
+        action={{ label: "Start store setup", href: "/sell/setup" }}
+      />
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl text-ink">Products</h1>
-          <p className="mt-1 text-sm text-muted">Manage catalog for {store.name}</p>
-        </div>
+    <div className="space-y-6">
+      <PortalPageHeader
+        eyebrow="Catalog"
+        title="Products"
+        description={`Manage the live catalog, stock levels, options, and availability for ${store.name}.`}
+      >
         {editing ? (
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={cancelEditing}
               disabled={savingEdits}
-              className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition hover:border-ink/30 disabled:opacity-50"
+              className="portal-button-secondary disabled:opacity-50"
             >
               Cancel
             </button>
@@ -443,7 +468,7 @@ export default function PortalProductsPage() {
               type="button"
               onClick={saveEdits}
               disabled={savingEdits}
-              className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-white transition hover:bg-ink/90 disabled:opacity-50"
+              className="portal-button-primary disabled:opacity-50"
             >
               {savingEdits ? "Saving…" : "Save changes"}
             </button>
@@ -453,11 +478,34 @@ export default function PortalProductsPage() {
             type="button"
             onClick={startEditing}
             disabled={products.length === 0}
-            className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-white transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="portal-button-primary disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Edit products
+            <PortalIcon name="settings" className="h-4 w-4" />
+            Edit catalog
           </button>
         )}
+        {!editing ? (
+          <button
+            type="button"
+            onClick={() => {
+              setAddProductOpen(true);
+              window.setTimeout(
+                () => document.getElementById("new-product")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                0,
+              );
+            }}
+            className="portal-button-secondary"
+          >
+            <PortalIcon name="plus" className="h-4 w-4" />
+            Add product
+          </button>
+        ) : null}
+      </PortalPageHeader>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <PortalMetric label="Live products" value={String(products.filter((product) => product.is_available).length)} detail={`${products.length} in catalog`} icon="products" />
+        <PortalMetric label="Low stock" value={String(products.filter((product) => product.stock <= 5).length)} detail="Items with 5 units or fewer" icon="warning" tone={products.some((product) => product.stock <= 5) ? "urgent" : "default"} />
+        <PortalMetric label="Hidden products" value={String(products.filter((product) => !product.is_available).length)} detail="Not visible to shoppers" icon="eye" />
       </div>
 
       {editing ? (
@@ -473,16 +521,16 @@ export default function PortalProductsPage() {
         </p>
       ) : null}
 
-      <div className="rounded-2xl border border-line bg-surface p-4">
+      <div className="portal-card p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <input
-            className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
+            className="portal-input"
             placeholder="Search title, description, or color"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           <select
-            className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
+            className="portal-select"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
           >
@@ -491,7 +539,7 @@ export default function PortalProductsPage() {
             <option value="price_asc">Sort: Price low to high</option>
             <option value="stock_asc">Sort: Stock low to high</option>
           </select>
-          <label className="flex items-center gap-2 rounded-xl border border-line bg-background px-3 py-2.5 text-sm">
+          <label className="flex items-center gap-2 rounded-xl border border-[#dce5e0] bg-[#fbfdfc] px-3 py-2.5 text-sm text-[#52635c]">
             <input
               type="checkbox"
               checked={showLowStock}
@@ -499,7 +547,7 @@ export default function PortalProductsPage() {
             />
             Low stock only (≤5)
           </label>
-          <label className="flex items-center gap-2 rounded-xl border border-line bg-background px-3 py-2.5 text-sm">
+          <label className="flex items-center gap-2 rounded-xl border border-[#dce5e0] bg-[#fbfdfc] px-3 py-2.5 text-sm text-[#52635c]">
             <input
               type="checkbox"
               checked={showHiddenOnly}
@@ -556,11 +604,19 @@ export default function PortalProductsPage() {
         </div>
       </div>
 
+      {addProductOpen ? (
       <form
+        id="new-product"
         onSubmit={onCreate}
-        className="grid gap-3 rounded-[1.5rem] border border-line bg-surface p-5 sm:grid-cols-2"
+        className="grid gap-3 rounded-2xl border border-[#cbdad4] bg-white p-5 shadow-[0_12px_30px_-28px_rgba(27,48,39,0.45)] sm:grid-cols-2"
       >
-        <h2 className="font-medium sm:col-span-2">Add product</h2>
+        <div className="flex items-center justify-between sm:col-span-2">
+          <div>
+            <p className="portal-eyebrow">New catalog item</p>
+            <h2 className="mt-1 text-lg font-semibold text-[#263530]">Add product</h2>
+          </div>
+          <button type="button" onClick={() => setAddProductOpen(false)} className="text-xs font-semibold text-[#66736e] hover:text-[#2f6f66]">Close</button>
+        </div>
         <input
           className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
           placeholder="Title"
@@ -595,7 +651,7 @@ export default function PortalProductsPage() {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-ink px-5 py-2.5 text-sm text-white sm:col-span-2 disabled:opacity-50"
+          className="portal-button-primary sm:col-span-2 disabled:opacity-50"
         >
           {saving ? "Saving…" : "Add product"}
         </button>
@@ -603,7 +659,9 @@ export default function PortalProductsPage() {
           <p className="text-sm text-accent-deep sm:col-span-2">{message}</p>
         ) : null}
       </form>
+      ) : null}
 
+      {editing ? (
       <ul className="space-y-3">
         {visibleProducts.map((product) => {
           const variants = [...(product.product_variants ?? [])].sort(
@@ -637,7 +695,6 @@ export default function PortalProductsPage() {
                     title={`Preview photos for ${product.title}`}
                     className="group relative h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-sand"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={product.image_urls[0]}
                       alt={product.title}
@@ -755,6 +812,24 @@ export default function PortalProductsPage() {
           );
         })}
       </ul>
+      ) : (
+        <CatalogTable
+          products={visibleProducts}
+          selectedIds={selectedIds}
+          onSelect={toggleSelected}
+          onPreview={(product) =>
+            setPreview({
+              images: product.image_urls.map((url, imageIndex) => ({
+                url,
+                label: `${product.title} photo ${imageIndex + 1}`,
+              })),
+              title: product.title,
+            })
+          }
+          onToggle={toggleAvailable}
+          onDelete={removeProduct}
+        />
+      )}
 
       {preview ? (
         <ImagePreviewDialog
@@ -763,6 +838,44 @@ export default function PortalProductsPage() {
           onClose={() => setPreview(null)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function CatalogTable({
+  products,
+  selectedIds,
+  onSelect,
+  onPreview,
+  onToggle,
+  onDelete,
+}: {
+  products: ProductWithVariants[];
+  selectedIds: string[];
+  onSelect: (productId: string) => void;
+  onPreview: (product: ProductWithVariants) => void;
+  onToggle: (product: Product) => void;
+  onDelete: (product: Product) => void;
+}) {
+  if (!products.length) {
+    return <PortalEmpty icon="products" title="No products match these filters" description="Try a different search, or add a new product to start building your catalog." action={{ label: "Add product", href: "/portal/products?new=1" }} />;
+  }
+
+  return (
+    <div className="portal-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf1ef] px-5 py-4">
+        <div><p className="text-sm font-semibold text-[#263530]">Catalog inventory</p><p className="mt-1 text-xs text-[#7b8882]">{products.length} product{products.length === 1 ? "" : "s"} in this view</p></div>
+        <p className="text-xs text-[#7b8882]">Select products above to make bulk changes.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="portal-table min-w-[800px] w-full text-left">
+          <thead className="bg-[#fbfdfc]"><tr><th className="w-12 px-5 py-3">Select</th><th className="px-3 py-3">Product</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Stock</th><th className="px-4 py-3 text-right">Price</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
+          <tbody>{products.map((product) => {
+            const variants = [...(product.product_variants ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+            return <tr key={product.id} className="transition hover:bg-[#f8faf9]"><td className="px-5 py-4"><input type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => onSelect(product.id)} aria-label={`Select ${product.title}`} /></td><td className="px-3 py-4"><div className="flex items-center gap-3"><button type="button" onClick={() => onPreview(product)} disabled={!product.image_urls.length} className="group h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-[#edf3f0] disabled:cursor-default">{product.image_urls.length ? <><img src={product.image_urls[0]} alt="" className="h-full w-full object-cover transition group-hover:scale-105" /><span className="sr-only">Preview photos</span></> : <span className="text-[10px] text-[#7b8882]">No photo</span>}</button><span className="min-w-0"><span className="block truncate text-sm font-semibold text-[#34423d]">{product.title}</span><span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">{variants.length ? variants.map((variant) => `${variant.color_name} (${variant.stock})`).join(" / ") : "No colour variants"}</span></span></div></td><td className="px-4 py-4">{product.is_available ? <StatusBadge status="live" /> : <StatusBadge status="paused" />}</td><td className="px-4 py-4 text-right"><span className={`text-sm font-semibold ${product.stock <= 5 ? "text-[#a56225]" : "text-[#40534d]"}`}>{product.stock}</span>{product.stock <= 5 ? <span className="ml-2"><StatusBadge status="low_stock" /></span> : null}</td><td className="px-4 py-4 text-right text-sm font-semibold text-[#263530]">{formatAed(product.price_aed)}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button type="button" onClick={() => onToggle(product)} className="portal-button-secondary px-3 py-1.5 text-xs">{product.is_available ? "Hide" : "Show"}</button><button type="button" onClick={() => onDelete(product)} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-[#b34e4e] hover:bg-[#fdf1f1]">Delete</button></div></td></tr>;
+          })}</tbody>
+        </table>
+      </div>
     </div>
   );
 }

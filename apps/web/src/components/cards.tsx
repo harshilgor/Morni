@@ -72,9 +72,9 @@ export function ProductCard({
   return (
     <Link
       href={href}
-      className="group relative block overflow-hidden rounded-2xl border border-line/70 bg-white/75 p-2.5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)]"
+      className="group relative block overflow-hidden rounded-xl border border-line/70 bg-white/75 p-2 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5"
     >
-      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-sand">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-sand sm:rounded-xl">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -91,8 +91,8 @@ export function ProductCard({
           />
         </div>
       </div>
-      <div className="space-y-1.5 px-1 pb-1 pt-3">
-        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-ink">
+      <div className="space-y-1 px-1 pb-1 pt-2.5 sm:space-y-1.5 sm:pt-3">
+        <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-ink sm:text-sm">
           {product.title}
         </h3>
         {showRating ? (
@@ -104,7 +104,7 @@ export function ProductCard({
             <span className="text-xs text-muted">({rating.reviewCount})</span>
           </div>
         ) : null}
-        <div className="flex items-center gap-2 text-sm font-medium">
+        <div className="flex items-center gap-1.5 text-sm font-medium">
           <span>{formatAed(product.price_aed)}</span>
           {product.compare_at_price_aed ? (
             <span className="text-xs font-normal text-muted line-through">
