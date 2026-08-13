@@ -104,7 +104,7 @@ const SLIDES: Slide[] = [
   },
 ];
 
-const AUTOPLAY_MS = 4600;
+const AUTOPLAY_MS = 3600;
 const RESUME_AFTER_INTERACT_MS = 6000;
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
