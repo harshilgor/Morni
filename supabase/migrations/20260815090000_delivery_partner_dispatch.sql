@@ -574,7 +574,7 @@ begin
       'id', job.id, 'status', job.status, 'assigned_at', job.assigned_at, 'assignment_expires_at', job.assignment_expires_at,
       'failure_reason', job.failure_reason, 'order_number', order_row.order_number, 'store_name', store.name,
       'pickup_area', store.area, 'delivery_area', order_row.delivery_area, 'driver_name', driver.display_name
-    ) order by job.updated_at desc limit 80)
+    ) order by job.updated_at desc)
       from public.delivery_jobs job
       join public.orders order_row on order_row.id = job.order_id
       join public.stores store on store.id = order_row.store_id
@@ -639,12 +639,12 @@ begin
     'drivers', coalesce((select jsonb_agg(jsonb_build_object(
       'id', driver.id, 'display_name', driver.display_name, 'partner_name', partner.name, 'availability', driver.availability, 'is_active', driver.is_active,
       'last_location_at', driver.last_location_at
-    ) order by driver.updated_at desc limit 80) from public.delivery_drivers driver join public.delivery_partners partner on partner.id = driver.partner_id), '[]'::jsonb),
+    ) order by driver.updated_at desc) from public.delivery_drivers driver join public.delivery_partners partner on partner.id = driver.partner_id), '[]'::jsonb),
     'jobs', coalesce((select jsonb_agg(jsonb_build_object(
       'id', job.id, 'status', job.status, 'attempts', job.dispatch_attempts, 'ready_at', job.ready_for_pickup_at,
       'assigned_at', job.assigned_at, 'failure_reason', job.failure_reason, 'order_number', order_row.order_number,
       'store_name', store.name, 'pickup_area', store.area, 'delivery_area', order_row.delivery_area, 'partner_name', partner.name, 'driver_name', driver.display_name
-    ) order by job.updated_at desc limit 120)
+    ) order by job.updated_at desc)
       from public.delivery_jobs job
       join public.orders order_row on order_row.id = job.order_id
       join public.stores store on store.id = order_row.store_id
