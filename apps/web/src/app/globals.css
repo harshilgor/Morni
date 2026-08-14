@@ -239,10 +239,33 @@ h3,
   animation: soft-pulse 2.4s ease-in-out infinite;
 }
 
+@keyframes add-to-bag-confetti {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.45) rotate(0deg);
+  }
+  14% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--confetti-x)),
+        calc(-50% + var(--confetti-y))
+      )
+      scale(1) rotate(var(--confetti-rotate));
+  }
+}
+
+.add-to-bag-confetti {
+  animation: add-to-bag-confetti 680ms cubic-bezier(0.18, 0.82, 0.27, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-rise-delay,
-  .animate-pulse-soft {
+  .animate-pulse-soft,
+  .add-to-bag-confetti {
     animation: none;
   }
 }

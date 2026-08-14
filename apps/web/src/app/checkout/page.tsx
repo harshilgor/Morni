@@ -13,6 +13,7 @@ import {
 } from "@/components/delivery-address-fields";
 import type { DeliveryAddress } from "@/lib/types";
 import { ProductRail, type RailProduct } from "@/components/product-rail";
+import { useLocation } from "@/lib/location";
 
 function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   return {
@@ -41,11 +42,19 @@ export default function CheckoutPage() {
   const [form, setForm] = useState<DeliveryAddressDraft>(EMPTY_DELIVERY_ADDRESS);
   const [recommendations, setRecommendations] = useState<RailProduct[]>([]);
   const [cardDetailsOpen, setCardDetailsOpen] = useState(false);
+  const [mobileAddressOpen, setMobileAddressOpen] = useState(false);
+  const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
   const smallOrderFee = orderSubtotal < 99 ? 15 : 0;
   const deliveryFee = 7;
   const serviceFee = 3;
   const orderTotal = orderSubtotal + smallOrderFee + deliveryFee + serviceFee;
+  const selectedAddress = savedAddresses.find(
+    (address) => address.id === selectedAddressId,
+  );
+  const deliverySummary = selectedAddress
+    ? [selectedAddress.street, selectedAddress.area].filter(Boolean).join(", ")
+    : [form.street, form.area].filter(Boolean).join(", ") || locationLabel;
 
   useEffect(() => {
     const supabase = createClient();
@@ -96,6 +105,7 @@ export default function CheckoutPage() {
     setForm(addressToDraft(address));
     setSaveAddress(true);
     setMakeDefault(address.is_default);
+    setMobileAddressOpen(false);
   }
 
   function useNewAddress() {
@@ -107,6 +117,17 @@ export default function CheckoutPage() {
     }));
     setSaveAddress(true);
     setMakeDefault(savedAddresses.length === 0);
+    setMobileAddressOpen(true);
+  }
+
+  function openMobileAddress() {
+    setMobileAddressOpen(true);
+    window.setTimeout(() => {
+      document.getElementById("checkout-mobile-delivery")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
   }
 
   useEffect(() => {
@@ -141,6 +162,140 @@ export default function CheckoutPage() {
   }
 
   return (
+    <>
+      <div className="lg:hidden">
+        <div className="mx-auto max-w-lg px-4 pb-6 pt-5">
+          <header className="flex items-end justify-between gap-4 border-b border-line pb-5">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">Your bag</p>
+              <h1 className="mt-1 font-display text-3xl text-ink">Cart</h1>
+            </div>
+            <p className="max-w-40 text-right text-xs leading-relaxed text-muted">
+              {items.length} {items.length === 1 ? "piece" : "pieces"} from {items[0]?.storeName}
+            </p>
+          </header>
+
+          <section aria-labelledby="mobile-cart-items" className="py-2">
+            <h2 id="mobile-cart-items" className="sr-only">Items in your bag</h2>
+            <div className="divide-y divide-line">
+              {items.map((item) => {
+                const lineId = item.lineId ?? cartLineId(item.productId, item.size, item.variantId);
+                return (
+                  <article key={lineId} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 py-4">
+                    <div className="aspect-[4/5] overflow-hidden rounded-xl bg-sand">
+                      {item.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                      ) : null}
+                    </div>
+                    <div className="flex min-w-0 flex-col">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-ink">{item.title}</h3>
+                          {(item.colorName || item.size) ? (
+                            <p className="mt-1 text-xs text-muted">
+                              {[item.colorName, item.size ? `Size ${item.size}` : null].filter(Boolean).join(" · ")}
+                            </p>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(lineId)}
+                          className="shrink-0 p-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted transition hover:text-accent-deep"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+                        <div className="inline-flex items-center rounded-lg border border-line bg-surface">
+                          <button type="button" aria-label={`Decrease quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity - 1)} className="flex h-8 w-8 items-center justify-center text-lg">−</button>
+                          <span className="flex h-8 min-w-8 items-center justify-center border-x border-line text-xs font-semibold">{item.quantity}</span>
+                          <button type="button" aria-label={`Increase quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity + 1)} className="flex h-8 w-8 items-center justify-center text-lg">+</button>
+                        </div>
+                        <p className="text-sm font-semibold text-ink">{formatAed(item.priceAed * item.quantity)}</p>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section aria-labelledby="mobile-price-details" className="border-t border-line py-6">
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="mobile-price-details" className="text-base font-semibold uppercase tracking-[0.08em] text-ink">Price details</h2>
+              <span className="text-sm font-semibold text-ink">{formatAed(orderTotal)}</span>
+            </div>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex justify-between gap-4"><span className="text-muted">Bag total</span><span>{formatAed(orderSubtotal)}</span></div>
+              {smallOrderFee > 0 ? <div className="flex justify-between gap-4"><span className="text-muted">Small order fee</span><span>{formatAed(smallOrderFee)}</span></div> : null}
+              <div className="flex justify-between gap-4"><span className="text-muted">Delivery fee</span><span>{formatAed(deliveryFee)}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-muted">Service fee</span><span>{formatAed(serviceFee)}</span></div>
+            </div>
+            <div className="mt-4 flex justify-between border-t border-line pt-4 text-base font-semibold text-ink"><span>Grand total</span><span>{formatAed(orderTotal)}</span></div>
+          </section>
+        </div>
+
+        <ProductRail
+          id="checkout-mobile-recommendations"
+          title="Complete your edit"
+          subtitle="Pieces chosen to pair with your bag."
+          products={recommendations}
+        />
+
+        <section id="checkout-mobile-delivery" className="mx-auto max-w-lg scroll-mt-4 px-4 pb-44 pt-2">
+          <div className="rounded-2xl border border-line bg-surface p-4 shadow-[0_10px_26px_-24px_rgba(28,20,24,0.7)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-deep">Deliver to</p>
+                <p className="mt-1 text-sm font-semibold text-ink">{selectedAddress?.label ?? locationLabel}</p>
+                <p className="mt-1 line-clamp-1 text-xs text-muted">{deliverySummary}</p>
+              </div>
+              <button type="button" onClick={openMobileAddress} className="shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink underline underline-offset-4">
+                Change
+              </button>
+            </div>
+
+            {mobileAddressOpen ? (
+              <div className="mt-5 border-t border-line pt-5">
+                {authed === false ? (
+                  <p className="mb-4 rounded-xl bg-[#fff0f4] px-3 py-2.5 text-sm text-accent-deep">
+                    <Link href="/auth?next=/checkout" className="underline">Sign in</Link> to save an address and place your order.
+                  </p>
+                ) : null}
+                {authed && savedAddresses.length > 0 ? (
+                  <div className="mb-4 space-y-2">
+                    <p className="text-sm font-semibold text-ink">Saved addresses</p>
+                    {savedAddresses.map((address) => (
+                      <button key={address.id} type="button" onClick={() => selectSavedAddress(address)} className={`w-full rounded-xl border p-3 text-left text-sm transition ${selectedAddressId === address.id ? "border-accent bg-[#fff0f4]" : "border-line bg-background"}`}>
+                        <span className="font-semibold text-ink">{address.label}</span>
+                        <span className="mt-1 block text-xs text-muted">{address.street}, {address.area}</span>
+                      </button>
+                    ))}
+                    <button type="button" onClick={useNewAddress} className="text-sm font-semibold text-accent-deep underline underline-offset-4">Use a new address</button>
+                  </div>
+                ) : null}
+                {!selectedAddressId ? (
+                  <div>
+                    <p className="mb-3 text-sm font-semibold text-ink">Enter your delivery address</p>
+                    <DeliveryAddressFields value={form} onChange={setForm} idPrefix="checkout-mobile-delivery-address" requireLabel={saveAddress} />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-3 shadow-[0_-12px_28px_-24px_rgba(28,20,24,0.8)] backdrop-blur lg:hidden">
+          <div className="mx-auto max-w-lg">
+            <button type="button" onClick={openMobileAddress} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985]">
+              Select address to continue
+            </button>
+          </div>
+        </div>
+      </div>
+
+    <div className="hidden lg:block">
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-14">
       <div className="min-w-0 space-y-8">
@@ -440,5 +595,7 @@ export default function CheckoutPage() {
         />
       </div>
     </div>
+    </div>
+    </>
   );
 }

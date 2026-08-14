@@ -8,7 +8,7 @@ export function SiteFooter() {
   const pathname = usePathname();
   const { auth } = useAuthUser();
 
-  if (pathname?.startsWith("/portal")) {
+  if (pathname?.startsWith("/portal") || pathname?.startsWith("/founder")) {
     return null;
   }
 

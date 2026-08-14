@@ -140,7 +140,11 @@ export function SiteHeader() {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [locationOpen]);
-  if (pathname?.startsWith("/portal")) {
+  const isProductDetailPage = Boolean(
+    pathname && /^\/stores\/[^/]+\/products\/[^/]+$/.test(pathname),
+  );
+
+  if (pathname?.startsWith("/portal") || pathname?.startsWith("/founder") || isProductDetailPage) {
     return null;
   }
 
@@ -193,6 +197,7 @@ export function SiteHeader() {
 
   const firstName = auth?.firstName;
   const isStoreOwner = auth?.hasStore ?? false;
+  const isAdmin = auth?.profile?.role === "admin";
 
   return (
     <header className="sticky top-0 z-50">
@@ -275,10 +280,19 @@ export function SiteHeader() {
                         href="/addresses"
                         className="block rounded-lg px-2 py-2 text-sm hover:bg-background"
                         onClick={() => setAccountOpen(false)}
-                      >
-                        Your addresses
-                      </Link>
-                      {isStoreOwner ? (
+                       >
+                         Your addresses
+                       </Link>
+                       {isAdmin ? (
+                         <Link
+                           href="/founder"
+                           className="block rounded-lg px-2 py-2 text-sm font-semibold text-[#2f6f66] hover:bg-background"
+                           onClick={() => setAccountOpen(false)}
+                         >
+                           Founder workspace
+                         </Link>
+                       ) : null}
+                       {isStoreOwner ? (
                         <>
                           <Link
                             href="/portal"
@@ -331,7 +345,7 @@ export function SiteHeader() {
 
           <Link
             href={auth ? "/orders" : "/auth"}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-white transition hover:border-white/35 hover:bg-white/5 md:hidden"
+            className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-white transition hover:border-white/35 hover:bg-white/5 md:hidden"
             aria-label={auth ? "View account and orders" : "Sign in"}
             title={auth ? "Account" : "Sign in"}
           >

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/cart";
@@ -29,6 +29,40 @@ function ArrowLeft() {
     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none">
       <path d="m14.5 5-7 7 7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+const CONFETTI_PIECES = [
+  { x: -54, y: -50, rotate: -42, color: "#f5c85b" },
+  { x: -26, y: -68, rotate: 28, color: "#c45b7a" },
+  { x: 8, y: -62, rotate: -24, color: "#2f6f66" },
+  { x: 42, y: -48, rotate: 48, color: "#d58b54" },
+  { x: 66, y: -15, rotate: -35, color: "#c45b7a" },
+  { x: 48, y: 22, rotate: 62, color: "#f5c85b" },
+  { x: 7, y: 34, rotate: -58, color: "#2f6f66" },
+  { x: -38, y: 22, rotate: 40, color: "#d58b54" },
+  { x: -66, y: -5, rotate: -52, color: "#c45b7a" },
+] as const;
+
+function AddToBagConfetti({ celebrationKey }: { celebrationKey: number }) {
+  if (celebrationKey === 0) return null;
+
+  return (
+    <span key={celebrationKey} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-visible">
+      {CONFETTI_PIECES.map((piece, index) => (
+        <span
+          key={`${celebrationKey}-${index}`}
+          className="add-to-bag-confetti absolute left-1/2 top-1/2 h-2.5 w-1.5 rounded-sm"
+          style={{
+            "--confetti-x": `${piece.x}px`,
+            "--confetti-y": `${piece.y}px`,
+            "--confetti-rotate": `${piece.rotate}deg`,
+            animationDelay: `${index * 18}ms`,
+            backgroundColor: piece.color,
+          } as CSSProperties}
+        />
+      ))}
+    </span>
   );
 }
 
@@ -103,6 +137,7 @@ export default function ProductPage() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [added, setAdded] = useState(false);
+  const [celebrationKey, setCelebrationKey] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [returnsOpen, setReturnsOpen] = useState(false);
@@ -254,6 +289,7 @@ export default function ProductPage() {
       imageUrl: gallery[0],
     });
     setAdded(true);
+    setCelebrationKey((key) => key + 1);
   };
   const addLabel = added ? "Added to bag" : needsSize && !selectedSize ? "Select a size" : availableStock <= 0 ? "Out of stock" : "Add to bag";
 
@@ -323,7 +359,13 @@ export default function ProductPage() {
           </div>
 
           <p className={`mt-5 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>{availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}` : ""}` : "This piece is currently out of stock"}</p>
-          <div className="mt-5 hidden gap-3 sm:flex"><button type="button" onClick={addToBag} disabled={!canAdd} className="min-h-14 flex-1 rounded-lg bg-ink px-5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button><button type="button" onClick={() => router.push("/cart")} className="min-h-14 rounded-lg border border-ink px-5 text-sm font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-surface">Bag</button></div>
+          <div className="mt-5 hidden gap-3 sm:flex">
+            <div className="relative flex-1">
+              <button type="button" onClick={addToBag} disabled={!canAdd} className="min-h-14 w-full rounded-lg bg-ink px-5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button>
+              <AddToBagConfetti celebrationKey={celebrationKey} />
+            </div>
+            <button type="button" onClick={() => router.push("/cart")} className="min-h-14 rounded-lg border border-ink px-5 text-sm font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-surface">Bag</button>
+          </div>
 
           <div className="mt-7 border-b border-line">
             <ProductAccordion title="Product details" open={detailsOpen} onToggle={() => setDetailsOpen((open) => !open)}><p>{product.description ?? "A thoughtfully selected piece from this local boutique."}</p>{selectedVariant ? <p className="mt-3">Colour: {selectedVariant.color_name}.</p> : null}</ProductAccordion>
@@ -337,7 +379,15 @@ export default function ProductPage() {
 
       <ProductReviewsSection reviews={reviews} avgRating={ratingSummary?.avgRating ?? null} reviewCount={ratingSummary?.reviewCount ?? 0} existingReview={existingReview} canReview={!existingReview && reviewOrderId ? { productId: product.id, orderId: reviewOrderId } : null} onReviewSaved={() => loadReviews(product.id)} />
 
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-background/95 px-4 py-3 shadow-[0_-12px_32px_-22px_rgba(28,20,24,0.4)] backdrop-blur sm:hidden"><div className="mx-auto flex max-w-lg gap-3"><WishlistToggle productId={product.id} /><button type="button" disabled={!canAdd} onClick={addToBag} className="min-h-12 flex-1 rounded-lg bg-ink px-4 text-sm font-semibold uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button></div></div>
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-background/95 px-4 py-3 shadow-[0_-12px_32px_-22px_rgba(28,20,24,0.4)] backdrop-blur sm:hidden">
+        <div className="mx-auto flex max-w-lg gap-3">
+          <WishlistToggle productId={product.id} />
+          <div className="relative flex-1">
+            <button type="button" disabled={!canAdd} onClick={addToBag} className="min-h-12 w-full rounded-lg bg-ink px-4 text-sm font-semibold uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button>
+            <AddToBagConfetti celebrationKey={celebrationKey} />
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
