@@ -219,6 +219,74 @@ function OrderTable({ orders, compact = false }: { orders: FounderData["recent_o
   return <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left"><thead className="border-y border-[#efe5e1] bg-[#fbf7f4]"><tr>{["Order", "Boutique", "Shopper", "Status", "Value", "Placed"].map((heading) => <th key={heading} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[#89777b]">{heading}</th>)}</tr></thead><tbody className="divide-y divide-[#f0e7e3]">{orders.map((order) => <tr key={order.id} className="transition hover:bg-[#fff9f6]"><td className="px-5 py-3.5 text-sm font-semibold text-[#302225]">{order.order_number}</td><td className="px-5 py-3.5 text-sm text-[#5f5054]">{order.store_name}</td><td className="px-5 py-3.5 text-sm text-[#5f5054]">{order.shopper_name}</td><td className="px-5 py-3.5"><StatusPill status={order.status} /></td><td className="px-5 py-3.5 text-sm font-semibold tabular-nums text-[#302225]">{formatAed(order.total_aed)}</td><td className="px-5 py-3.5 text-xs text-[#857478]">{compact ? dateTime(order.placed_at) : `${dateTime(order.placed_at)} · ${order.delivery_area}`}</td></tr>)}{orders.length === 0 ? <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-[#7d6d71]">No orders in this period yet.</td></tr> : null}</tbody></table></div>;
 }
 
+const deliveryStatusText: Record<DeliveryJobStatus, string> = {
+  unassigned: "Waiting for rider",
+  assigned: "Awaiting acceptance",
+  accepted: "Heading to pickup",
+  at_pickup: "At the store",
+  collected: "Out for delivery",
+  delivered: "Delivered",
+  failed: "Needs attention",
+  cancelled: "Cancelled",
+};
+
+function DeliveryStatusPill({ status }: { status: DeliveryJobStatus }) {
+  const styles: Record<DeliveryJobStatus, string> = {
+    unassigned: "border-[#dfc484] bg-[#fff7dd] text-[#7c5606]",
+    assigned: "border-[#9fc0d5] bg-[#eef7fc] text-[#2b5f7b]",
+    accepted: "border-[#c5a9d2] bg-[#faf0fc] text-[#6d367e]",
+    at_pickup: "border-[#aab8dd] bg-[#f0f3ff] text-[#465a9a]",
+    collected: "border-[#9fcfc5] bg-[#eaf8f5] text-[#17665a]",
+    delivered: "border-[#a5cfad] bg-[#eff9ef] text-[#236434]",
+    failed: "border-[#e2a3a8] bg-[#fff1f1] text-[#8b3030]",
+    cancelled: "border-[#d4c9c7] bg-[#f5f2f1] text-[#695d5d]",
+  };
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${styles[status]}`}>{deliveryStatusText[status]}</span>;
+}
+
+function DeliveryView({ data, onRefresh }: { data: FounderDeliveryData; onRefresh: () => void }) {
+  const [partnerName, setPartnerName] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [partnerId, setPartnerId] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"dispatcher" | "driver">("dispatcher");
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<"partner" | "invite" | null>(null);
+
+  async function createPartner(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting("partner");
+    setFormError(null);
+    const response = await fetch("/api/delivery/partners", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: partnerName, supportEmail }) });
+    const payload = (await response.json().catch(() => null)) as { error?: string; partner?: { id: string } } | null;
+    if (!response.ok || !payload?.partner) setFormError(payload?.error ?? "Unable to create delivery partner.");
+    else { setPartnerName(""); setSupportEmail(""); setPartnerId(payload.partner.id); onRefresh(); }
+    setSubmitting(null);
+  }
+
+  async function createInvite(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const targetPartnerId = partnerId || data.partners[0]?.id;
+    if (!targetPartnerId) return;
+    setSubmitting("invite");
+    setFormError(null);
+    setInviteUrl(null);
+    const response = await fetch(`/api/delivery/partners/${targetPartnerId}/invites`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: inviteEmail, role: inviteRole }) });
+    const payload = (await response.json().catch(() => null)) as { error?: string; inviteUrl?: string } | null;
+    if (!response.ok || !payload?.inviteUrl) setFormError(payload?.error ?? "Unable to create invite.");
+    else { setInviteEmail(""); setInviteUrl(payload.inviteUrl); }
+    setSubmitting(null);
+  }
+
+  async function copyInvite() {
+    if (inviteUrl) await navigator.clipboard.writeText(inviteUrl);
+  }
+
+  const selectedPartner = partnerId || data.partners[0]?.id || "";
+  return <div className="space-y-5"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Active jobs" value={number(data.metrics.active_jobs)} detail="Assigned or currently moving" /><MetricCard label="Needs a rider" value={number(data.metrics.waiting_jobs)} detail="Awaiting automatic dispatch" tone={data.metrics.waiting_jobs ? "attention" : "default"} /><MetricCard label="Exceptions" value={number(data.metrics.exceptions)} detail="Failed or overdue assignments" tone={data.metrics.exceptions ? "attention" : "default"} /><MetricCard label="Riders available" value={number(data.metrics.available_drivers)} detail="Ready for nearby pickup work" /></div><div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(20rem,0.7fr)]"><Panel className="overflow-hidden"><div className="p-5 sm:p-6"><SectionTitle eyebrow="Live operations" title="Delivery control tower" detail="Every ready order, delivery-company assignment and rider status across Morni." /></div><div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left"><thead className="border-y border-[#efe5e1] bg-[#fbf7f4]"><tr>{["Order", "Route", "Partner & rider", "Status", "Attempts"].map((heading) => <th key={heading} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[#89777b]">{heading}</th>)}</tr></thead><tbody className="divide-y divide-[#f0e7e3]">{data.jobs.map((job) => <tr key={job.id} className="align-top transition hover:bg-[#fff9f6]"><td className="px-5 py-4"><span className="block text-sm font-semibold text-[#302225]">{job.order_number}</span><span className="mt-1 block text-xs text-[#867579]">Ready {dateTime(job.ready_at)}</span></td><td className="px-5 py-4 text-sm text-[#5f5054]"><span className="block font-medium">{job.store_name}</span><span className="mt-1 block text-xs text-[#867579]">{job.pickup_area} to {job.delivery_area}</span></td><td className="px-5 py-4 text-sm text-[#5f5054]"><span className="block">{job.partner_name ?? "Not assigned"}</span><span className="mt-1 block text-xs text-[#867579]">{job.driver_name ?? "No rider yet"}</span></td><td className="px-5 py-4"><DeliveryStatusPill status={job.status} />{job.failure_reason ? <span className="mt-1.5 block max-w-44 text-xs leading-5 text-[#9b354f]">{job.failure_reason}</span> : null}</td><td className="px-5 py-4 text-sm font-semibold tabular-nums text-[#302225]">{number(job.attempts)}</td></tr>)}{data.jobs.length === 0 ? <tr><td colSpan={5} className="px-5 py-14 text-center text-sm text-[#7d6d71]">Ready-for-pickup orders will appear here automatically.</td></tr> : null}</tbody></table></div></Panel><Panel className="p-5 sm:p-6"><SectionTitle eyebrow="Network" title="Delivery partners" detail="Capacity and automatic-dispatch coverage at a glance." /><div className="mt-5 space-y-3">{data.partners.map((partner) => <div key={partner.id} className="rounded-xl border border-[#eee3df] bg-[#fdf9f6] p-3.5"><div className="flex items-start justify-between gap-3"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-[#302225]">{partner.name}</span><span className="mt-1 block text-xs text-[#7e6e72]">{number(partner.available_drivers)} of {number(partner.total_drivers)} riders available</span></span><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${partner.auto_dispatch_enabled && partner.is_active ? "bg-[#e8f4eb] text-[#29623a]" : "bg-[#f6e8e9] text-[#913b4c]"}`}>{partner.auto_dispatch_enabled && partner.is_active ? "Dispatching" : "Paused"}</span></div><p className="mt-3 text-xs text-[#66565a]">{number(partner.active_jobs)} active delivery job{partner.active_jobs === 1 ? "" : "s"}</p></div>)}{data.partners.length === 0 ? <p className="rounded-xl border border-dashed border-[#dfcfca] px-4 py-5 text-sm leading-6 text-[#75666a]">Add your first delivery company to start assigning ready orders.</p> : null}</div></Panel></div><div className="grid gap-5 xl:grid-cols-2"><Panel className="p-5 sm:p-6"><SectionTitle eyebrow="Onboard" title="Add a delivery company" detail="Create a partner first, then invite its dispatcher or riders securely." /><form onSubmit={createPartner} className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"><input required value={partnerName} onChange={(event) => setPartnerName(event.target.value)} placeholder="Delivery company name" className="rounded-xl border border-[#dfcfca] bg-[#fffdf9] px-3.5 py-2.5 text-sm outline-none transition focus:border-[#9b354f]" /><input required type="email" value={supportEmail} onChange={(event) => setSupportEmail(event.target.value)} placeholder="Support email" className="rounded-xl border border-[#dfcfca] bg-[#fffdf9] px-3.5 py-2.5 text-sm outline-none transition focus:border-[#9b354f]" /><button type="submit" disabled={submitting === "partner"} className="rounded-xl bg-[#2a1b20] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{submitting === "partner" ? "Adding" : "Add partner"}</button></form></Panel><Panel className="p-5 sm:p-6"><SectionTitle eyebrow="Access" title="Invite dispatchers and riders" detail="Each invite is one-time and connects the person to the selected delivery company." /><form onSubmit={createInvite} className="mt-5 grid gap-3 sm:grid-cols-2"><select required value={selectedPartner} onChange={(event) => setPartnerId(event.target.value)} className="rounded-xl border border-[#dfcfca] bg-[#fffdf9] px-3.5 py-2.5 text-sm outline-none transition focus:border-[#9b354f]"><option value="" disabled>Select partner</option>{data.partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</select><select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "dispatcher" | "driver")} className="rounded-xl border border-[#dfcfca] bg-[#fffdf9] px-3.5 py-2.5 text-sm outline-none transition focus:border-[#9b354f]"><option value="dispatcher">Dispatcher</option><option value="driver">Rider</option></select><input required type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="name@company.com" className="rounded-xl border border-[#dfcfca] bg-[#fffdf9] px-3.5 py-2.5 text-sm outline-none transition focus:border-[#9b354f]" /><button type="submit" disabled={!selectedPartner || submitting === "invite"} className="rounded-xl border border-[#2a1b20] px-4 py-2.5 text-sm font-semibold text-[#2a1b20] disabled:opacity-50">{submitting === "invite" ? "Creating" : "Create invite"}</button></form>{formError ? <p role="alert" className="mt-3 text-xs leading-5 text-[#9b354f]">{formError}</p> : null}{inviteUrl ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f4ece8] p-3"><span className="text-xs leading-5 text-[#67555a]">The invite is ready to share once.</span><button type="button" onClick={() => void copyInvite()} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#683145] shadow-sm">Copy invite link</button></div> : null}</Panel></div><Panel className="overflow-hidden"><div className="p-5 sm:p-6"><SectionTitle eyebrow="Rider network" title="Availability across partners" detail="Last location signals help automatic dispatch prioritise the closest available rider." /></div><div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left"><thead className="border-y border-[#efe5e1] bg-[#fbf7f4]"><tr>{["Rider", "Partner", "Availability", "Last location"].map((heading) => <th key={heading} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[#89777b]">{heading}</th>)}</tr></thead><tbody className="divide-y divide-[#f0e7e3]">{data.drivers.map((driver) => <tr key={driver.id}><td className="px-5 py-4 text-sm font-semibold text-[#302225]">{driver.display_name}</td><td className="px-5 py-4 text-sm text-[#5f5054]">{driver.partner_name}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${driver.availability === "available" ? "bg-[#e8f4eb] text-[#29623a]" : driver.availability === "assigned" ? "bg-[#eef7fc] text-[#2b5f7b]" : "bg-[#f2eeee] text-[#6f6262]"}`}>{driver.availability}</span></td><td className="px-5 py-4 text-sm text-[#5f5054]">{dateTime(driver.last_location_at)}</td></tr>)}{data.drivers.length === 0 ? <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-[#7d6d71]">Riders will appear after delivery partners accept their invitations.</td></tr> : null}</tbody></table></div></Panel></div>;
+}
+
 function StoresView({ stores }: { stores: FounderData["stores"] }) {
   return <Panel className="overflow-hidden"><div className="p-5 sm:p-6"><SectionTitle eyebrow="Network" title="Boutique health" detail="Find catalogue gaps, stock risks, and commercial activity in one place." /></div><div className="overflow-x-auto"><table className="w-full min-w-[840px] text-left"><thead className="border-y border-[#efe5e1] bg-[#fbf7f4]"><tr>{["Boutique", "Location", "Status", "Live pieces", "Low stock", "Orders", "Sales"].map((heading) => <th key={heading} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[#89777b]">{heading}</th>)}</tr></thead><tbody className="divide-y divide-[#f0e7e3]">{stores.map((store) => <tr key={store.id} className="transition hover:bg-[#fff9f6]"><td className="px-5 py-4"><span className="block text-sm font-semibold text-[#302225]">{store.name}</span><span className="mt-1 block text-xs text-[#867579]">Joined {dateTime(store.created_at)}</span></td><td className="px-5 py-4 text-sm text-[#5f5054]">{store.emirate.replace("_", " ")}</td><td className="px-5 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${store.is_active ? "border-[#a9cdb0] bg-[#eef8ef] text-[#286435]" : "border-[#dfb1b6] bg-[#fff2f2] text-[#8c3140]"}`}>{store.is_active ? "Live" : "Paused"}</span></td><td className="px-5 py-4 text-sm font-semibold tabular-nums text-[#302225]">{number(store.live_products)}</td><td className={`px-5 py-4 text-sm font-semibold tabular-nums ${store.low_stock_products ? "text-[#9a6514]" : "text-[#5f5054]"}`}>{number(store.low_stock_products)}</td><td className="px-5 py-4 text-sm font-semibold tabular-nums text-[#302225]">{number(store.period_orders)}</td><td className="px-5 py-4 text-sm font-semibold tabular-nums text-[#302225]">{formatAed(store.period_revenue)}</td></tr>)}</tbody></table></div></Panel>;
 }
@@ -240,8 +308,9 @@ function AlertsView({ alerts, onViewChange }: { alerts: FounderData["alerts"]; o
   return <ActionCentre alerts={alerts} onViewChange={onViewChange} />;
 }
 
-function WorkspaceContent({ data, activeView, ownerName, onViewChange }: { data: FounderData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void }) {
+function WorkspaceContent({ data, deliveryData, activeView, ownerName, onViewChange, onRefresh }: { data: FounderData; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void }) {
   if (activeView === "operations") return <Panel className="overflow-hidden"><OrderTable orders={data.recent_orders} /></Panel>;
+  if (activeView === "delivery") return <DeliveryView data={deliveryData} onRefresh={onRefresh} />;
   if (activeView === "stores") return <StoresView stores={data.stores} />;
   if (activeView === "customers") return <CustomersView customers={data.customers} />;
   if (activeView === "catalogue") return <CatalogueView products={data.top_products} />;
@@ -253,6 +322,7 @@ function WorkspaceContent({ data, activeView, ownerName, onViewChange }: { data:
 export function FounderWorkspace() {
   const { auth, loading: authLoading } = useAuthUser();
   const [data, setData] = useState<FounderData | null>(null);
+  const [deliveryData, setDeliveryData] = useState<FounderDeliveryData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [range, setRange] = useState<7 | 30>(7);
@@ -263,9 +333,20 @@ export function FounderWorkspace() {
   useEffect(() => {
     if (!isAdmin) return;
     let active = true;
-    void createClient().rpc("founder_workspace_data", { p_range_days: range }).then(({ data: response, error: rpcError }) => {
+    void Promise.all([
+      createClient().rpc("founder_workspace_data", { p_range_days: range }),
+      createClient().rpc("founder_delivery_workspace_data"),
+    ]).then(([workspaceResponse, deliveryResponse]) => {
       if (!active) return;
-      if (rpcError) { setError(rpcError.message); setData(null); } else { setData(response as unknown as FounderData); }
+      if (workspaceResponse.error || deliveryResponse.error) {
+        setError(workspaceResponse.error?.message ?? deliveryResponse.error?.message ?? "Unable to load Founder data.");
+        setData(null);
+        setDeliveryData(null);
+      } else {
+        setData(workspaceResponse.data as unknown as FounderData);
+        setDeliveryData(deliveryResponse.data as unknown as FounderDeliveryData);
+        setError(null);
+      }
       setLoadingData(false);
     });
     return () => { active = false; };
@@ -277,6 +358,7 @@ export function FounderWorkspace() {
   const viewHeading = useMemo(() => ({
     overview: ["Today at Morni", "Your daily marketplace briefing and priority actions."],
     operations: ["Orders", "The live order queue across every Morni boutique."],
+    delivery: ["Delivery", "The live network of delivery jobs, partners, riders and exceptions."],
     stores: ["Stores", "Commercial and catalogue health across your boutique network."],
     customers: ["Customers", "The shopper relationships that are growing Morni."],
     catalogue: ["Catalogue", "Demand and inventory signals from the live marketplace."],
@@ -288,7 +370,7 @@ export function FounderWorkspace() {
   if (!auth) return <FounderAccess title="Sign in to open Founder" description="Use the Morni administrator account to access the company workspace." action="Sign in" href="/auth?next=/founder" />;
   if (!isAdmin) return <FounderAccess title="Founder access is restricted" description="This workspace is available only to Morni administrator accounts. Seller accounts continue to use the Seller Portal." action="Open Seller Portal" href="/portal" />;
 
-  return <div className="min-h-screen bg-[#f7f2ed] text-[#302225]"><div className="flex min-h-screen flex-col lg:flex-row"><FounderSidebar activeView={activeView} onViewChange={setActiveView} alertCount={data?.alerts.length ?? 0} /><div className="min-w-0 flex-1"><header className="sticky top-0 z-30 border-b border-[#eadeda] bg-[#f7f2ed]/95 backdrop-blur-xl"><div className="flex min-h-16 flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-9"><div className="mr-auto"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#9b354f]">Morni · Founder</p><p className="mt-0.5 text-sm font-semibold text-[#322326]">{viewHeading[0]}</p></div><div className="flex items-center gap-1 rounded-full border border-[#e6d9d5] bg-[#fffaf6] p-1">{([7, 30] as const).map((days) => <button key={days} type="button" onClick={() => changeRange(days)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${range === days ? "bg-[#2a1b20] text-white" : "text-[#78676b] hover:text-[#2a1b20]"}`}>Last {days}d</button>)}</div><button type="button" onClick={refreshData} className="grid h-8 w-8 place-items-center rounded-full border border-[#e4d6d2] bg-[#fffaf6] text-[#6b585d] transition hover:bg-white hover:text-[#9b354f]" aria-label="Refresh founder data"><PortalIcon name="refresh" className={`h-4 w-4 ${loadingData ? "animate-spin" : ""}`} /></button><span className="hidden rounded-full border border-[#e4d6d2] bg-[#fffaf6] px-3 py-1.5 text-xs font-semibold text-[#5c4a4e] sm:inline">{auth.firstName}</span></div></header><main className="mx-auto w-full max-w-[1550px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><div className="mb-7 flex flex-wrap items-end justify-between gap-3"><div><h1 className="font-display text-4xl tracking-[-0.045em] text-[#2a1b20] sm:text-[2.7rem]">{viewHeading[0]}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#75666a]">{viewHeading[1]}</p></div>{data ? <p className="text-xs text-[#88777b]">Updated {dateTime(data.generated_at)} · Dubai time</p> : null}</div>{!data && !error ? <FounderLoading /> : null}{error ? <FounderError error={error} onRetry={refreshData} /> : null}{data ? <WorkspaceContent data={data} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} /> : null}</main></div></div></div>;
+  return <div className="min-h-screen bg-[#f7f2ed] text-[#302225]"><div className="flex min-h-screen flex-col lg:flex-row"><FounderSidebar activeView={activeView} onViewChange={setActiveView} alertCount={data?.alerts.length ?? 0} /><div className="min-w-0 flex-1"><header className="sticky top-0 z-30 border-b border-[#eadeda] bg-[#f7f2ed]/95 backdrop-blur-xl"><div className="flex min-h-16 flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-9"><div className="mr-auto"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#9b354f]">Morni · Founder</p><p className="mt-0.5 text-sm font-semibold text-[#322326]">{viewHeading[0]}</p></div><div className="flex items-center gap-1 rounded-full border border-[#e6d9d5] bg-[#fffaf6] p-1">{([7, 30] as const).map((days) => <button key={days} type="button" onClick={() => changeRange(days)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${range === days ? "bg-[#2a1b20] text-white" : "text-[#78676b] hover:text-[#2a1b20]"}`}>Last {days}d</button>)}</div><button type="button" onClick={refreshData} className="grid h-8 w-8 place-items-center rounded-full border border-[#e4d6d2] bg-[#fffaf6] text-[#6b585d] transition hover:bg-white hover:text-[#9b354f]" aria-label="Refresh founder data"><PortalIcon name="refresh" className={`h-4 w-4 ${loadingData ? "animate-spin" : ""}`} /></button><span className="hidden rounded-full border border-[#e4d6d2] bg-[#fffaf6] px-3 py-1.5 text-xs font-semibold text-[#5c4a4e] sm:inline">{auth.firstName}</span></div></header><main className="mx-auto w-full max-w-[1550px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><div className="mb-7 flex flex-wrap items-end justify-between gap-3"><div><h1 className="font-display text-4xl tracking-[-0.045em] text-[#2a1b20] sm:text-[2.7rem]">{viewHeading[0]}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#75666a]">{viewHeading[1]}</p></div>{data ? <p className="text-xs text-[#88777b]">Updated {dateTime(data.generated_at)} · Dubai time</p> : null}</div>{!data && !error ? <FounderLoading /> : null}{error ? <FounderError error={error} onRetry={refreshData} /> : null}{data && deliveryData ? <WorkspaceContent data={data} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} /> : null}</main></div></div></div>;
 }
 
 function FounderLoading() { return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className={`${index > 3 ? "h-52" : "h-32"} animate-pulse rounded-2xl border border-[#eadeda] bg-[#fffaf6]`} />)}</div>; }

@@ -499,7 +499,8 @@ declare
 begin
   for v_job in
     select id from public.delivery_jobs
-    where status = 'assigned' and assignment_expires_at < now()
+    where status = 'unassigned'
+       or (status = 'assigned' and assignment_expires_at < now())
   loop
     perform public.assign_delivery_job(v_job.id);
     v_requeued := v_requeued + 1;
@@ -618,25 +619,25 @@ begin
   return jsonb_build_object(
     'metrics', jsonb_build_object(
       'active_jobs', (select count(*) from public.delivery_jobs where status in ('assigned', 'accepted', 'at_pickup', 'collected')),
-      'unassigned_jobs', (select count(*) from public.delivery_jobs where status = 'unassigned'),
-      'exception_jobs', (select count(*) from public.delivery_jobs where status = 'failed' or (status = 'assigned' and assignment_expires_at < now())),
+      'waiting_jobs', (select count(*) from public.delivery_jobs where status = 'unassigned'),
+      'exceptions', (select count(*) from public.delivery_jobs where status = 'failed' or (status = 'assigned' and assignment_expires_at < now())),
       'available_drivers', (select count(*) from public.delivery_drivers where is_active and availability = 'available'),
       'total_drivers', (select count(*) from public.delivery_drivers where is_active)
     ),
     'partners', coalesce((select jsonb_agg(jsonb_build_object(
       'id', partner.id, 'name', partner.name, 'is_active', partner.is_active, 'auto_dispatch_enabled', partner.auto_dispatch_enabled,
-      'drivers', (select count(*) from public.delivery_drivers driver where driver.partner_id = partner.id and driver.is_active),
+      'total_drivers', (select count(*) from public.delivery_drivers driver where driver.partner_id = partner.id and driver.is_active),
       'available_drivers', (select count(*) from public.delivery_drivers driver where driver.partner_id = partner.id and driver.is_active and driver.availability = 'available'),
       'active_jobs', (select count(*) from public.delivery_jobs job where job.partner_id = partner.id and job.status in ('assigned', 'accepted', 'at_pickup', 'collected'))
     ) order by partner.dispatch_priority, partner.name) from public.delivery_partners partner), '[]'::jsonb),
     'drivers', coalesce((select jsonb_agg(jsonb_build_object(
-      'id', driver.id, 'display_name', driver.display_name, 'partner_name', partner.name, 'availability', driver.availability,
+      'id', driver.id, 'display_name', driver.display_name, 'partner_name', partner.name, 'availability', driver.availability, 'is_active', driver.is_active,
       'last_location_at', driver.last_location_at
     ) order by driver.updated_at desc limit 80) from public.delivery_drivers driver join public.delivery_partners partner on partner.id = driver.partner_id), '[]'::jsonb),
     'jobs', coalesce((select jsonb_agg(jsonb_build_object(
-      'id', job.id, 'status', job.status, 'dispatch_attempts', job.dispatch_attempts, 'ready_for_pickup_at', job.ready_for_pickup_at,
+      'id', job.id, 'status', job.status, 'attempts', job.dispatch_attempts, 'ready_at', job.ready_for_pickup_at,
       'assigned_at', job.assigned_at, 'failure_reason', job.failure_reason, 'order_number', order_row.order_number,
-      'store_name', store.name, 'delivery_area', order_row.delivery_area, 'partner_name', partner.name, 'driver_name', driver.display_name
+      'store_name', store.name, 'pickup_area', store.area, 'delivery_area', order_row.delivery_area, 'partner_name', partner.name, 'driver_name', driver.display_name
     ) order by job.updated_at desc limit 120)
       from public.delivery_jobs job
       join public.orders order_row on order_row.id = job.order_id
