@@ -367,6 +367,12 @@ begin
       last_location_at = case when p_lat is null then last_location_at else now() end
   where id = v_driver.id
   returning * into v_driver;
+  if p_availability = 'available' then
+    perform public.assign_delivery_job(job.id)
+    from public.delivery_jobs job
+    where job.status = 'unassigned'
+      and (job.partner_id is null or job.partner_id = v_driver.partner_id);
+  end if;
   return v_driver;
 end;
 $$;

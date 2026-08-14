@@ -73,7 +73,12 @@ export function PartnerWorkspace() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { if (auth) void load(); }, [auth, load]);
+  useEffect(() => {
+    if (!auth) return;
+    const requestLoad = () => void load();
+    if (typeof queueMicrotask === "function") queueMicrotask(requestLoad);
+    else window.setTimeout(requestLoad, 0);
+  }, [auth, load]);
 
   const counts = useMemo(() => ({
     active: data?.jobs.filter((job) => ["assigned", "accepted", "at_pickup", "collected"].includes(job.status)).length ?? 0,
@@ -118,7 +123,12 @@ export function DriverWorkspace() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { if (auth) void load(); }, [auth, load]);
+  useEffect(() => {
+    if (!auth) return;
+    const requestLoad = () => void load();
+    if (typeof queueMicrotask === "function") queueMicrotask(requestLoad);
+    else window.setTimeout(requestLoad, 0);
+  }, [auth, load]);
 
   async function setAvailability(availability: DriverAvailability) {
     if (!data) return;
