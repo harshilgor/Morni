@@ -7,8 +7,6 @@ import type { OrderStatus } from "@/lib/types";
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   placed: "accepted",
   accepted: "picking",
-  picking: "out_for_delivery",
-  out_for_delivery: "delivered",
 };
 
 export async function PATCH(

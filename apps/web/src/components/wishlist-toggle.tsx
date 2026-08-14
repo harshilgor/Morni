@@ -7,14 +7,15 @@ import { useAuthUser } from "@/lib/use-auth-user";
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-      <path
-        d="M12 21s-7-4.6-9.4-8.8C.7 8.7 2.2 5.8 5.2 5.1c1.8-.4 3.4.2 4.5 1.4 1.1-1.2 2.7-1.8 4.5-1.4 3 .7 4.5 3.6 2.6 7.1C19 16.4 12 21 12 21z"
-        fill={filled ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+        <path
+          d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z"
+          fill={filled ? "currentColor" : "none"}
+          stroke="currentColor"
+          strokeWidth="1.65"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
     </svg>
   );
 }
@@ -129,4 +130,3 @@ export function WishlistToggle({
     </button>
   );
 }
-

@@ -105,6 +105,7 @@ export function SiteHeader() {
   const accountRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
 
   useEffect(() => {
@@ -124,6 +125,23 @@ export function SiteHeader() {
   useEffect(() => {
     return () => {
       if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const updateHeaderHeight = () => {
+      document.documentElement.style.setProperty("--site-header-height", `${header.getBoundingClientRect().height}px`);
+    };
+
+    updateHeaderHeight();
+    const observer = new ResizeObserver(updateHeaderHeight);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--site-header-height");
     };
   }, []);
 
@@ -200,7 +218,7 @@ export function SiteHeader() {
   const isAdmin = auth?.profile?.role === "admin";
 
   return (
-    <header className="sticky top-0 z-50">
+    <header ref={headerRef} className="sticky top-0 z-50">
       <div className="bg-ink text-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-2.5">
           <Link

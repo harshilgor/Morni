@@ -1,0 +1,80 @@
+{
+  "input": "C:\\Projects\\Morni\\deliverables\\Morni_ECR_POS_Integration_Questionnaire.docx",
+  "fonts_by_char_count": {
+    "Arial": 1262
+  },
+  "direct_run_formatting_runs": 25,
+  "direct_paragraph_formatting_paragraphs": 5,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 1,
+      "text": "Arab Financial Services",
+      "style": "Normal"
+    },
+    {
+      "para_index": 2,
+      "text": "ECR\u2013POS Integration Questionnaire",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "Arab Financial Services",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "text": "ECR\u2013POS Integration Questionnaire",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "text": "",
+        "style": "Normal"
+      },
+      {
+        "para_index": 26,
+        "text": " Sale |  Tip |  Pre-Authorization |  Completion |  Void |  Refund |  [X] Sale   [ ] Tip   [ ] Pre-Authorization   [ ] Co",
+        "style": "List Number"
+      },
+      {
+        "para_index": 27,
+        "text": " Query |  Query Last Transaction |  Settlement |  EOD Reports (Details, Summary, etc.) [X] Query   [X] Query Last Transa",
+        "style": "List Number"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "Arab Financial Services",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "run_text": "ECR\u2013POS Integration Questionnaire",
+        "style": "Normal"
+      },
+      {
+        "para_index": 5,
+        "run_text": "Morni",
+        "style": "List Number"
+      },
+      {
+        "para_index": 6,
+        "run_text": "Multi-vendor fashion e-commerce marketplace",
+        "style": "List Number"
+      },
+      {
+        "para_index": 7,
+        "run_text": "United Arab Emirates (UAE)",
+        "style": "List Number"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

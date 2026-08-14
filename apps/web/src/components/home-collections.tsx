@@ -53,7 +53,7 @@ export function HomeCollections() {
           <Link
             key={occasion.title}
             href={occasion.href}
-            className="group relative h-[360px] w-[76vw] shrink-0 snap-start overflow-hidden rounded-2xl sm:h-[400px] sm:w-[330px] sm:rounded-3xl lg:w-[380px]"
+            className="group relative h-[360px] w-[76vw] shrink-0 snap-start overflow-hidden sm:h-[400px] sm:w-[330px] lg:w-[380px]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

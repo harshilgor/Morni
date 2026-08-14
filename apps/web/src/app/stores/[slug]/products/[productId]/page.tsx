@@ -325,7 +325,6 @@ export default function ProductPage() {
                   <img src={gallery[activeImage]} alt={product.title} className="h-full w-full object-contain" />
                 ) : null}
               </div>
-              <div className="absolute right-3 top-3 z-10 lg:hidden"><WishlistToggle productId={product.id} /></div>
               {gallery.length > 1 ? (
                 <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5 rounded-full bg-ink/30 px-2.5 py-2 backdrop-blur">
                   {gallery.map((url, index) => <button key={`${url}-${index}`} type="button" onClick={() => setActiveImage(index)} aria-label={`View image ${index + 1}`} className={`h-1.5 rounded-full transition ${activeImage === index ? "w-5 bg-white" : "w-1.5 bg-white/65"}`} />)}

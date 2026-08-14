@@ -55,6 +55,9 @@ export default function CheckoutPage() {
   const deliverySummary = selectedAddress
     ? [selectedAddress.street, selectedAddress.area].filter(Boolean).join(", ")
     : [form.street, form.area].filter(Boolean).join(", ") || locationLabel;
+  const mobileAddressReady = Boolean(
+    selectedAddressId || (form.area.trim() && form.street.trim()),
+  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -105,7 +108,6 @@ export default function CheckoutPage() {
     setForm(addressToDraft(address));
     setSaveAddress(true);
     setMakeDefault(address.is_default);
-    setMobileAddressOpen(false);
   }
 
   function useNewAddress() {
@@ -122,13 +124,24 @@ export default function CheckoutPage() {
 
   function openMobileAddress() {
     setMobileAddressOpen(true);
-    window.setTimeout(() => {
-      document.getElementById("checkout-mobile-delivery")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 0);
   }
+
+  useEffect(() => {
+    if (!mobileAddressOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileAddressOpen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileAddressOpen]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -236,63 +249,138 @@ export default function CheckoutPage() {
           </section>
         </div>
 
-        <ProductRail
-          id="checkout-mobile-recommendations"
-          title="Complete your edit"
-          subtitle="Pieces chosen to pair with your bag."
-          products={recommendations}
-        />
+        <div className="pb-40">
+          <ProductRail
+            id="checkout-mobile-recommendations"
+            title="Complete your edit"
+            subtitle="Pieces chosen to pair with your bag."
+            products={recommendations}
+          />
+        </div>
 
-        <section id="checkout-mobile-delivery" className="mx-auto max-w-lg scroll-mt-4 px-4 pb-44 pt-2">
-          <div className="rounded-2xl border border-line bg-surface p-4 shadow-[0_10px_26px_-24px_rgba(28,20,24,0.7)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-deep">Deliver to</p>
-                <p className="mt-1 text-sm font-semibold text-ink">{selectedAddress?.label ?? locationLabel}</p>
-                <p className="mt-1 line-clamp-1 text-xs text-muted">{deliverySummary}</p>
-              </div>
-              <button type="button" onClick={openMobileAddress} className="shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-ink underline underline-offset-4">
-                Change
-              </button>
-            </div>
-
-            {mobileAddressOpen ? (
-              <div className="mt-5 border-t border-line pt-5">
-                {authed === false ? (
-                  <p className="mb-4 rounded-xl bg-[#fff0f4] px-3 py-2.5 text-sm text-accent-deep">
-                    <Link href="/auth?next=/checkout" className="underline">Sign in</Link> to save an address and place your order.
-                  </p>
-                ) : null}
-                {authed && savedAddresses.length > 0 ? (
-                  <div className="mb-4 space-y-2">
-                    <p className="text-sm font-semibold text-ink">Saved addresses</p>
-                    {savedAddresses.map((address) => (
-                      <button key={address.id} type="button" onClick={() => selectSavedAddress(address)} className={`w-full rounded-xl border p-3 text-left text-sm transition ${selectedAddressId === address.id ? "border-accent bg-[#fff0f4]" : "border-line bg-background"}`}>
-                        <span className="font-semibold text-ink">{address.label}</span>
-                        <span className="mt-1 block text-xs text-muted">{address.street}, {address.area}</span>
-                      </button>
-                    ))}
-                    <button type="button" onClick={useNewAddress} className="text-sm font-semibold text-accent-deep underline underline-offset-4">Use a new address</button>
-                  </div>
-                ) : null}
-                {!selectedAddressId ? (
-                  <div>
-                    <p className="mb-3 text-sm font-semibold text-ink">Enter your delivery address</p>
-                    <DeliveryAddressFields value={form} onChange={setForm} idPrefix="checkout-mobile-delivery-address" requireLabel={saveAddress} />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-3 shadow-[0_-12px_28px_-24px_rgba(28,20,24,0.8)] backdrop-blur lg:hidden">
-          <div className="mx-auto max-w-lg">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface px-4 pt-3 shadow-[0_-12px_30px_-22px_rgba(28,20,24,0.65)] lg:hidden" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
+          <div className="mx-auto max-w-lg space-y-3">
+            <button
+              type="button"
+              onClick={openMobileAddress}
+              aria-expanded={mobileAddressOpen}
+              aria-controls="mobile-address-sheet"
+              className="flex w-full items-center gap-3 text-left"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sand text-ink" aria-hidden="true">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                  <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
+                  <circle cx="12" cy="10" r="2.5" />
+                </svg>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-deep">Deliver to</span>
+                <span className="mt-0.5 block truncate text-sm font-semibold text-ink">{selectedAddress?.label ?? locationLabel}</span>
+                <span className="mt-0.5 block truncate text-xs text-muted">{deliverySummary}</span>
+              </span>
+              <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
+            </button>
             <button type="button" onClick={openMobileAddress} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985]">
               Select address to continue
             </button>
           </div>
         </div>
+
+        {mobileAddressOpen ? (
+          <div className="fixed inset-0 z-[70] lg:hidden">
+            <button
+              type="button"
+              aria-label="Close delivery address picker"
+              onClick={() => setMobileAddressOpen(false)}
+              className="absolute inset-0 bg-ink/45"
+            />
+            <section
+              id="mobile-address-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="mobile-address-sheet-title"
+              className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-2xl bg-surface shadow-[0_-18px_50px_-20px_rgba(28,20,24,0.65)]"
+            >
+              <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-line" aria-hidden="true" />
+              <header className="flex items-center justify-between border-b border-line px-5 py-4">
+                <h2 id="mobile-address-sheet-title" className="text-base font-semibold uppercase tracking-[0.08em] text-ink">
+                  Select delivery address
+                </h2>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setMobileAddressOpen(false)}
+                  className="grid h-9 w-9 place-items-center text-2xl font-light text-ink"
+                >
+                  ×
+                </button>
+              </header>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+                {authed === null ? (
+                  <p className="py-8 text-center text-sm text-muted">Loading delivery addresses...</p>
+                ) : null}
+
+                {authed === false ? (
+                  <p className="mb-5 rounded-xl bg-[#fff0f4] px-3 py-3 text-sm leading-relaxed text-accent-deep">
+                    <Link href="/auth?next=/checkout" className="font-semibold underline underline-offset-4">Sign in</Link> to save an address and place your order.
+                  </p>
+                ) : null}
+
+                {authed && savedAddresses.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-ink">Saved addresses</p>
+                      <button type="button" onClick={useNewAddress} className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-deep">
+                        + Add new
+                      </button>
+                    </div>
+                    {savedAddresses.map((address) => {
+                      const selected = selectedAddressId === address.id;
+                      return (
+                        <button
+                          key={address.id}
+                          type="button"
+                          onClick={() => selectSavedAddress(address)}
+                          className={`flex w-full items-start gap-3 border p-4 text-left transition ${selected ? "border-ink bg-background ring-1 ring-ink" : "border-line bg-surface"}`}
+                        >
+                          <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border ${selected ? "border-ink" : "border-line"}`} aria-hidden="true">
+                            {selected ? <span className="h-2.5 w-2.5 rounded-full bg-ink" /> : null}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                              {address.label}
+                              {address.is_default ? <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Default</span> : null}
+                            </span>
+                            <span className="mt-1 block text-xs leading-relaxed text-muted">{address.street}, {address.area}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {!selectedAddressId && authed !== null ? (
+                  <div className={savedAddresses.length > 0 ? "mt-6 border-t border-line pt-5" : ""}>
+                    <p className="mb-4 text-sm font-semibold text-ink">Enter your delivery address</p>
+                    <DeliveryAddressFields value={form} onChange={setForm} idPrefix="checkout-mobile-delivery-address" requireLabel={saveAddress} />
+                  </div>
+                ) : null}
+              </div>
+
+              <footer className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
+                <button
+                  type="button"
+                  disabled={!mobileAddressReady}
+                  onClick={() => setMobileAddressOpen(false)}
+                  className="w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Deliver here
+                </button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
       </div>
 
     <div className="hidden lg:block">
