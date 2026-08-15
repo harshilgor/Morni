@@ -1,16 +1,5 @@
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 72);
-}
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { name?: string; supportEmail?: string } | null;
@@ -23,18 +12,13 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const admin = createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("role").eq("id", user.id).maybeSingle();
-  if (profile?.role !== "admin") return NextResponse.json({ error: "Founder access is required." }, { status: 403 });
+  const { data, error } = await supabase.rpc("create_delivery_partner", {
+    p_name: name,
+    p_support_email: supportEmail,
+  });
+  if (error) return NextResponse.json({ error: error.message }, { status: error.code === "42501" ? 403 : 400 });
 
-  const baseSlug = slugify(name);
-  if (!baseSlug) return NextResponse.json({ error: "Enter a valid delivery company name." }, { status: 400 });
-  const slug = `${baseSlug}-${randomUUID().slice(0, 8)}`;
-  const { data: partner, error } = await admin
-    .from("delivery_partners")
-    .insert({ name, slug, support_email: supportEmail })
-    .select("id, name, slug")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const partner = data as { id: string; name: string; slug: string } | null;
+  if (!partner?.id) return NextResponse.json({ error: "Unable to create delivery partner." }, { status: 500 });
   return NextResponse.json({ partner }, { status: 201 });
 }

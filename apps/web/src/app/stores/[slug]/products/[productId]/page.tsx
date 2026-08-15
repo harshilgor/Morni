@@ -120,6 +120,50 @@ function RelatedProductCard({ product }: { product: RelatedProduct }) {
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none">
+      <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BagSheet({
+  mode,
+  product,
+  store,
+  sizes,
+  relatedProducts,
+  onClose,
+  onSizeSelect,
+}: {
+  mode: "size" | "added";
+  product: Product;
+  store: Store;
+  sizes: string[];
+  relatedProducts: RelatedProduct[];
+  onClose: () => void;
+  onSizeSelect: (size: string) => void;
+}) {
+  const recommendations = relatedProducts.slice(0, 2);
+  const image = product.image_urls?.[0];
+  const title = mode === "size" ? "Choose your size" : "Added to your bag";
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end bg-ink/45 p-0 sm:items-center sm:justify-center sm:p-6" role="presentation" onMouseDown={onClose}>
+      <section role="dialog" aria-modal="true" aria-labelledby="bag-sheet-title" className="max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl bg-background shadow-[0_-18px_60px_-24px_rgba(28,20,24,0.65)] sm:max-w-xl sm:rounded-2xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-background px-5 py-4">
+          <span className="h-1.5 w-10 rounded-full bg-ink/20 sm:hidden" aria-hidden="true" />
+          <h2 id="bag-sheet-title" className="text-base font-semibold text-ink sm:text-lg">{title}</h2>
+          <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full text-ink transition hover:bg-surface" aria-label="Close"> <CloseIcon /> </button>
+        </div>
+
+        {mode === "size" ? <div className="p-5 sm:p-6"><p className="text-sm leading-6 text-muted">Select a size for {product.title} before adding it to your bag.</p><div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">{sizes.map((size) => <button key={size} type="button" onClick={() => onSizeSelect(size)} className="min-h-14 rounded-lg border border-line bg-white px-4 text-sm font-semibold text-ink transition hover:border-ink hover:bg-ink hover:text-white">{size}</button>)}</div></div> : <div className="p-5 sm:p-6"><div className="flex items-center gap-3 rounded-xl bg-surface p-3"><div className="h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-[#f4f1ed]">{image ? <img src={image} alt="" className="h-full w-full object-cover" /> : null}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{product.title}</p><p className="mt-1 text-sm text-muted">{store.name} · {formatAed(product.price_aed)}</p></div></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><Link href="/cart" className="inline-flex min-h-12 items-center justify-center rounded-lg bg-ink px-5 text-sm font-semibold uppercase tracking-[0.1em] text-white transition hover:bg-accent-deep">View bag</Link><button type="button" onClick={onClose} className="min-h-12 rounded-lg border border-line bg-white px-5 text-sm font-semibold text-ink transition hover:border-ink/45">Keep shopping</button></div>{recommendations.length ? <section className="mt-8 border-t border-line pt-6"><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">Complete your edit</p><h3 className="mt-2 font-display text-3xl text-ink">You may also like</h3><div className="mt-5 grid grid-cols-2 gap-3">{recommendations.map((relatedProduct) => <Link key={relatedProduct.id} href={`/stores/${relatedProduct.stores.slug}/products/${relatedProduct.id}`} onClick={onClose} className="min-w-0"><div className="aspect-[4/5] overflow-hidden rounded-xl bg-[#f4f1ed]">{relatedProduct.image_urls?.[0] ? <img src={relatedProduct.image_urls[0]} alt={relatedProduct.title} className="h-full w-full object-cover" /> : null}</div><p className="mt-2 line-clamp-2 text-sm font-medium leading-snug text-ink">{relatedProduct.title}</p><p className="mt-1 text-sm text-ink">{formatAed(relatedProduct.price_aed)}</p></Link>)}</div></section> : null}</div>}
+      </section>
+    </div>
+  );
+}
+
 export default function ProductPage() {
   const params = useParams<{ slug: string; productId: string }>();
   const router = useRouter();
@@ -138,6 +182,7 @@ export default function ProductPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [added, setAdded] = useState(false);
   const [celebrationKey, setCelebrationKey] = useState(0);
+  const [bagSheet, setBagSheet] = useState<"size" | "added" | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [returnsOpen, setReturnsOpen] = useState(false);
@@ -210,6 +255,7 @@ export default function ProductPage() {
       setSelectedSize(null);
       setActiveImage(0);
       setAdded(false);
+      setBagSheet(null);
 
       void supabase.rpc("active_store_campaign", { p_store_id: row.store_id }).then(({ data }) => {
         if (active) setCampaign(((data ?? []) as StoreCampaign[])[0] ?? null);
@@ -279,19 +325,24 @@ export default function ProductPage() {
 
   const needsColor = variants.length > 0;
   const needsSize = availableSizes.length > 0;
-  const canAdd = availableStock > 0 && (!needsColor || Boolean(selectedVariant)) && (!needsSize || Boolean(selectedSize));
-  const addToBag = () => {
+  const canAdd = availableStock > 0 && (!needsColor || Boolean(selectedVariant));
+  const addToBag = (size = selectedSize) => {
     if (!canAdd) return;
+    if (needsSize && !size) {
+      setBagSheet("size");
+      return;
+    }
     addItem(product, store.name, 1, {
-      size: selectedSize ?? undefined,
+      size: size ?? undefined,
       variantId: selectedVariant?.id,
       colorName: selectedVariant?.color_name,
       imageUrl: gallery[0],
     });
     setAdded(true);
     setCelebrationKey((key) => key + 1);
+    setBagSheet("added");
   };
-  const addLabel = added ? "Added to bag" : needsSize && !selectedSize ? "Select a size" : availableStock <= 0 ? "Out of stock" : "Add to bag";
+  const addLabel = added ? "Added to bag" : availableStock <= 0 ? "Out of stock" : "Add to bag";
 
   return (
     <main className="mx-auto max-w-[88rem] px-4 pb-28 pt-4 sm:px-6 sm:pt-6 lg:pb-16">
@@ -360,7 +411,7 @@ export default function ProductPage() {
           <p className={`mt-5 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>{availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}` : ""}` : "This piece is currently out of stock"}</p>
           <div className="mt-5 hidden gap-3 sm:flex">
             <div className="relative flex-1">
-              <button type="button" onClick={addToBag} disabled={!canAdd} className="min-h-14 w-full rounded-lg bg-ink px-5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button>
+              <button type="button" onClick={() => addToBag()} disabled={!canAdd} className="min-h-14 w-full rounded-lg bg-ink px-5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button>
               <AddToBagConfetti celebrationKey={celebrationKey} />
             </div>
             <button type="button" onClick={() => router.push("/cart")} className="min-h-14 rounded-lg border border-ink px-5 text-sm font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-surface">Bag</button>
@@ -382,11 +433,12 @@ export default function ProductPage() {
         <div className="mx-auto flex max-w-lg gap-3">
           <WishlistToggle productId={product.id} />
           <div className="relative flex-1">
-            <button type="button" disabled={!canAdd} onClick={addToBag} className="min-h-12 w-full rounded-lg bg-ink px-4 text-sm font-semibold uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button>
+            <button type="button" disabled={!canAdd} onClick={() => addToBag()} className="min-h-12 w-full rounded-lg bg-ink px-4 text-sm font-semibold uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button>
             <AddToBagConfetti celebrationKey={celebrationKey} />
           </div>
         </div>
       </div>
+      {bagSheet ? <BagSheet mode={bagSheet} product={product} store={store} sizes={availableSizes} relatedProducts={relatedProducts} onClose={() => setBagSheet(null)} onSizeSelect={(size) => { setSelectedSize(size); setAdded(false); addToBag(size); }} /> : null}
     </main>
   );
 }
