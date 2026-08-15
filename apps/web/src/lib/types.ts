@@ -97,7 +97,9 @@ export type Order = {
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   subtotal_aed: number;
+  small_order_fee_aed: number;
   delivery_fee_aed: number;
+  service_fee_aed: number;
   total_aed: number;
   delivery_emirate: UaeEmirate;
   delivery_area: string;

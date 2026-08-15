@@ -5,16 +5,19 @@ import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import { formatAed } from "@/lib/format";
 import type { DeliveryAddressDraft } from "@/components/delivery-address-fields";
+import { calculateCheckoutFees } from "@/lib/fees";
+import {
+  OrderFeeLines,
+  SmallOrderNudge,
+} from "@/components/order-fee-summary";
 
 export default function PaymentsPage() {
   const { items, subtotal } = useCart();
   const [address, setAddress] = useState<DeliveryAddressDraft | null>(null);
   const [cardOpen, setCardOpen] = useState(true);
   const orderSubtotal = subtotal();
-  const smallOrderFee = orderSubtotal < 99 ? 15 : 0;
-  const deliveryFee = 7;
-  const serviceFee = 3;
-  const orderTotal = orderSubtotal + smallOrderFee + deliveryFee + serviceFee;
+  const fees = calculateCheckoutFees(orderSubtotal);
+  const orderTotal = fees.totalAed;
 
   useEffect(() => {
     const storedAddress = window.sessionStorage.getItem("morni-checkout-address");
@@ -129,14 +132,10 @@ export default function PaymentsPage() {
         </div>
 
         <aside className="h-fit border border-line bg-surface p-5 sm:p-6 lg:sticky lg:top-24">
+          <SmallOrderNudge fees={fees} />
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Order total</p>
           <h2 className="mt-1 font-display text-3xl text-ink">Price details</h2>
-          <div className="mt-6 space-y-3 border-y border-line py-5 text-sm">
-            <div className="flex justify-between gap-4"><span className="text-muted">Subtotal</span><span>{formatAed(orderSubtotal)}</span></div>
-            {smallOrderFee > 0 ? <div className="flex justify-between gap-4"><span className="text-muted">Small order fee</span><span>{formatAed(smallOrderFee)}</span></div> : null}
-            <div className="flex justify-between gap-4"><span className="text-muted">Delivery fee</span><span>{formatAed(deliveryFee)}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-muted">Service fee</span><span>{formatAed(serviceFee)}</span></div>
-          </div>
+          <div className="mt-6 border-y border-line py-5"><OrderFeeLines fees={fees} /></div>
           <div className="mt-5 flex justify-between gap-4 text-lg font-semibold text-ink"><span>Total</span><span>{formatAed(orderTotal)}</span></div>
           <button type="button" disabled className="mt-6 w-full cursor-not-allowed bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white opacity-50">
             Payment integration coming soon

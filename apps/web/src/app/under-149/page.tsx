@@ -39,10 +39,6 @@ export default async function Under149Page() {
           Home
         </Link>
         <span aria-hidden>/</span>
-        <Link href="/categories" className="hover:text-ink">
-          Categories
-        </Link>
-        <span aria-hidden>/</span>
         <span className="text-ink">Under AED 149</span>
       </nav>
 

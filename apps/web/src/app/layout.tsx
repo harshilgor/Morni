@@ -17,10 +17,21 @@ const body = Manrope({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  applicationName: "Morni",
   title: "Morni — Local retail, delivered in 1 hour",
   description:
     "Browse UAE boutique offerings and get fashion delivered within the hour.",
+  openGraph: {
+    title: "Morni — Local retail, delivered in 1 hour",
+    description:
+      "Browse UAE boutique offerings and get fashion delivered within the hour.",
+    siteName: "Morni",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

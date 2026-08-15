@@ -18,10 +18,11 @@ function AuthForm() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [message, setMessage] = useState<string | null>(
-    authError ? "Google sign-in failed. Please try again." : null,
+    authError ? "This sign-in link is invalid or has expired. Please request a new one." : null,
   );
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
 
   const title = useMemo(
     () => (mode === "signin" ? "Welcome back" : "Create your Morni account"),
@@ -49,6 +50,26 @@ function AuthForm() {
       setMessage(error.message);
       setGoogleLoading(false);
     }
+  }
+
+  async function sendSignInLink() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setMessage("Enter a valid email address first.");
+      return;
+    }
+
+    setLinkLoading(true);
+    setMessage(null);
+    const supabase = createClient();
+    const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    const { error } = await supabase.auth.signInWithOtp({
+      email: normalizedEmail,
+      options: { emailRedirectTo },
+    });
+
+    setMessage(error ? error.message : "Check your email for a secure sign-in link.");
+    setLinkLoading(false);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -171,11 +192,21 @@ function AuthForm() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || linkLoading}
           className="w-full rounded-full bg-ink py-3 text-sm text-white disabled:opacity-50"
         >
           {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
         </button>
+        {mode === "signin" ? (
+          <button
+            type="button"
+            onClick={() => void sendSignInLink()}
+            disabled={loading || linkLoading}
+            className="w-full rounded-full border border-line bg-surface py-3 text-sm text-ink disabled:opacity-50"
+          >
+            {linkLoading ? "Sending link…" : "Email me a sign-in link"}
+          </button>
+        ) : null}
       </form>
     </div>
   );

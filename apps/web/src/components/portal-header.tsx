@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
 import type { Product, ProductReview } from "@/lib/types";
+import { BrandLogo } from "@/components/brand-logo";
 
 type Activity = {
   id: string;
@@ -60,8 +61,8 @@ export function PortalHeader() {
     <header className="sticky top-0 z-30 border-b border-[#c6d0cb] bg-white/95 shadow-[0_1px_2px_rgba(20,35,29,0.04)] backdrop-blur">
       <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-9">
         <Link href="/portal" className="mr-auto flex items-center gap-2 text-sm font-semibold text-[#1d2925] lg:hidden">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#21342e] font-display text-lg text-white">M</span>
-          Morni Portal
+          <BrandLogo className="h-7 w-auto" />
+          <span>Portal</span>
         </Link>
         {stores.length ? (
           <label className="hidden items-center gap-2 text-xs text-[#66736e] lg:flex">

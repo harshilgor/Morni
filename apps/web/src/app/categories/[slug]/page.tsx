@@ -38,7 +38,7 @@ export default async function CategoryPage({
 
   if (!category) notFound();
 
-  if (category.slug === "more") redirect("/categories");
+  if (category.slug === "more") redirect("/");
 
   const [productPage, { data: categoryList }] = await Promise.all([
     getCategoryProductPage(supabase, category, 0, CATEGORY_PRODUCT_BATCH_SIZE),
@@ -55,10 +55,6 @@ export default async function CategoryPage({
       <nav className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
         <Link href="/" className="hover:text-ink">
           Home
-        </Link>
-        <span aria-hidden>/</span>
-        <Link href="/categories" className="hover:text-ink">
-          Categories
         </Link>
         <span aria-hidden>/</span>
         <span className="text-ink">{category.name}</span>

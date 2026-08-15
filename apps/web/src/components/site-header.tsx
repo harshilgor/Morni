@@ -11,6 +11,7 @@ import type { UaeEmirate } from "@/lib/types";
 import { SearchTypeahead } from "@/components/search-typeahead";
 import { SavedAddressPicker } from "@/components/saved-address-picker";
 import { OCCASIONS } from "@/lib/occasions";
+import { BrandLogo } from "@/components/brand-logo";
 
 function PinIcon({ className }: { className?: string }) {
   return (
@@ -223,9 +224,10 @@ export function SiteHeader() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-2.5">
           <Link
             href="/"
-            className="shrink-0 font-display text-2xl tracking-tight text-white sm:text-[1.7rem]"
+            className="shrink-0 rounded-md bg-white px-2 py-1 shadow-sm"
+            aria-label="Morni home"
           >
-            Morni
+            <BrandLogo className="h-6 w-auto sm:h-7" priority />
           </Link>
 
           <div className="hidden shrink-0 sm:block">
@@ -419,30 +421,32 @@ export function SiteHeader() {
             <span className="text-accent-deep">For</span>{" "}
             <span className="text-[#5c4a50]">you</span>
           </Link>
-          <Link
-            href="/categories"
+          <button
+            type="button"
             onMouseEnter={openCategories}
             onFocus={openCategories}
+            onClick={openCategories}
             aria-expanded={categoriesOpen}
             aria-haspopup="menu"
-            className={`shrink-0 font-medium transition ${
+            className={`hidden shrink-0 font-medium transition md:inline-flex ${
               categoriesOpen ? "text-white" : "text-white/90 hover:text-white"
             }`}
           >
             Categories
-          </Link>
-          <Link
-            href="/categories"
+          </button>
+          <button
+            type="button"
             onMouseEnter={openOccasions}
             onFocus={openOccasions}
+            onClick={openOccasions}
             aria-expanded={occasionsOpen}
             aria-haspopup="menu"
-            className={`shrink-0 font-medium transition ${
+            className={`hidden shrink-0 font-medium transition md:inline-flex ${
               occasionsOpen ? "text-white" : "text-white/90 hover:text-white"
             }`}
           >
             Occasions
-          </Link>
+          </button>
           <Link href="/stores" className="shrink-0 font-medium text-white/90 hover:text-white">
             Stores
           </Link>
@@ -505,9 +509,6 @@ export function SiteHeader() {
                     </Link>
                   ))}
                 </div>
-                <Link href="/categories" role="menuitem" onClick={() => setCategoriesOpen(false)} className="mt-5 flex items-center justify-center rounded-full border border-ink px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition hover:bg-ink hover:text-white">
-                  Explore all categories
-                </Link>
               </div>
             </div>
           </div>
@@ -529,14 +530,6 @@ export function SiteHeader() {
                     Shop by occasion
                   </p>
                 </div>
-                <Link
-                  href="/categories"
-                  role="menuitem"
-                  onClick={closeMenus}
-                  className="hidden rounded-full border border-ink px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition hover:bg-ink hover:text-white sm:inline-flex"
-                >
-                  Explore all edits
-                </Link>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 {OCCASIONS.map((occasion) => (

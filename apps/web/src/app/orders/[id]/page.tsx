@@ -8,6 +8,7 @@ import { emirateLabel, formatAed, orderStatusLabel } from "@/lib/format";
 import type { Order, OrderItem, ProductReview } from "@/lib/types";
 import { ProductReviewForm } from "@/components/product-review-form";
 import { StarRating } from "@/components/star-rating";
+import { ReturnRefundPanel } from "@/components/return-refund-panel";
 
 const STEPS = ["placed", "accepted", "picking", "out_for_delivery", "delivered"] as const;
 
@@ -161,6 +162,10 @@ export default function OrderDetailPage() {
             );
           })}
         </div>
+      ) : null}
+
+      {order.status === "delivered" && items.length > 0 ? (
+        <ReturnRefundPanel order={order} items={items} />
       ) : null}
 
       <div className="mt-4 rounded-[1.5rem] border border-line bg-surface p-6 text-sm">

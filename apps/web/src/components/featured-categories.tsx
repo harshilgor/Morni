@@ -45,11 +45,7 @@ export function FeaturedCategories({
           {categories.map((category, index) => (
             <Link
               key={category.id}
-              href={
-                category.slug === "more"
-                  ? "/categories"
-                  : `/categories/${category.slug}`
-              }
+              href={`/categories/${category.slug}`}
               className="group relative flex min-w-0 flex-col border-b border-r border-[#ded7d2] bg-white transition duration-300 hover:z-10 hover:border-[#9d5369] hover:shadow-[0_18px_45px_-30px_rgba(53,31,38,0.7)]"
             >
               <div className="flex min-h-[3.8rem] items-start justify-between gap-1.5 px-2.5 pb-2.5 pt-3 sm:min-h-[5.25rem] sm:gap-2 sm:px-5 sm:pb-3 sm:pt-5">
@@ -85,16 +81,6 @@ export function FeaturedCategories({
               </div>
             </Link>
           ))}
-        </div>
-
-        <div className="mt-8 text-center">
-          <Link
-            href="/categories"
-            className="inline-flex items-center gap-3 border-b border-ink pb-1 text-xs font-semibold uppercase tracking-[0.16em] text-ink transition hover:border-accent-deep hover:text-accent-deep"
-          >
-            Explore all categories
-            <span aria-hidden>→</span>
-          </Link>
         </div>
       </div>
     </section>

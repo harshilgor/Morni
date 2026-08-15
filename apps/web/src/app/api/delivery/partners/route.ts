@@ -16,7 +16,12 @@ export async function POST(request: Request) {
     p_name: name,
     p_support_email: supportEmail,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: error.code === "42501" ? 403 : 400 });
+  if (error) {
+    const message = error.code === "23505"
+      ? "That email is already linked to a delivery partner."
+      : error.message;
+    return NextResponse.json({ error: message }, { status: error.code === "42501" ? 403 : 400 });
+  }
 
   const partner = data as { id: string; name: string; slug: string } | null;
   if (!partner?.id) return NextResponse.json({ error: "Unable to create delivery partner." }, { status: 500 });

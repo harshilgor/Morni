@@ -43,10 +43,6 @@ export default async function ClearancePage() {
           Home
         </Link>
         <span aria-hidden>/</span>
-        <Link href="/categories" className="hover:text-ink">
-          Categories
-        </Link>
-        <span aria-hidden>/</span>
         <span className="text-ink">Clearance sale</span>
       </nav>
 

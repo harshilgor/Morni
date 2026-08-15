@@ -15,6 +15,11 @@ import {
 import type { DeliveryAddress } from "@/lib/types";
 import { ProductRail, type RailProduct } from "@/components/product-rail";
 import { useLocation } from "@/lib/location";
+import { calculateCheckoutFees } from "@/lib/fees";
+import {
+  OrderFeeLines,
+  SmallOrderNudge,
+} from "@/components/order-fee-summary";
 
 function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   return {
@@ -47,10 +52,8 @@ export default function CheckoutPage() {
   const [mobileAddressOpen, setMobileAddressOpen] = useState(false);
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
-  const smallOrderFee = orderSubtotal < 99 ? 15 : 0;
-  const deliveryFee = 7;
-  const serviceFee = 3;
-  const orderTotal = orderSubtotal + smallOrderFee + deliveryFee + serviceFee;
+  const fees = calculateCheckoutFees(orderSubtotal);
+  const orderTotal = fees.totalAed;
   const selectedAddress = savedAddresses.find(
     (address) => address.id === selectedAddressId,
   );
@@ -248,16 +251,12 @@ export default function CheckoutPage() {
           </section>
 
           <section aria-labelledby="mobile-price-details" className="border-t border-line py-6">
+            <SmallOrderNudge fees={fees} />
             <div className="flex items-center justify-between gap-4">
               <h2 id="mobile-price-details" className="text-base font-semibold uppercase tracking-[0.08em] text-ink">Price details</h2>
               <span className="text-sm font-semibold text-ink">{formatAed(orderTotal)}</span>
             </div>
-            <div className="mt-4 space-y-3 text-sm">
-              <div className="flex justify-between gap-4"><span className="text-muted">Bag total</span><span>{formatAed(orderSubtotal)}</span></div>
-              {smallOrderFee > 0 ? <div className="flex justify-between gap-4"><span className="text-muted">Small order fee</span><span>{formatAed(smallOrderFee)}</span></div> : null}
-              <div className="flex justify-between gap-4"><span className="text-muted">Delivery fee</span><span>{formatAed(deliveryFee)}</span></div>
-              <div className="flex justify-between gap-4"><span className="text-muted">Service fee</span><span>{formatAed(serviceFee)}</span></div>
-            </div>
+            <div className="mt-4"><OrderFeeLines fees={fees} /></div>
             <div className="mt-4 flex justify-between border-t border-line pt-4 text-base font-semibold text-ink"><span>Grand total</span><span>{formatAed(orderTotal)}</span></div>
           </section>
         </div>
@@ -662,16 +661,10 @@ export default function CheckoutPage() {
       </div>
 
       <aside className="h-fit border border-line bg-surface p-5 sm:sticky sm:top-24 sm:p-6">
+        <SmallOrderNudge fees={fees} />
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Order total</p>
         <h2 className="mt-1 font-display text-3xl text-ink">Price details</h2>
-        <div className="mt-6 space-y-3 border-y border-line py-5 text-sm">
-          <div className="flex justify-between gap-4"><span className="text-muted">Subtotal</span><span>{formatAed(orderSubtotal)}</span></div>
-          {smallOrderFee > 0 ? (
-            <div className="flex justify-between gap-4"><span className="text-muted">Small order fee (under AED 99)</span><span>{formatAed(smallOrderFee)}</span></div>
-          ) : null}
-          <div className="flex justify-between gap-4"><span className="text-muted">Delivery fee</span><span>{formatAed(deliveryFee)}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-muted">Service fee</span><span>{formatAed(serviceFee)}</span></div>
-        </div>
+        <div className="mt-6 border-y border-line py-5"><OrderFeeLines fees={fees} /></div>
         <div className="mt-5 flex justify-between gap-4 text-lg font-semibold text-ink">
           <span>Total</span>
           <span>{formatAed(orderTotal)}</span>

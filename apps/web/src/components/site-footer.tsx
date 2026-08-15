@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthUser } from "@/lib/use-auth-user";
+import { BrandLogo } from "@/components/brand-logo";
 
 export function SiteFooter() {
   const pathname = usePathname();
@@ -34,7 +35,6 @@ export function SiteFooter() {
         { href: "/categories/lehengas", label: "Lehengas" },
         { href: "/categories/kurtis", label: "Kurtis" },
         { href: "/categories/party-wear", label: "Party wear" },
-        { href: "/categories", label: "All categories" },
       ],
     },
     {
@@ -54,8 +54,12 @@ export function SiteFooter() {
     <footer className="mt-auto border-t border-line bg-[#2a1f24] text-white">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-[1.2fr_1fr_1fr_1fr] sm:px-5">
         <div>
-          <Link href="/" className="font-display text-2xl tracking-tight">
-            Morni
+          <Link
+            href="/"
+            className="inline-flex rounded-md bg-white px-3 py-2"
+            aria-label="Morni home"
+          >
+            <BrandLogo className="h-8 w-auto" />
           </Link>
           <p className="mt-2 max-w-xs text-sm text-white/65">
             {auth
@@ -87,7 +91,7 @@ export function SiteFooter() {
 
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-white/45 sm:px-5">
-          <span>© {new Date().getFullYear()} Morni</span>
+          <span>© {new Date().getFullYear()} Morni · Real Magic Trading LLC</span>
           <span>Secure online payments coming soon</span>
         </div>
       </div>
