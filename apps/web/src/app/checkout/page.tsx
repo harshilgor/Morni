@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/lib/cart";
 import { cartLineId } from "@/lib/cart";
@@ -33,6 +34,7 @@ const paymentMethods = [
 ];
 
 export default function CheckoutPage() {
+  const router = useRouter();
   const { items, subtotal, removeItem, setQuantity } = useCart();
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<DeliveryAddress[]>([]);
@@ -58,6 +60,17 @@ export default function CheckoutPage() {
   const mobileAddressReady = Boolean(
     selectedAddressId || (form.area.trim() && form.street.trim()),
   );
+
+  function continueToPayment() {
+    if (!mobileAddressReady) {
+      setMobileAddressOpen(true);
+      return;
+    }
+
+    const address = selectedAddress ? addressToDraft(selectedAddress) : form;
+    window.sessionStorage.setItem("morni-checkout-address", JSON.stringify(address));
+    router.push("/payments");
+  }
 
   useEffect(() => {
     const supabase = createClient();
@@ -280,8 +293,8 @@ export default function CheckoutPage() {
               </span>
               <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
             </button>
-            <button type="button" onClick={openMobileAddress} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985]">
-              Select address to continue
+            <button type="button" onClick={continueToPayment} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985]">
+              {mobileAddressReady ? "Continue to payment" : "Select address to continue"}
             </button>
           </div>
         </div>
@@ -372,7 +385,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   disabled={!mobileAddressReady}
-                  onClick={() => setMobileAddressOpen(false)}
+                  onClick={continueToPayment}
                   className="w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Deliver here
@@ -665,10 +678,11 @@ export default function CheckoutPage() {
         </div>
         <button
           type="button"
-          disabled
-          className="mt-6 w-full cursor-not-allowed bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white opacity-50"
+          disabled={!mobileAddressReady}
+          onClick={continueToPayment}
+          className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Secure payment coming soon
+          {mobileAddressReady ? "Continue to payment" : "Select address to continue"}
         </button>
         <p className="mt-3 text-center text-xs leading-relaxed text-muted">Online payment will be required to place this order. Delivery and service fees are included above.</p>
       </aside>

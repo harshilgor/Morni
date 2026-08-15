@@ -25,31 +25,32 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
         <h2 className="text-sm font-bold uppercase tracking-[0.28em] text-ink">
           New and popular
         </h2>
-        <div className="sticky top-[var(--site-header-height,0px)] z-40 -mx-4 mt-5 border-y border-[#e8e8e8] bg-white/95 px-4 py-3 shadow-[0_8px_18px_-16px_rgba(28,20,24,0.5)] backdrop-blur sm:static sm:mx-0 sm:mt-5 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:shadow-none">
-          <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:overflow-visible">
-            {tabs.map((tab) => {
-              const isActive = tab.slug === active.slug;
-              return (
-                <button
-                  key={tab.slug}
-                  type="button"
-                  onClick={() => setActiveSlug(tab.slug)}
-                  aria-pressed={isActive}
-                  className={`shrink-0 border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
-                    isActive
-                      ? "border-ink bg-ink text-white"
-                      : "border-line bg-white text-ink hover:border-ink/40"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+      </div>
+
+      <div className="sticky top-[var(--site-header-height,0px)] z-40 mt-5 border-y border-[#e8e8e8] bg-white/95 px-4 py-3 shadow-[0_8px_18px_-16px_rgba(28,20,24,0.5)] backdrop-blur sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-2">
+          {tabs.map((tab) => {
+            const isActive = tab.slug === active.slug;
+            return (
+              <button
+                key={tab.slug}
+                type="button"
+                onClick={() => setActiveSlug(tab.slug)}
+                aria-pressed={isActive}
+                className={`border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
+                  isActive
+                    ? "border-ink bg-ink text-white"
+                    : "border-line bg-white text-ink hover:border-ink/40"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="mt-8 grid w-full grid-cols-3 gap-px border-y border-[#e8e8e8] bg-[#e8e8e8] sm:grid-cols-3 xl:grid-cols-5">
+      <div className="mt-8 grid w-full grid-cols-2 gap-px border-y border-[#e8e8e8] bg-[#e8e8e8] sm:grid-cols-3 xl:grid-cols-5">
         {active.products.map((product) => (
           <Link
             key={product.id}

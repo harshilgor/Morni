@@ -31,7 +31,7 @@ const SLIDES: Slide[] = [
     subtitle: "Everyday boutique finds under AED 99.",
     cta: "Shop under AED 99",
     href: "/under-99",
-    image: "/hero/under-99.jpeg",
+    image: "/hero/under-99.webp",
     visualOnly: true,
   },
   {
@@ -41,7 +41,7 @@ const SLIDES: Slide[] = [
     subtitle: "Special reductions from boutiques near you.",
     cta: "Shop the sale",
     href: "/clearance",
-    image: "/hero/up-to-50-off.jpeg",
+    image: "/hero/up-to-50-off.webp",
     visualOnly: true,
   },
   {
@@ -51,7 +51,7 @@ const SLIDES: Slide[] = [
     subtitle: "Elevated occasionwear from UAE boutiques.",
     cta: "Explore premium pieces",
     href: "/search?min=500",
-    image: "/hero/premium-collection.jpeg",
+    image: "/hero/premium-collection.webp",
     visualOnly: true,
   },
   {
@@ -61,7 +61,7 @@ const SLIDES: Slide[] = [
     subtitle: "Boutique looks at an easy price point.",
     cta: "Shop under AED 149",
     href: "/under-149",
-    image: "/hero/under-149.jpeg",
+    image: "/hero/under-149.webp",
     visualOnly: true,
   },
   {
@@ -248,7 +248,10 @@ export function HeroCarousel() {
               src={slide.image}
               alt=""
               fill
-              priority={index === 0}
+              preload={index === 0}
+              loading={index === 0 ? undefined : index === 1 ? "eager" : "lazy"}
+              fetchPriority={index === 1 ? "low" : undefined}
+              quality={75}
               sizes="(max-width: 639px) 88vw, (max-width: 1023px) 58vw, 46vw"
               className="object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
               style={{ objectPosition: slide.imagePosition ?? "center" }}
