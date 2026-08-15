@@ -66,6 +66,17 @@ export function SiteFooter() {
               ? `Welcome back, ${auth.firstName}. Local UAE retail, delivered within 1 hour.`
               : "Local UAE retail, delivered within 1 hour."}
           </p>
+          <p className="mt-3 space-y-1 text-sm text-white/80">
+            <a href="tel:043257001" className="block transition hover:text-white">
+              04-3257001
+            </a>
+            <a
+              href="mailto:info@rmt.ae"
+              className="block transition hover:text-white"
+            >
+              info@rmt.ae
+            </a>
+          </p>
         </div>
 
         {columns.map((column) => (
