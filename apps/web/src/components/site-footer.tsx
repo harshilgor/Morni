@@ -71,7 +71,6 @@ export function SiteFooter() {
               info@rmt.ae
             </a>
           </p>
-          <p className="mt-4 text-sm text-white/55">A venture of Real Magic Trading</p>
         </div>
 
         {columns.map((column) => (
