@@ -57,7 +57,7 @@ export function SiteFooter() {
           </Link>
           <p className="mt-2 max-w-xs text-sm text-white/65">
             {auth
-              ? `Welcome back, ${auth.firstName}. Local UAE retail, same-day delivery.`
+              ? `Welcome back, ${auth.firstName}. A venture of Real Magic Trading, same-day delivery.`
               : "Local UAE retail, same-day delivery."}
           </p>
           <p className="mt-3 space-y-1 text-sm text-white/80">
