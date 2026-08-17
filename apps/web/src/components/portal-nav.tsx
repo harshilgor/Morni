@@ -5,8 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { PortalIcon, type PortalIconName } from "@/components/portal-icons";
 import { createClient } from "@/lib/supabase/client";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
-import { BrandLogo } from "@/components/brand-logo";
-
 const primaryLinks: { href: string; label: string; icon: PortalIconName }[] = [
   { href: "/portal", label: "Overview", icon: "overview" },
   { href: "/portal/orders", label: "Orders", icon: "orders" },
@@ -55,7 +53,7 @@ export function PortalNav() {
   return (
     <aside className="z-40 border-b border-[#c6d0cb] bg-[#f8faf9] lg:sticky lg:top-0 lg:h-screen lg:w-[15.5rem] lg:shrink-0 lg:border-b-0 lg:border-r">
       <div className="flex h-full flex-col">
-        <div className="hidden border-b border-[#d5ddd9] px-5 py-5 lg:block"><Link href="/portal" className="flex items-center gap-3"><BrandLogo className="h-8 w-auto" /><span><span className="block text-sm font-bold tracking-[-0.03em] text-[#17231f]">Portal</span><span className="mt-0.5 block text-[11px] text-[#687770]">Seller workspace</span></span></Link></div>
+        <div className="hidden border-b border-[#d5ddd9] px-5 py-5 lg:block"><Link href="/portal" className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-lg bg-[#21342e] font-display text-xl text-white shadow-sm">M</span><span><span className="block text-base font-bold tracking-[-0.03em] text-[#17231f]">Morni Portal</span><span className="mt-0.5 block text-[11px] text-[#687770]">Seller workspace</span></span></Link></div>
         <nav className="flex gap-1 overflow-x-auto px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block lg:overflow-visible lg:px-3 lg:py-4">
           <NavGroup links={primaryLinks} pathname={pathname} />
           <NavGroup title="Manage" links={manageLinks} pathname={pathname} />

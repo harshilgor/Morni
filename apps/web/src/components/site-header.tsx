@@ -11,8 +11,6 @@ import type { UaeEmirate } from "@/lib/types";
 import { SearchTypeahead } from "@/components/search-typeahead";
 import { SavedAddressPicker } from "@/components/saved-address-picker";
 import { OCCASIONS } from "@/lib/occasions";
-import { BrandLogo } from "@/components/brand-logo";
-
 function PinIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -224,10 +222,9 @@ export function SiteHeader() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-2.5">
           <Link
             href="/"
-            className="shrink-0 rounded-md bg-white px-2 py-1 shadow-sm"
-            aria-label="Morni home"
+            className="shrink-0 font-display text-2xl tracking-tight text-white sm:text-[1.7rem]"
           >
-            <BrandLogo className="h-6 w-auto sm:h-7" priority />
+            Morni
           </Link>
 
           <div className="hidden shrink-0 sm:block">

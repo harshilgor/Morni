@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthUser } from "@/lib/use-auth-user";
-import { BrandLogo } from "@/components/brand-logo";
-
 export function SiteFooter() {
   const pathname = usePathname();
   const { auth } = useAuthUser();
@@ -54,12 +52,8 @@ export function SiteFooter() {
     <footer className="mt-auto border-t border-line bg-[#2a1f24] text-white">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-[1.2fr_1fr_1fr_1fr] sm:px-5">
         <div>
-          <Link
-            href="/"
-            className="inline-flex rounded-md bg-white px-3 py-2"
-            aria-label="Morni home"
-          >
-            <BrandLogo className="h-8 w-auto" />
+          <Link href="/" className="font-display text-2xl tracking-tight">
+            Morni
           </Link>
           <p className="mt-2 max-w-xs text-sm text-white/65">
             {auth
