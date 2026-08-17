@@ -21,7 +21,7 @@ const steps = [
 const perks = [
   {
     title: "Shoppers nearby",
-    body: "Reach customers browsing local retail who want same-hour delivery.",
+    body: "Reach customers browsing local retail who want same-day delivery.",
   },
   {
     title: "Simple portal",
@@ -65,7 +65,7 @@ export default function SellPage() {
             </h1>
             <p className="max-w-lg text-lg text-muted">
               List what you already sell on the floor. Morni brings customers who want
-              local fashion delivered within about an hour.
+              local fashion delivered the same day.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link

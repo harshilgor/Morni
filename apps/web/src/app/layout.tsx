@@ -20,13 +20,13 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "Morni",
-  title: "Morni — Local retail, delivered in 1 hour",
+  title: "Morni — Local retail, same-day delivery",
   description:
-    "Browse UAE boutique offerings and get fashion delivered within the hour.",
+    "Browse UAE boutique offerings and get fashion delivered the same day.",
   openGraph: {
-    title: "Morni — Local retail, delivered in 1 hour",
+    title: "Morni — Local retail, same-day delivery",
     description:
-      "Browse UAE boutique offerings and get fashion delivered within the hour.",
+      "Browse UAE boutique offerings and get fashion delivered the same day.",
     siteName: "Morni",
     type: "website",
   },

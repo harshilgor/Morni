@@ -25,6 +25,6 @@ Native shopper app. Requires **macOS + Xcode 15+**.
 
 - Discover stores by UAE emirate
 - Store / product browsing
-- Bag (single-store cart for 1-hour delivery)
+- Bag (single-store cart for same-day delivery)
 - COD checkout with payment_method/payment_status fields ready for a gateway
 - Orders + account auth against the same Supabase backend as web

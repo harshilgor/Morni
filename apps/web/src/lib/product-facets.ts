@@ -118,9 +118,7 @@ export const DELIVERY_BUCKETS: {
   label: string;
   max: number | null;
 }[] = [
-  { id: "under-60", label: "Within 1 hour", max: 60 },
-  { id: "60-120", label: "1 – 2 hours", max: 120 },
-  { id: "120-plus", label: "2 hours or more", max: null },
+  { id: "same-day", label: "Same-day delivery", max: null },
 ];
 
 const SIZE_ORDER = [
@@ -180,8 +178,6 @@ export function priceBucketId(price: number): string | null {
   return bucket?.id ?? null;
 }
 
-export function deliveryBucketId(etaMinutes: number): string {
-  if (etaMinutes <= 60) return "under-60";
-  if (etaMinutes <= 120) return "60-120";
-  return "120-plus";
+export function deliveryBucketId(_etaMinutes: number): string {
+  return "same-day";
 }

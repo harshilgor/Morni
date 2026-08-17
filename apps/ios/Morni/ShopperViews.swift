@@ -28,12 +28,12 @@ struct CartView: View {
                     } header: {
                         Text(model.cart.first?.storeName ?? "Bag")
                     } footer: {
-                        Text("One store per order for 1-hour delivery routing.")
+                        Text("One store per order for same-day delivery routing.")
                     }
 
                     Section {
                         LabeledContent("Subtotal", value: Formatters.aed(model.cartSubtotal))
-                        LabeledContent("Delivery", value: "AED 0 · within 1 hour")
+                        LabeledContent("Delivery", value: "AED 0 · same day")
                         NavigationLink("Checkout · Pay on delivery") {
                             CheckoutView()
                         }
@@ -218,7 +218,7 @@ struct AccountView: View {
                 Section { Text(error).foregroundStyle(.red) }
             }
             Section("About") {
-                Text("Morni delivers local UAE retail within 1 hour.")
+                Text("Morni delivers local UAE retail the same day.")
                 Text("Payments gateway will be added after infrastructure.")
                     .foregroundStyle(.secondary)
             }

@@ -1,6 +1,6 @@
 ﻿# Morni
 
-UAE marketplace for local retail — browse boutiques, shop online, delivery within ~1 hour.
+UAE marketplace for local retail — browse boutiques, shop online, same-day delivery.
 
 ## Monorepo
 

@@ -52,7 +52,7 @@ export default async function ClearancePage() {
             Clearance sale
           </h1>
           <p className="mt-1.5 text-sm text-muted">
-            Final markdowns from local UAE boutiques - same-hour delivery available
+            Final markdowns from local UAE boutiques - same-day delivery available
           </p>
         </div>
       </div>

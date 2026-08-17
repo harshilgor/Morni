@@ -57,8 +57,8 @@ export function SiteFooter() {
           </Link>
           <p className="mt-2 max-w-xs text-sm text-white/65">
             {auth
-              ? `Welcome back, ${auth.firstName}. Local UAE retail, delivered within 1 hour.`
-              : "Local UAE retail, delivered within 1 hour."}
+              ? `Welcome back, ${auth.firstName}. Local UAE retail, same-day delivery.`
+              : "Local UAE retail, same-day delivery."}
           </p>
           <p className="mt-3 space-y-1 text-sm text-white/80">
             <a href="tel:043257001" className="block transition hover:text-white">
@@ -71,6 +71,7 @@ export function SiteFooter() {
               info@rmt.ae
             </a>
           </p>
+          <p className="mt-4 text-sm text-white/55">A venture of Real Magic Trading</p>
         </div>
 
         {columns.map((column) => (

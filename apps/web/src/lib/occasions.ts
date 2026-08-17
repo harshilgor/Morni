@@ -17,7 +17,7 @@ export const OCCASIONS = [
   },
   {
     title: "Office wear",
-    subtitle: "Polished workwear kurtis, delivered within the hour.",
+    subtitle: "Polished workwear kurtis, delivered the same day.",
     href: "/categories/kurtis",
     image: "/categories/office-wear.webp",
     tone: "#9fd4cc",

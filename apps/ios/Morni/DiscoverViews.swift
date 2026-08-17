@@ -13,7 +13,7 @@ struct DiscoverView: View {
                         .foregroundStyle(Color(red: 0.56, green: 0.24, blue: 0.35))
                     Text("Morni")
                         .font(.system(size: 48, weight: .medium, design: .serif))
-                    Text("Browse nearby retail offerings and get delivery within 1 hour.")
+                    Text("Browse nearby retail offerings and get same-day delivery.")
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal)

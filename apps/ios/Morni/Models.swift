@@ -108,6 +108,6 @@ enum Formatters {
     }
 
     static func deliveryPromise(_ minutes: Int = 60) -> String {
-        minutes <= 60 ? "Delivery within 1 hour" : "Delivery in about \(minutes) minutes"
+        "Same-day delivery"
     }
 }

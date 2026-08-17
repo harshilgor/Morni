@@ -57,7 +57,7 @@ export function HomeStores({
                 : `Stores in ${emirateLabel(activeSelection)}`}
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Same-hour delivery from local retail floors.
+              Same-day delivery from local retail floors.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
