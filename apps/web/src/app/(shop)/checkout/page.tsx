@@ -34,13 +34,9 @@ function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   } as DeliveryAddressDraft;
 }
 
-const paymentMethods = [
-  { title: "Apple Pay", detail: "Fast checkout on supported devices" },
-];
-
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, removeItem, setQuantity } = useCart();
+  const { items, subtotal, removeItem, setQuantity, clear } = useCart();
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<DeliveryAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -48,8 +44,9 @@ export default function CheckoutPage() {
   const [makeDefault, setMakeDefault] = useState(false);
   const [form, setForm] = useState<DeliveryAddressDraft>(EMPTY_DELIVERY_ADDRESS);
   const [recommendations, setRecommendations] = useState<RailProduct[]>([]);
-  const [cardDetailsOpen, setCardDetailsOpen] = useState(false);
   const [mobileAddressOpen, setMobileAddressOpen] = useState(false);
+  const [placing, setPlacing] = useState(false);
+  const [placeError, setPlaceError] = useState<string | null>(null);
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
   const fees = calculateCheckoutFees(orderSubtotal);
@@ -64,26 +61,78 @@ export default function CheckoutPage() {
     selectedAddressId || (form.area.trim() && form.street.trim()),
   );
 
-  function continueToPayment() {
-    if (!mobileAddressReady) {
+  function resolveAddress(): DeliveryAddressDraft | null {
+    if (selectedAddress && isDeliverableEmirate(selectedAddress.emirate)) {
+      return addressToDraft(selectedAddress);
+    }
+    if (form.area.trim() && form.street.trim() && isDeliverableEmirate(form.emirate)) {
+      return { ...form, emirate: DELIVERY_EMIRATE };
+    }
+    return null;
+  }
+
+  function confirmMobileAddress() {
+    if (!resolveAddress()) {
+      setMobileAddressOpen(true);
+      return;
+    }
+    setPlaceError(null);
+    setMobileAddressOpen(false);
+  }
+
+  async function placeOrder() {
+    if (authed === false) {
+      router.push("/auth?next=/checkout");
+      return;
+    }
+
+    const address = resolveAddress();
+    if (!address) {
+      setMobileAddressOpen(true);
+      return;
+    }
+    if (!address.phone.trim()) {
+      setPlaceError("Add a contact number so the boutique and driver can reach you.");
       setMobileAddressOpen(true);
       return;
     }
 
-    if (selectedAddress && !isDeliverableEmirate(selectedAddress.emirate)) {
-      setMobileAddressOpen(true);
-      return;
+    setPlacing(true);
+    setPlaceError(null);
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            quantity: item.quantity,
+            size: item.size ?? null,
+          })),
+          address,
+          saveAddress: Boolean(authed && saveAddress && !selectedAddressId),
+          makeDefault,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { order?: { id?: string }; error?: string }
+        | null;
+      if (response.status === 401) {
+        router.push("/auth?next=/checkout");
+        return;
+      }
+      if (!response.ok || !payload?.order?.id) {
+        setPlaceError(payload?.error ?? "Unable to place this order.");
+        return;
+      }
+      clear();
+      router.push(`/orders/${payload.order.id}`);
+    } catch {
+      setPlaceError("Unable to place this order.");
+    } finally {
+      setPlacing(false);
     }
-
-    const address = selectedAddress
-      ? addressToDraft(selectedAddress)
-      : { ...form, emirate: DELIVERY_EMIRATE };
-    if (!isDeliverableEmirate(address.emirate)) {
-      setMobileAddressOpen(true);
-      return;
-    }
-    window.sessionStorage.setItem("morni-checkout-address", JSON.stringify(address));
-    router.push("/payments");
   }
 
   useEffect(() => {
@@ -306,8 +355,15 @@ export default function CheckoutPage() {
               </span>
               <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
             </button>
-            <button type="button" onClick={continueToPayment} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985]">
-              {mobileAddressReady ? "Continue to payment" : "Select address to continue"}
+            {placeError ? <p className="text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
+            <button type="button" onClick={() => void placeOrder()} disabled={placing} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
+              {placing
+                ? "Placing order..."
+                : authed === false
+                  ? "Sign in to place order"
+                  : mobileAddressReady
+                    ? "Place order"
+                    : "Select address to continue"}
             </button>
           </div>
         </div>
@@ -401,7 +457,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   disabled={!mobileAddressReady}
-                  onClick={continueToPayment}
+                  onClick={confirmMobileAddress}
                   className="w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Deliver here
@@ -577,107 +633,10 @@ export default function CheckoutPage() {
         ) : null}
 
         <section aria-labelledby="payment-heading" className="border-t border-line pt-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Payment</p>
-              <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Pay securely online</h2>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-                We are preparing a secure online payment experience for Morni.
-              </p>
-            </div>
-            <span className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-muted">
-              Coming soon
-            </span>
-          </div>
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              aria-expanded={cardDetailsOpen}
-              aria-controls="card-payment-details"
-              onClick={() => setCardDetailsOpen((open) => !open)}
-              className={`rounded-xl border p-4 text-left transition ${
-                cardDetailsOpen
-                  ? "border-ink bg-background ring-1 ring-ink"
-                  : "border-line bg-surface hover:border-ink/40"
-              }`}
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className="font-medium text-ink">Card</span>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">
-                  {cardDetailsOpen ? "Selected" : "Select"}
-                </span>
-              </span>
-              <span className="mt-1 block text-xs leading-relaxed text-muted">Visa, Mastercard and more</span>
-            </button>
-            {paymentMethods.map((method) => (
-              <div key={method.title} aria-disabled="true" className="rounded-xl border border-line bg-surface p-4 opacity-70">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium text-ink">{method.title}</p>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">Soon</span>
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-muted">{method.detail}</p>
-              </div>
-            ))}
-          </div>
-
-          {cardDetailsOpen ? (
-            <div id="card-payment-details" className="mt-3 rounded-xl border border-line bg-background p-4 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-medium text-ink">Card details</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">Your details will be entered securely through our payment partner.</p>
-                </div>
-                <span className="rounded-full bg-sand px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">Preview</span>
-              </div>
-              <fieldset disabled className="mt-5 grid gap-4 sm:grid-cols-2">
-                <label className="sm:col-span-2">
-                  <span className="mb-1.5 block text-xs font-medium text-ink">Card number</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="cc-number"
-                    placeholder="1234  5678  9012  3456"
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-3 text-sm text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-70"
-                  />
-                </label>
-                <label>
-                  <span className="mb-1.5 block text-xs font-medium text-ink">Expiry date</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="cc-exp"
-                    placeholder="MM / YY"
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-3 text-sm text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-70"
-                  />
-                </label>
-                <label>
-                  <span className="mb-1.5 block text-xs font-medium text-ink">Security code</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="cc-csc"
-                    placeholder="CVV"
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-3 text-sm text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-70"
-                  />
-                </label>
-                <label className="sm:col-span-2">
-                  <span className="mb-1.5 block text-xs font-medium text-ink">Name on card</span>
-                  <input
-                    type="text"
-                    autoComplete="cc-name"
-                    placeholder="As shown on your card"
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-3 text-sm text-ink placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-70"
-                  />
-                </label>
-              </fieldset>
-              <p className="mt-4 text-xs leading-relaxed text-muted">This is a design preview only — do not enter card information. These secure fields will be enabled when the payment provider is connected.</p>
-            </div>
-          ) : null}
-
-          <p className="mt-4 flex items-center gap-2 text-xs leading-relaxed text-muted">
-            <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full border border-line text-[11px] text-ink">✓</span>
-            Payment details will be handled by a certified payment provider and never stored by Morni.
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Payment</p>
+          <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Pay later</h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+            Online payments are not connected yet. Place the order now and the boutique will receive it immediately.
           </p>
         </section>
         </section>
@@ -693,15 +652,22 @@ export default function CheckoutPage() {
           <span>Total</span>
           <span>{formatAed(orderTotal)}</span>
         </div>
+        {placeError ? <p className="mt-4 text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
         <button
           type="button"
-          disabled={!mobileAddressReady}
-          onClick={continueToPayment}
+          disabled={placing || (!mobileAddressReady && authed !== false)}
+          onClick={() => void placeOrder()}
           className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {mobileAddressReady ? "Continue to payment" : "Select address to continue"}
+          {placing
+            ? "Placing order..."
+            : authed === false
+              ? "Sign in to place order"
+              : mobileAddressReady
+                ? "Place order"
+                : "Select address to continue"}
         </button>
-        <p className="mt-3 text-center text-xs leading-relaxed text-muted">Online payment will be required to place this order. Delivery and service fees are included above.</p>
+        <p className="mt-3 text-center text-xs leading-relaxed text-muted">Payment will be collected later. Delivery and service fees are included above.</p>
       </aside>
       </div>
 

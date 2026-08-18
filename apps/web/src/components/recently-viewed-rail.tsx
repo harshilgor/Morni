@@ -11,22 +11,19 @@ export function RecentlyViewedRail() {
 
   return (
     <section className="border-y border-[#e2dfd8] bg-[#f8f7f4]">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-5">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b5a60]">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mb-4 sm:mb-5">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b5a60] sm:mb-2">
           Continue shopping
         </p>
-        <h2 className="font-display text-3xl text-ink">Recently viewed</h2>
-        <p className="mt-1 text-sm text-muted">
+        <h2 className="shop-section-title">Recently viewed</h2>
+        <p className="shop-section-copy">
           Pick up where you left off — looks you already explored.
         </p>
       </div>
-      <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="shop-rail">
         {items.map((item) => (
-          <div
-            key={item.id}
-            className="w-[min(64vw,240px)] shrink-0 snap-start sm:w-[230px]"
-          >
+          <div key={item.id} className="shop-rail-item">
             <ProductCard
               product={{
                 id: item.id,
@@ -40,8 +37,8 @@ export function RecentlyViewedRail() {
           </div>
         ))}
       </div>
-      <div className="mt-4">
-        <Link href="/for-you" className="text-sm font-medium text-ink hover:underline">
+      <div className="mt-3 sm:mt-4">
+        <Link href="/for-you" className="text-xs font-medium text-ink hover:underline sm:text-sm">
           Get personal picks on For you →
         </Link>
       </div>

@@ -21,11 +21,11 @@ export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
   if (!active) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-deep sm:text-[11px]">
         Shop by intent
       </p>
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-1 sm:mt-3 sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {intents.map((intent) => {
           const selected = intent.id === active.id;
           return (
@@ -34,7 +34,7 @@ export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
               type="button"
               onClick={() => setActiveId(intent.id)}
               aria-pressed={selected}
-              className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-ink/30 ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-medium transition focus:outline-none focus:ring-2 focus:ring-ink/30 sm:px-3.5 sm:py-2 sm:text-xs ${
                 selected
                   ? "border-ink bg-ink text-white"
                   : "border-line bg-white/80 text-ink hover:border-ink/30 hover:bg-white"
@@ -46,26 +46,26 @@ export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
         })}
       </div>
 
-      <div className="mt-8 flex items-end justify-between gap-3">
-        <div>
-          <h2 className="font-display text-3xl text-ink">{active.title}</h2>
-          <p className="mt-1 text-sm text-muted">{active.subtitle}</p>
+      <div className="mt-5 flex items-end justify-between gap-3 sm:mt-8">
+        <div className="min-w-0">
+          <h2 className="shop-section-title">{active.title}</h2>
+          <p className="shop-section-copy">{active.subtitle}</p>
         </div>
-        <Link href={active.href} className="shrink-0 text-sm font-medium text-accent-deep hover:underline">
+        <Link href={active.href} className="shrink-0 text-xs font-medium text-accent-deep hover:underline sm:text-sm">
           View all
         </Link>
       </div>
 
       {active.products.length > 0 ? (
-        <div className="-mx-4 mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="shop-rail mt-4 sm:mt-5">
           {active.products.map((product) => (
-            <div key={product.id} className="w-[min(64vw,240px)] shrink-0 snap-start sm:w-[230px]">
+            <div key={product.id} className="shop-rail-item">
               <ProductCard product={product} href={product.href} rating={product.rating} />
             </div>
           ))}
         </div>
       ) : (
-        <p className="mt-5 rounded-xl border border-dashed border-line bg-background p-6 text-sm text-muted">
+        <p className="mt-4 rounded-xl border border-dashed border-line bg-background p-5 text-sm text-muted sm:mt-5 sm:p-6">
           Nothing matches this edit yet. Explore the full collection instead.
         </p>
       )}

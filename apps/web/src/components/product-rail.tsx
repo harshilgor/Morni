@@ -28,27 +28,24 @@ export function ProductRail({
   if (products.length === 0) return null;
 
   return (
-    <section id={id} className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-5 flex items-end justify-between gap-3">
-        <div>
-          <h2 className="font-display text-3xl text-ink">{title}</h2>
-          {subtitle ? <p className="mt-1 text-sm text-muted">{subtitle}</p> : null}
+    <section id={id} className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mb-4 flex items-end justify-between gap-3 sm:mb-5">
+        <div className="min-w-0">
+          <h2 className="shop-section-title">{title}</h2>
+          {subtitle ? <p className="shop-section-copy">{subtitle}</p> : null}
         </div>
         {href ? (
           <Link
             href={href}
-            className="shrink-0 text-sm font-medium text-accent-deep hover:underline"
+            className="shrink-0 text-xs font-medium text-accent-deep hover:underline sm:text-sm"
           >
             View all
           </Link>
         ) : null}
       </div>
-      <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="shop-rail">
         {products.map((product) => (
-          <div
-            key={product.id}
-            className="w-[min(64vw,240px)] shrink-0 snap-start sm:w-[230px]"
-          >
+          <div key={product.id} className="shop-rail-item">
             <ProductCard product={product} href={product.href} rating={product.rating} />
           </div>
         ))}

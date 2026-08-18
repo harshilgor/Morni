@@ -85,16 +85,6 @@ const SLIDES: Slide[] = [
     visualOnly: true,
   },
   {
-    id: "office-edit",
-    eyebrow: "The work edit",
-    title: "Polished days",
-    subtitle: "Modern officewear, ready for your next meeting.",
-    cta: "Shop officewear",
-    href: "/categories/office-wear",
-    image: "/categories/office-wear.webp",
-    imagePosition: "center 30%",
-  },
-  {
     id: "wedding-edit",
     eyebrow: "For the celebrations",
     title: "Wedding season",

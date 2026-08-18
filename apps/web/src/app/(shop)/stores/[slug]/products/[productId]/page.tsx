@@ -9,6 +9,7 @@ import { formatAed } from "@/lib/format";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
 import type { Product, ProductReview, ProductVariant, Store } from "@/lib/types";
 import { WishlistToggle } from "@/components/wishlist-toggle";
+import { AddToBagButton } from "@/components/add-to-bag-button";
 import { ProductReviewsSection } from "@/components/product-reviews-section";
 import { formatRatingLabel } from "@/lib/product-ratings";
 import { StarRating } from "@/components/star-rating";
@@ -398,7 +399,9 @@ export default function ProductPage() {
         </section>
 
         <section className="min-w-0 lg:sticky lg:top-20">
-          <div className="hidden justify-end lg:flex"><WishlistToggle productId={product.id} /></div>
+          <div className="hidden justify-end lg:flex">
+            <WishlistToggle productId={product.id} />
+          </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">{store.name}</p>
           <h1 className="mt-2 font-display text-[2.45rem] leading-[0.97] text-ink sm:text-5xl lg:text-[1.95rem] lg:leading-[1.02] xl:text-[2.15rem]">{product.title}</h1>
           <div className="mt-4 flex items-end justify-between gap-4 lg:mt-3">
@@ -414,11 +417,23 @@ export default function ProductPage() {
 
           <p className={`mt-4 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>{availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}` : ""}` : "This piece is currently out of stock"}</p>
           <div className="mt-4 hidden gap-3 sm:flex">
-            <div className="relative flex-1">
-              <button type="button" onClick={() => addToBag()} disabled={!canAdd} className="min-h-14 w-full rounded-lg bg-ink px-5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-12 lg:px-4">{addLabel}</button>
+            <div className="relative min-w-0 flex-1">
+              <AddToBagButton
+                label={addLabel}
+                disabled={!canAdd}
+                added={added}
+                onClick={() => addToBag()}
+                size="compact"
+              />
               <AddToBagConfetti celebrationKey={celebrationKey} />
             </div>
-            <button type="button" onClick={() => router.push("/cart")} className="min-h-14 rounded-lg border border-ink px-5 text-sm font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-surface lg:min-h-12 lg:px-4">Cart</button>
+            <button
+              type="button"
+              onClick={() => router.push("/cart")}
+              className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full border border-line bg-white px-6 text-sm font-semibold text-ink transition hover:border-ink/30 hover:bg-surface lg:min-h-11 lg:px-5"
+            >
+              Cart
+            </button>
           </div>
 
           <div className="mt-6 border-b border-line lg:mt-5">
@@ -433,11 +448,16 @@ export default function ProductPage() {
 
       <ProductReviewsSection reviews={reviews} avgRating={ratingSummary?.avgRating ?? null} reviewCount={ratingSummary?.reviewCount ?? 0} existingReview={existingReview} canReview={!existingReview && reviewOrderId ? { productId: product.id, orderId: reviewOrderId } : null} onReviewSaved={() => loadReviews(product.id)} />
 
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-background/95 px-4 py-3 shadow-[0_-12px_32px_-22px_rgba(28,20,24,0.4)] backdrop-blur sm:hidden">
-        <div className="mx-auto flex max-w-lg gap-3">
-          <WishlistToggle productId={product.id} />
-          <div className="relative flex-1">
-            <button type="button" disabled={!canAdd} onClick={() => addToBag()} className="min-h-12 w-full rounded-lg bg-ink px-4 text-sm font-semibold uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button>
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-background/92 px-4 py-3 shadow-[0_-10px_30px_-18px_rgba(28,20,24,0.18)] backdrop-blur-xl sm:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <WishlistToggle productId={product.id} size="lg" />
+          <div className="relative min-w-0 flex-1">
+            <AddToBagButton
+              label={addLabel}
+              disabled={!canAdd}
+              added={added}
+              onClick={() => addToBag()}
+            />
             <AddToBagConfetti celebrationKey={celebrationKey} />
           </div>
         </div>

@@ -113,7 +113,9 @@ export default function OrderDetailPage() {
           <div className="flex justify-between">
             <span className="text-muted">Payment</span>
             <span>
-              {order.payment_method.toUpperCase()} · {order.payment_status}
+              {order.payment_method === "cod"
+                ? "Pay later"
+                : `${order.payment_method.replaceAll("_", " ")} · ${order.payment_status}`}
             </span>
           </div>
           <div className="mt-2 flex justify-between font-medium">

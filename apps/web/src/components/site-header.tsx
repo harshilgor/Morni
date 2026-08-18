@@ -11,7 +11,6 @@ import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
 import { SearchTypeahead } from "@/components/search-typeahead";
 import { SavedAddressPicker } from "@/components/saved-address-picker";
-import { OCCASIONS } from "@/lib/occasions";
 function PinIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -88,7 +87,7 @@ const CATEGORY_MENU_GROUPS = [
     links: [["Lehengas", "/categories/lehengas"], ["Shararas", "/categories/shararas"], ["Salwar kameez", "/categories/salwar-kameez"], ["Kurtis", "/categories/kurtis"]],
   },
   {
-    title: "Shop the occasion",
+    title: "More to explore",
     links: [["Party wear", "/categories/party-wear"], ["Indo-western", "/categories/indo-western"], ["Dresses", "/categories/dresses"], ["Evening edit", "/categories/evening"]],
   },
   {
@@ -115,7 +114,6 @@ export function SiteHeader() {
   const [locationOpen, setLocationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [occasionsOpen, setOccasionsOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
   const navigationRef = useRef<HTMLDivElement>(null);
@@ -130,7 +128,6 @@ export function SiteHeader() {
       }
       if (!categoryMenuRef.current?.contains(e.target as Node)) {
         setCategoriesOpen(false);
-        setOccasionsOpen(false);
       }
     }
     document.addEventListener("mousedown", onClick);
@@ -192,7 +189,11 @@ export function SiteHeader() {
     pathname && /^\/stores\/[^/]+\/products\/[^/]+$/.test(pathname),
   );
 
-  if (pathname?.startsWith("/portal") || pathname?.startsWith("/founder")) {
+  if (
+    pathname?.startsWith("/portal") ||
+    pathname?.startsWith("/founder") ||
+    pathname === "/for-you"
+  ) {
     return null;
   }
 
@@ -214,26 +215,17 @@ export function SiteHeader() {
   function openCategories() {
     if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
     setCategoriesOpen(true);
-    setOccasionsOpen(false);
-  }
-
-  function openOccasions() {
-    if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
-    setCategoriesOpen(false);
-    setOccasionsOpen(true);
   }
 
   function scheduleMenusClose() {
     if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
     menuCloseTimer.current = window.setTimeout(() => {
       setCategoriesOpen(false);
-      setOccasionsOpen(false);
     }, 120);
   }
 
   function closeMenus() {
     setCategoriesOpen(false);
-    setOccasionsOpen(false);
   }
 
   async function signOut() {
@@ -477,18 +469,6 @@ export function SiteHeader() {
           >
             Categories
           </button>
-          <button
-            type="button"
-            onMouseEnter={openOccasions}
-            onFocus={openOccasions}
-            onClick={openOccasions}
-            aria-expanded={occasionsOpen}
-            aria-haspopup="menu"
-            data-nav-item
-            className={getNavPillClasses(occasionsOpen)}
-          >
-            Occasions
-          </button>
           <Link data-nav-item href="/stores" className={getNavPillClasses(isActiveNavItem("/stores"))}>
             Stores
           </Link>
@@ -545,50 +525,6 @@ export function SiteHeader() {
                     </Link>
                   ))}
                 </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-        {occasionsOpen ? (
-          <div
-            className="absolute inset-x-0 top-full z-50 hidden border-b border-line bg-surface text-ink shadow-[0_24px_48px_-30px_rgba(28,20,24,0.7)] md:block"
-            onMouseEnter={openOccasions}
-            role="menu"
-            aria-label="Shop by occasion"
-          >
-            <div className="mx-auto max-w-7xl px-5 py-6">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">
-                    Curated edits
-                  </p>
-                  <p className="mt-1 font-display text-2xl text-ink">
-                    Shop by occasion
-                  </p>
-                </div>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                {OCCASIONS.map((occasion) => (
-                  <Link
-                    key={occasion.title}
-                    href={occasion.href}
-                    role="menuitem"
-                    onClick={closeMenus}
-                    className="group min-w-0"
-                  >
-                    <div className="aspect-[4/5] overflow-hidden rounded-xl bg-sand">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={occasion.image}
-                        alt=""
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      />
-                    </div>
-                    <p className="mt-2 truncate text-center text-xs font-medium text-ink transition group-hover:text-accent-deep">
-                      {occasion.title}
-                    </p>
-                  </Link>
-                ))}
               </div>
             </div>
           </div>
