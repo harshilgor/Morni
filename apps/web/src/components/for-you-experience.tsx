@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ForYouSwipeDeck } from "@/components/for-you-swipe-deck";
 import type { BrowseCategory } from "@/lib/browse-categories";
 import {
   applyTasteSwipe,
@@ -26,8 +28,6 @@ import { createClient } from "@/lib/supabase/client";
 
 type Step = "loading" | "test" | "results";
 
-const SWIPE_THRESHOLD = 110;
-
 function ProductResultCard({
   product,
   onNotForMe,
@@ -36,7 +36,13 @@ function ProductResultCard({
   onNotForMe: (productId: string) => void;
 }) {
   return (
-    <article className="group overflow-hidden rounded-lg border border-line bg-surface">
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 420, damping: 32 }}
+      className="group overflow-hidden rounded-2xl border border-line bg-surface"
+    >
       <Link href={`/stores/${product.stores.slug}/products/${product.id}`} className="block">
         <div className="aspect-[3/4] overflow-hidden bg-sand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -63,7 +69,116 @@ function ProductResultCard({
           Not for me
         </button>
       </div>
-    </article>
+    </motion.article>
+  );
+}
+
+function ForYouResults({
+  favouriteProducts,
+  recommendations,
+  strongestCategories,
+  onReset,
+  onNotForMe,
+}: {
+  favouriteProducts: ForYouProduct[];
+  recommendations: ForYouProduct[];
+  strongestCategories: BrowseCategory[];
+  onReset: () => void;
+  onNotForMe: (productId: string) => void;
+}) {
+  return (
+    <section id="for-you" className="scroll-mt-24 border-y border-line/70 bg-[#fff9f7] py-10 sm:py-12">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 620, damping: 36 }}
+          className="border-b border-line/80 pb-8 text-center"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">Your edit</p>
+          <h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">Picked for you</h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm text-muted">
+            {strongestCategories.length > 0 ? (
+              <>
+                You are leaning toward{" "}
+                {strongestCategories.map((category, categoryIndex) => (
+                  <span key={category.slug}>
+                    {categoryIndex > 0 ? ", " : null}
+                    <Link
+                      href={`/categories/${category.slug}`}
+                      className="font-medium text-ink underline decoration-accent/50 underline-offset-4 transition hover:text-accent-deep"
+                    >
+                      {category.name}
+                    </Link>
+                  </span>
+                ))}
+                .
+              </>
+            ) : (
+              "Keep exploring and we will shape this edit around what you love."
+            )}
+          </p>
+          {strongestCategories.length > 0 ? (
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {strongestCategories.map((category) => (
+                <Link
+                  key={category.slug}
+                  href={`/categories/${category.slug}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-sm transition hover:border-accent hover:text-accent-deep"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={category.image_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+                  {category.name}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+            >
+              Reset my taste
+            </button>
+          </div>
+        </motion.div>
+
+        {favouriteProducts.length > 0 ? (
+          <section className="pt-9">
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">You liked these</p>
+              <h3 className="mt-1 font-display text-2xl text-ink sm:text-3xl">Your favourites</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {favouriteProducts.map((product) => (
+                <ProductResultCard key={product.id} product={product} onNotForMe={onNotForMe} />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="pt-10">
+          <div className="mb-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">
+              Based on your choices
+            </p>
+            <h3 className="mt-1 font-display text-2xl text-ink sm:text-3xl">Your recommended edit</h3>
+          </div>
+          {recommendations.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {recommendations.map((product) => (
+                <ProductResultCard key={product.id} product={product} onNotForMe={onNotForMe} />
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-line bg-surface px-5 py-10 text-center text-sm text-muted">
+              There are no more matching local products right now. Check back as stores add new pieces.
+            </p>
+          )}
+        </section>
+      </div>
+    </section>
   );
 }
 
@@ -80,11 +195,9 @@ export function ForYouExperience({
   const [profile, setProfile] = useState<TasteProfile>(emptyTasteProfile());
   const [dismissedProductIds, setDismissedProductIds] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
-  const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
   const [shopperId, setShopperId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const sessionPromiseRef = useRef<Promise<string | null> | null>(null);
-  const startRef = useRef<{ x: number; y: number } | null>(null);
 
   const localProducts = useMemo(
     () => products.filter((product) => !emirate || product.stores.emirate === emirate),
@@ -95,11 +208,9 @@ export function ForYouExperience({
     [categories, localProducts],
   );
   const activeIndex = Math.min(index, Math.max(deck.length - 1, 0));
-  const current = deck[activeIndex] ?? null;
   const minimumSwipes = Math.min(MIN_SWIPES_FOR_RESULTS, deck.length);
   const completedSwipes = profile.likes + profile.passes;
   const canFinish = completedSwipes >= minimumSwipes;
-  const progress = deck.length === 0 ? 0 : Math.min(1, completedSwipes / deck.length);
 
   useEffect(() => {
     let mounted = true;
@@ -163,11 +274,10 @@ export function ForYouExperience({
           .insert({ shopper_id: shopperId })
           .select("id")
           .single(),
-      )
-        .then(({ data }) => {
-          sessionIdRef.current = data?.id ?? null;
-          return sessionIdRef.current;
-        });
+      ).then(({ data }) => {
+        sessionIdRef.current = data?.id ?? null;
+        return sessionIdRef.current;
+      });
     }
     return sessionPromiseRef.current;
   }, [shopperId, supabase]);
@@ -199,6 +309,7 @@ export function ForYouExperience({
 
   const vote = useCallback(
     (decision: TasteSwipe["decision"]) => {
+      const current = deck[activeIndex];
       if (!current) return;
       const swipe: TasteSwipe = {
         productId: current.productId,
@@ -209,7 +320,6 @@ export function ForYouExperience({
       };
       const nextProfile = applyTasteSwipe(profile, swipe);
       setProfile(nextProfile);
-      setDrag({ x: 0, y: 0, active: false });
       saveSwipe(swipe, nextProfile);
 
       if (activeIndex + 1 >= deck.length) {
@@ -218,31 +328,8 @@ export function ForYouExperience({
         setIndex(activeIndex + 1);
       }
     },
-    [activeIndex, current, deck.length, profile, saveSwipe],
+    [activeIndex, deck, profile, saveSwipe],
   );
-
-  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    startRef.current = { x: event.clientX, y: event.clientY };
-    setDrag({ x: 0, y: 0, active: true });
-  };
-
-  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!startRef.current || !drag.active) return;
-    setDrag({
-      x: event.clientX - startRef.current.x,
-      y: (event.clientY - startRef.current.y) * 0.25,
-      active: true,
-    });
-  };
-
-  const onPointerUp = () => {
-    if (!drag.active) return;
-    if (drag.x >= SWIPE_THRESHOLD) vote("liked");
-    else if (drag.x <= -SWIPE_THRESHOLD) vote("passed");
-    else setDrag({ x: 0, y: 0, active: false });
-    startRef.current = null;
-  };
 
   const markNotForMe = useCallback(
     (productId: string) => {
@@ -278,6 +365,10 @@ export function ForYouExperience({
     ]);
   }, [shopperId, supabase]);
 
+  const finishEarly = useCallback(() => {
+    setStep("results");
+  }, []);
+
   const favouriteProducts = useMemo(
     () => localProducts.filter((product) => profile.likedProductIds.includes(product.id)),
     [localProducts, profile.likedProductIds],
@@ -289,199 +380,46 @@ export function ForYouExperience({
   const strongestCategories = topCategories(profile, categories);
 
   if (step === "loading") {
-    return <div className="mx-auto max-w-3xl px-4 py-16 text-center text-sm text-muted">Preparing your edit...</div>;
+    return (
+      <section id="for-you" className="scroll-mt-24 border-y border-line/70 bg-[#fff9f7] py-16 text-center">
+        <p className="text-sm text-muted">Preparing your edit...</p>
+      </section>
+    );
   }
 
   if (deck.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <h1 className="font-display text-4xl text-ink">Your edit is on its way</h1>
-        <p className="mx-auto mt-3 max-w-md text-muted">
+      <section id="for-you" className="scroll-mt-24 border-y border-line/70 bg-[#fff9f7] py-16 text-center">
+        <h2 className="font-display text-3xl text-ink">Your edit is on its way</h2>
+        <p className="mx-auto mt-3 max-w-md text-sm text-muted">
           We need a little more available local inventory before we can build your taste test.
         </p>
-      </div>
+      </section>
     );
   }
 
-  if (step === "test" && current) {
+  if (step === "test") {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-7 sm:px-6 sm:py-10">
-        <div className="sticky top-0 z-20 -mx-4 border-b border-line/70 bg-background/95 px-4 pb-4 pt-1 backdrop-blur sm:-mx-6 sm:px-6">
-          <div className="rounded-lg border border-line/80 bg-surface/90 px-4 py-4 shadow-sm sm:px-5">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-deep">Your edit</p>
-                <h1 className="mt-1 font-display text-3xl leading-tight text-ink">Tell us what feels like you</h1>
-              </div>
-              <p className="shrink-0 rounded-full bg-sand px-3 py-1 text-sm font-medium text-muted">
-                {Math.min(completedSwipes + 1, deck.length)} of {deck.length}
-              </p>
-            </div>
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-line/80">
-              <div className="h-full rounded-full bg-accent-deep transition-all duration-300" style={{ width: `${Math.max(5, progress * 100)}%` }} />
-            </div>
-          </div>
-        </div>
-
-        <section className="animate-rise pt-7">
-          <p className="mx-auto mb-6 max-w-md text-center text-sm leading-relaxed text-muted">
-            Swipe right to save the feeling, or left to pass. Every piece is available from a local Morni store.
-          </p>
-          <div className="relative mx-auto h-[min(48vh,500px)] w-full max-w-md touch-none select-none">
-            {deck.slice(activeIndex + 1, activeIndex + 3).map((card, cardIndex) => (
-              <div
-                key={card.id}
-                className="absolute inset-0 overflow-hidden rounded-lg bg-sand shadow-sm"
-                style={{
-                  transform: `scale(${0.965 - cardIndex * 0.03}) translateY(${(cardIndex + 1) * 10}px)`,
-                  zIndex: 1 - cardIndex,
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={card.imageUrl} alt="" className="h-full w-full object-cover opacity-70" />
-              </div>
-            ))}
-            <div
-              role="img"
-              aria-label={`${current.title}. Swipe right to like or left to pass.`}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-              className="absolute inset-0 z-10 cursor-grab overflow-hidden rounded-lg bg-ink shadow-xl shadow-ink/15 active:cursor-grabbing"
-              style={{
-                transform: `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x * 0.04}deg)`,
-                transition: drag.active ? "none" : "transform 0.25s ease",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={current.imageUrl} alt="" className="pointer-events-none h-full w-full object-cover" draggable={false} />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-              <span
-                className="pointer-events-none absolute left-5 top-5 rounded border-2 border-emerald-300 px-3 py-1 text-sm font-bold uppercase tracking-wide text-emerald-300"
-                style={{ opacity: Math.min(1, Math.max(0, drag.x / SWIPE_THRESHOLD)) }}
-              >
-                Like
-              </span>
-              <span
-                className="pointer-events-none absolute right-5 top-5 rounded border-2 border-rose-300 px-3 py-1 text-sm font-bold uppercase tracking-wide text-rose-300"
-                style={{ opacity: Math.min(1, Math.max(0, -drag.x / SWIPE_THRESHOLD)) }}
-              >
-                Pass
-              </span>
-              <div className="absolute inset-x-0 bottom-0 space-y-1.5 p-5 text-white sm:p-6">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/75">{current.categoryName} - {current.storeName}</p>
-                <h2 className="font-display text-3xl leading-tight">{current.title}</h2>
-                <p className="pt-1 text-sm font-medium">{formatAed(current.priceAed)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-7 flex items-center justify-center gap-4 sm:gap-6">
-            <button
-              type="button"
-              onClick={() => vote("passed")}
-              className="flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface text-2xl leading-none text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-rose-300 hover:text-rose-500 hover:shadow-md"
-              aria-label="Pass this piece"
-              title="Pass"
-            >
-              &#215;
-            </button>
-            <button type="button" onClick={() => setStep("results")} disabled={!canFinish} className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-medium uppercase tracking-[0.12em] text-muted shadow-sm transition enabled:hover:-translate-y-0.5 enabled:hover:border-accent enabled:hover:text-ink disabled:cursor-not-allowed disabled:opacity-45">See my edit</button>
-            <button
-              type="button"
-              onClick={() => vote("liked")}
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-ink text-2xl leading-none text-white shadow-md transition hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-lg"
-              aria-label="Like this piece"
-              title="Like"
-            >
-              <span aria-hidden="true">&#10084;&#65039;</span>
-            </button>
-          </div>
-          <p className="mt-3 text-center text-xs text-muted">
-            {canFinish ? "You have enough signals to see your edit whenever you are ready." : `${Math.max(minimumSwipes - completedSwipes, 0)} more choices unlock your edit.`}
-          </p>
-        </section>
-      </main>
+      <ForYouSwipeDeck
+        deck={deck}
+        activeIndex={activeIndex}
+        profile={profile}
+        completedSwipes={completedSwipes}
+        minimumSwipes={minimumSwipes}
+        canFinish={canFinish}
+        onVote={vote}
+        onFinish={finishEarly}
+      />
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <section className="border-b border-line pb-8 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-deep">Your edit</p>
-        <h1 className="mt-2 font-display text-4xl text-ink sm:text-5xl">Picked for you</h1>
-        <p className="mx-auto mt-3 max-w-xl text-muted">
-          {strongestCategories.length > 0
-            ? (
-              <>
-                You are leaning toward{" "}
-                {strongestCategories.map((category, categoryIndex) => (
-                  <span key={category.slug}>
-                    {categoryIndex > 0 ? ", " : null}
-                    <Link
-                      href={`/categories/${category.slug}`}
-                      className="font-medium text-ink underline decoration-accent/50 underline-offset-4 transition hover:text-accent-deep"
-                    >
-                      {category.name}
-                    </Link>
-                  </span>
-                ))}
-                .
-              </>
-            )
-            : "Keep exploring and we will shape this edit around what you love."}
-        </p>
-        {strongestCategories.length > 0 ? (
-          <div className="mt-5 flex flex-wrap justify-center gap-5">
-            {strongestCategories.map((category) => (
-              <Link
-                key={category.slug}
-                href={`/categories/${category.slug}`}
-                className="group flex w-20 flex-col items-center gap-2 text-center"
-                aria-label={`Shop ${category.name}`}
-              >
-                <span className="h-16 w-16 overflow-hidden rounded-full border border-line bg-sand shadow-sm transition duration-200 group-hover:-translate-y-0.5 group-hover:border-accent group-hover:shadow-md">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={category.image_url}
-                    alt=""
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                </span>
-                <span className="line-clamp-2 text-xs font-medium leading-tight text-ink group-hover:text-accent-deep">
-                  {category.name}
-                </span>
-              </Link>
-            ))}
-          </div>
-        ) : null}
-        <div className="mt-5 flex justify-center">
-          <button type="button" onClick={resetTaste} className="text-sm text-muted underline-offset-4 hover:text-ink hover:underline">Reset my taste</button>
-        </div>
-      </section>
-
-      {favouriteProducts.length > 0 ? (
-        <section className="pt-9">
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-deep">You liked these</p><h2 className="mt-1 font-display text-3xl text-ink">Your favourites</h2></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {favouriteProducts.map((product) => <ProductResultCard key={product.id} product={product} onNotForMe={markNotForMe} />)}
-          </div>
-        </section>
-      ) : null}
-
-      <section className="pt-10">
-        <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-deep">Based on your choices</p><h2 className="mt-1 font-display text-3xl text-ink">Your recommended edit</h2></div>
-        {recommendations.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {recommendations.map((product) => <ProductResultCard key={product.id} product={product} onNotForMe={markNotForMe} />)}
-          </div>
-        ) : (
-          <p className="rounded-lg border border-dashed border-line bg-surface px-5 py-10 text-center text-sm text-muted">There are no more matching local products right now. Check back as stores add new pieces.</p>
-        )}
-      </section>
-    </main>
+    <ForYouResults
+      favouriteProducts={favouriteProducts}
+      recommendations={recommendations}
+      strongestCategories={strongestCategories}
+      onReset={resetTaste}
+      onNotForMe={markNotForMe}
+    />
   );
 }

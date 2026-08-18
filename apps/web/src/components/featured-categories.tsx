@@ -35,10 +35,6 @@ export function FeaturedCategories({
           <h2 className="mt-3 font-display text-4xl leading-none text-ink sm:text-5xl lg:text-6xl">
             Featured categories
           </h2>
-          <p className="mt-4 max-w-xl text-sm leading-6 text-muted sm:text-base">
-            Discover timeless silhouettes and modern occasionwear, curated from
-            boutiques across the UAE.
-          </p>
         </div>
 
         <div className="grid grid-cols-3 border-l border-t border-[#ded7d2] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">

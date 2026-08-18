@@ -189,6 +189,19 @@ export function profileFromSwipes(swipes: TasteSwipe[]) {
   return swipes.reduce(applyTasteSwipe, emptyTasteProfile());
 }
 
+/** 65–95% match badge for swipe cards; stable per category when taste is still empty. */
+export function vibeScoreForCard(profile: TasteProfile, categorySlug: string) {
+  const interactions = profile.likes + profile.passes;
+  if (interactions === 0) {
+    let hash = 0;
+    for (const char of categorySlug) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+    return 68 + (hash % 22);
+  }
+  const score = Math.max(0, profile.categoryScores[categorySlug] ?? 0);
+  const maxScore = Math.max(1, ...Object.values(profile.categoryScores).map((v) => Math.max(0, v)));
+  return Math.round(65 + (score / maxScore) * 30);
+}
+
 export function topCategories(profile: TasteProfile, categories: BrowseCategory[], limit = 3) {
   return [...categories]
     .sort((a, b) => (profile.categoryScores[b.slug] ?? 0) - (profile.categoryScores[a.slug] ?? 0))
