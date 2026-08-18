@@ -161,7 +161,7 @@ export function SiteHeader() {
     pathname && /^\/stores\/[^/]+\/products\/[^/]+$/.test(pathname),
   );
 
-  if (pathname?.startsWith("/portal") || pathname?.startsWith("/founder") || isProductDetailPage) {
+  if (pathname?.startsWith("/portal") || pathname?.startsWith("/founder")) {
     return null;
   }
 
@@ -217,7 +217,10 @@ export function SiteHeader() {
   const isAdmin = auth?.profile?.role === "admin";
 
   return (
-    <header ref={headerRef} className="sticky top-0 z-50">
+    <header
+      ref={headerRef}
+      className={`${isProductDetailPage ? "hidden lg:block" : ""} sticky top-0 z-50`}
+    >
       <div className="bg-ink text-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-4 sm:px-5 sm:py-2.5">
           <Link

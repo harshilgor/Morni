@@ -91,12 +91,12 @@ function ProductAccordion({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex min-h-15 w-full items-center justify-between gap-4 py-4 text-left text-sm font-semibold uppercase tracking-[0.1em] text-ink"
+        className="flex min-h-15 w-full items-center justify-between gap-4 py-4 text-left text-sm font-semibold uppercase tracking-[0.1em] text-ink lg:min-h-12 lg:gap-3 lg:py-3"
       >
         {title}
         <Chevron open={open} />
       </button>
-      {open ? <div className="-mt-1 pb-5 text-sm leading-relaxed text-muted">{children}</div> : null}
+      {open ? <div className="-mt-1 pb-5 text-sm leading-relaxed text-muted lg:pb-4">{children}</div> : null}
     </div>
   );
 }
@@ -108,13 +108,13 @@ function RelatedProductCard({ product }: { product: RelatedProduct }) {
       href={`/stores/${product.stores.slug}/products/${product.id}`}
       className="group block min-w-0"
     >
-      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-[#f4f1ed]">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-[#f4f1ed] lg:aspect-[3/4] lg:rounded-lg">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]" />
         ) : null}
       </div>
-      <p className="mt-3 line-clamp-2 text-sm font-medium leading-snug text-ink">{product.title}</p>
+      <p className="mt-3 line-clamp-2 text-sm font-medium leading-snug text-ink lg:mt-2">{product.title}</p>
       <p className="mt-1 text-sm text-ink">{formatAed(product.price_aed)}</p>
     </Link>
   );
@@ -345,22 +345,26 @@ export default function ProductPage() {
   const addLabel = added ? "Added to bag" : availableStock <= 0 ? "Out of stock" : "Add to bag";
 
   return (
-    <main className="mx-auto max-w-[88rem] px-4 pb-28 pt-4 sm:px-6 sm:pt-6 lg:pb-16">
-      <div className="mb-4 flex items-center justify-between gap-4 sm:mb-6">
+    <main className="mx-auto max-w-[88rem] px-4 pb-28 pt-4 sm:px-6 sm:pt-6 lg:pb-16 lg:pt-5">
+      <div className="mb-4 lg:hidden">
         <button type="button" onClick={() => router.back()} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink transition hover:text-accent-deep">
           <ArrowLeft />
           <span>Back</span>
         </button>
-        <Link href={`/stores/${store.slug}`} className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep hover:underline">
-          {store.name}
-        </Link>
       </div>
 
-      <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1.16fr)_minmax(22rem,0.72fr)] lg:gap-12 xl:gap-16">
+      <div className="grid items-start gap-7 lg:grid-cols-[auto_minmax(0,1.02fr)_minmax(19rem,0.62fr)] lg:gap-6 xl:grid-cols-[auto_minmax(0,1.06fr)_minmax(20rem,0.64fr)] xl:gap-8">
+        <div className="hidden lg:flex lg:pt-2">
+          <button type="button" onClick={() => router.back()} className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap text-sm font-medium text-ink transition hover:text-accent-deep">
+            <ArrowLeft />
+            <span>Back</span>
+          </button>
+        </div>
+
         <section className="min-w-0">
           <div className="flex gap-3 lg:gap-4">
             {gallery.length > 1 ? (
-              <div className="hidden w-[4.7rem] shrink-0 space-y-2 lg:block">
+              <div className="hidden w-[4.2rem] shrink-0 space-y-2 lg:block">
                 {gallery.map((url, index) => (
                   <button key={`${url}-${index}`} type="button" onClick={() => setActiveImage(index)} aria-label={`View image ${index + 1}`} aria-pressed={activeImage === index} className={`aspect-[4/5] w-full overflow-hidden rounded-lg border bg-[#f4f1ed] transition ${activeImage === index ? "border-ink" : "border-transparent opacity-60 hover:opacity-100"}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -369,8 +373,8 @@ export default function ProductPage() {
                 ))}
               </div>
             ) : null}
-            <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl bg-[#f4f2ef] sm:rounded-2xl">
-              <div className="aspect-[4/5] w-full">
+            <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl bg-[#f4f2ef] sm:rounded-2xl lg:h-[calc(100vh-8.75rem)] lg:max-h-[46rem] lg:min-h-[34rem]">
+              <div className="aspect-[4/5] w-full lg:h-full lg:aspect-auto">
                 {gallery[activeImage] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={gallery[activeImage]} alt={product.title} className="h-full w-full object-contain" />
@@ -393,31 +397,31 @@ export default function ProductPage() {
           ) : null}
         </section>
 
-        <section className="min-w-0 lg:sticky lg:top-24">
+        <section className="min-w-0 lg:sticky lg:top-20">
           <div className="hidden justify-end lg:flex"><WishlistToggle productId={product.id} /></div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">{store.name}</p>
-          <h1 className="mt-3 font-display text-[2.45rem] leading-[0.97] text-ink sm:text-5xl">{product.title}</h1>
-          <div className="mt-5 flex items-end justify-between gap-4">
-            <div className="flex items-baseline gap-2.5"><span className="text-xl font-semibold text-ink">{formatAed(product.price_aed)}</span>{product.compare_at_price_aed ? <span className="text-sm text-muted line-through">{formatAed(product.compare_at_price_aed)}</span> : null}</div>
+          <h1 className="mt-2 font-display text-[2.45rem] leading-[0.97] text-ink sm:text-5xl lg:text-[1.95rem] lg:leading-[1.02] xl:text-[2.15rem]">{product.title}</h1>
+          <div className="mt-4 flex items-end justify-between gap-4 lg:mt-3">
+            <div className="flex items-baseline gap-2.5"><span className="text-xl font-semibold text-ink lg:text-lg">{formatAed(product.price_aed)}</span>{product.compare_at_price_aed ? <span className="text-sm text-muted line-through">{formatAed(product.compare_at_price_aed)}</span> : null}</div>
             {ratingSummary ? <span className="inline-flex items-center gap-1.5 text-sm text-ink"><StarRating value={ratingSummary.avgRating} /><span className="font-medium">{formatRatingLabel(ratingSummary.avgRating)}</span><span className="text-muted">({ratingSummary.reviewCount})</span></span> : null}
           </div>
-          {campaign ? <div className="mt-5 rounded-xl border border-accent/20 bg-[#fff4f6] px-4 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-deep">Boutique offer</p><p className="mt-1 text-sm font-medium text-ink">{campaign.title}</p>{campaign.description ? <p className="mt-1 text-sm text-muted">{campaign.description}</p> : null}</div> : null}
+          {campaign ? <div className="mt-5 rounded-xl border border-accent/20 bg-[#fff4f6] px-4 py-3 lg:mt-4 lg:px-3 lg:py-2"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-deep">Boutique offer</p><p className="mt-1 text-sm font-medium text-ink">{campaign.title}</p>{campaign.description ? <p className="mt-1 text-sm text-muted">{campaign.description}</p> : null}</div> : null}
 
-          <div className="mt-7 space-y-6">
+          <div className="mt-6 space-y-5 lg:mt-5 lg:space-y-4">
             {variants.length ? <div><p className="text-sm font-semibold text-ink">Colour {selectedVariant ? <span className="font-normal text-muted">— {selectedVariant.color_name}</span> : null}</p><div className="mt-3 flex flex-wrap gap-2.5">{variants.map((variant) => { const selected = selectedVariantId === variant.id; return <button key={variant.id} type="button" onClick={() => selectVariant(variant)} disabled={variant.stock <= 0} aria-pressed={selected} className={`flex h-11 items-center gap-2 rounded-full border px-3.5 text-sm transition ${selected ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"} disabled:cursor-not-allowed disabled:opacity-35`}><span className="h-3.5 w-3.5 rounded-full border border-white/40" style={{ background: variant.color_hex ?? "#c45b7a" }} />{variant.color_name}</button>; })}</div></div> : null}
-            {availableSizes.length ? <div><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">Size {selectedSize ? <span className="font-normal text-muted">— {selectedSize}</span> : null}</p><SizeGuide /></div><div className="mt-3 grid grid-cols-4 gap-2">{availableSizes.map((size) => <button key={size} type="button" onClick={() => { setSelectedSize(size); setAdded(false); }} aria-pressed={selectedSize === size} className={`min-h-12 rounded-lg border text-sm font-semibold transition ${selectedSize === size ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"}`}>{size}</button>)}</div>{!selectedSize ? <p className="mt-2 text-xs text-accent-deep">Select a size to add this piece to your bag.</p> : null}</div> : null}
+            {availableSizes.length ? <div><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">Size {selectedSize ? <span className="font-normal text-muted">— {selectedSize}</span> : null}</p><SizeGuide /></div><div className="mt-3 grid grid-cols-4 gap-2">{availableSizes.map((size) => <button key={size} type="button" onClick={() => { setSelectedSize(size); setAdded(false); }} aria-pressed={selectedSize === size} className={`min-h-10 rounded-md border px-2 text-sm font-semibold transition lg:min-h-9 lg:text-[13px] ${selectedSize === size ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"}`}>{size}</button>)}</div>{!selectedSize ? <p className="mt-2 text-xs text-accent-deep">Select a size to add this piece to your bag.</p> : null}</div> : null}
           </div>
 
-          <p className={`mt-5 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>{availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}` : ""}` : "This piece is currently out of stock"}</p>
-          <div className="mt-5 hidden gap-3 sm:flex">
+          <p className={`mt-4 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>{availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}` : ""}` : "This piece is currently out of stock"}</p>
+          <div className="mt-4 hidden gap-3 sm:flex">
             <div className="relative flex-1">
-              <button type="button" onClick={() => addToBag()} disabled={!canAdd} className="min-h-14 w-full rounded-lg bg-ink px-5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40">{addLabel}</button>
+              <button type="button" onClick={() => addToBag()} disabled={!canAdd} className="min-h-14 w-full rounded-lg bg-ink px-5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-12 lg:px-4">{addLabel}</button>
               <AddToBagConfetti celebrationKey={celebrationKey} />
             </div>
-            <button type="button" onClick={() => router.push("/cart")} className="min-h-14 rounded-lg border border-ink px-5 text-sm font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-surface">Bag</button>
+            <button type="button" onClick={() => router.push("/cart")} className="min-h-14 rounded-lg border border-ink px-5 text-sm font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-surface lg:min-h-12 lg:px-4">Cart</button>
           </div>
 
-          <div className="mt-7 border-b border-line">
+          <div className="mt-6 border-b border-line lg:mt-5">
             <ProductAccordion title="Product details" open={detailsOpen} onToggle={() => setDetailsOpen((open) => !open)}><p>{product.description ?? "A thoughtfully selected piece from this local boutique."}</p>{selectedVariant ? <p className="mt-3">Colour: {selectedVariant.color_name}.</p> : null}</ProductAccordion>
             <ProductAccordion title="Delivery" open={deliveryOpen} onToggle={() => setDeliveryOpen((open) => !open)}><p>Delivery is available across Dubai. Your exact delivery estimate is confirmed at checkout once you choose an address.</p></ProductAccordion>
             <ProductAccordion title="Returns" open={returnsOpen} onToggle={() => setReturnsOpen((open) => !open)}><p>Please contact Morni support promptly if there is an issue with your order. Items must be returned unused and in their original condition.</p></ProductAccordion>
@@ -425,7 +429,7 @@ export default function ProductPage() {
         </section>
       </div>
 
-      {relatedProducts.length ? <section className="mt-14 border-t border-line pt-10 sm:mt-20"><div className="flex items-end justify-between gap-4"><div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">More to discover</p><h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">You may also like</h2></div><Link href={`/stores/${store.slug}`} className="text-sm font-semibold text-ink underline underline-offset-4">View boutique</Link></div><div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-4 sm:gap-5">{relatedProducts.map((relatedProduct) => <RelatedProductCard key={relatedProduct.id} product={relatedProduct} />)}</div></section> : null}
+      {relatedProducts.length ? <section className="mt-14 border-t border-line pt-10 sm:mt-20 lg:mt-12 lg:pt-6"><div className="flex flex-col items-center gap-3 text-center sm:gap-4"><div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">More to discover</p><h2 className="mt-2 font-display text-2xl text-ink sm:text-3xl lg:text-2xl">You may also like</h2></div><Link href={`/stores/${store.slug}`} className="text-sm font-semibold text-ink underline underline-offset-4">View boutique</Link></div><div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-4 sm:gap-5 lg:mt-5 lg:grid-cols-5 lg:gap-4">{relatedProducts.map((relatedProduct) => <RelatedProductCard key={relatedProduct.id} product={relatedProduct} />)}</div></section> : null}
 
       <ProductReviewsSection reviews={reviews} avgRating={ratingSummary?.avgRating ?? null} reviewCount={ratingSummary?.reviewCount ?? 0} existingReview={existingReview} canReview={!existingReview && reviewOrderId ? { productId: product.id, orderId: reviewOrderId } : null} onReviewSaved={() => loadReviews(product.id)} />
 
