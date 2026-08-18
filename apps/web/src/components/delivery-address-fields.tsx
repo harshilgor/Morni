@@ -1,7 +1,10 @@
 "use client";
 
-import { EMIRATES } from "@/lib/format";
-import { UAE_AREAS } from "@/lib/location";
+import {
+  DELIVERY_EMIRATE,
+  DELIVERY_ONLY_MESSAGE,
+  UAE_AREAS,
+} from "@/lib/location";
 import type { UaeEmirate } from "@/lib/types";
 
 export type DeliveryAddressDraft = {
@@ -18,7 +21,7 @@ export type DeliveryAddressDraft = {
 export const EMPTY_DELIVERY_ADDRESS: DeliveryAddressDraft = {
   label: "",
   phone: "",
-  emirate: "dubai",
+  emirate: DELIVERY_EMIRATE,
   area: "",
   street: "",
   building: "",
@@ -37,10 +40,10 @@ export function DeliveryAddressFields({
   idPrefix: string;
   requireLabel?: boolean;
 }) {
-  const areas = UAE_AREAS[value.emirate] ?? [];
+  const areas = UAE_AREAS[DELIVERY_EMIRATE] ?? [];
 
   function patch(next: Partial<DeliveryAddressDraft>) {
-    onChange({ ...value, ...next });
+    onChange({ ...value, ...next, emirate: DELIVERY_EMIRATE });
   }
 
   return (
@@ -73,22 +76,12 @@ export function DeliveryAddressFields({
           required
         />
       </label>
-      <label className="block space-y-1.5 text-sm">
+      <div className="space-y-1.5 text-sm">
         <span className="text-muted">Emirate</span>
-        <select
-          name={`${idPrefix}-emirate`}
-          autoComplete="shipping address-level1"
-          className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-          value={value.emirate}
-          onChange={(event) => patch({ emirate: event.target.value as UaeEmirate })}
-        >
-          {EMIRATES.map((emirate) => (
-            <option key={emirate.value} value={emirate.value}>
-              {emirate.label}
-            </option>
-          ))}
-        </select>
-      </label>
+        <p className="rounded-xl border border-line bg-background px-3 py-2.5 text-ink">Dubai</p>
+        <p className="text-xs leading-relaxed text-muted">{DELIVERY_ONLY_MESSAGE}</p>
+        <input type="hidden" name={`${idPrefix}-emirate`} value={DELIVERY_EMIRATE} />
+      </div>
       <label className="block space-y-1.5 text-sm">
         <span className="text-muted">Area / neighborhood</span>
         <input

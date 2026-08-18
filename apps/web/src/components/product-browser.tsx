@@ -841,20 +841,14 @@ export function ProductBrowser({
       </aside>
 
       <div>
-        <div className="sticky top-[7.35rem] z-20 -mx-4 border-y border-line/80 bg-background/95 px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
-          <div
-            className={`grid gap-2 lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-3 ${
-              categoryIsPreferred
-                ? "grid-cols-[repeat(3,minmax(0,1fr))]"
-                : "grid-cols-[repeat(2,minmax(0,1fr))]"
-            }`}
-          >
+        <div className="sticky top-[7.35rem] z-20 -mx-4 border-b border-line/80 bg-background/95 px-4 py-2 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
+          <div className="flex items-center gap-2 lg:flex-wrap lg:justify-between lg:gap-3">
             {categoryIsPreferred ? (
               <button
                 type="button"
                 onClick={toggleForYou}
                 aria-pressed={forYouActive}
-                className={`flex h-11 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition lg:hidden ${
+                className={`inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold transition lg:hidden ${
                   forYouActive
                     ? "border-ink bg-ink text-white"
                     : "border-line bg-surface text-ink hover:border-ink/40"
@@ -867,12 +861,12 @@ export function ProductBrowser({
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink transition hover:border-ink/40 lg:hidden"
+              className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-line bg-surface px-2.5 text-[11px] font-semibold text-ink transition hover:border-ink/40 lg:hidden"
             >
               <span aria-hidden="true">&#9881;</span>
               Filters{activeCount > 0 ? ` (${activeCount})` : ""}
             </button>
-            <label className="relative flex h-11 min-w-0 items-center gap-1.5 overflow-hidden rounded-lg border border-line bg-surface px-3 text-xs text-ink lg:justify-center lg:overflow-visible lg:rounded-full lg:px-3 lg:py-1.5">
+            <label className="relative inline-flex h-8 min-w-0 max-w-[9.5rem] items-center gap-1 overflow-hidden rounded-full border border-line bg-surface px-2.5 text-[11px] text-ink lg:max-w-none lg:h-auto lg:overflow-visible lg:px-3 lg:py-1.5 lg:text-xs">
               <span className="hidden shrink-0 text-muted lg:inline">Sort</span>
               <span className="min-w-0 flex-1 truncate font-semibold lg:hidden">
                 {currentSort.mobileLabel}
@@ -891,15 +885,15 @@ export function ProductBrowser({
               </select>
               <span aria-hidden="true" className="shrink-0 text-muted lg:hidden">&#8964;</span>
             </label>
-            <p className={`${categoryIsPreferred ? "col-span-3" : "col-span-2"} text-sm text-muted lg:col-auto`}>
-              {forYouActive ? "Picked for you - " : ""}
+            <p className="ml-auto shrink-0 text-[11px] text-muted lg:text-sm">
+              {forYouActive ? "Picked for you · " : ""}
               {sorted.length} {sorted.length === 1 ? "piece" : "pieces"}
             </p>
           </div>
         </div>
 
         {forYouActive ? (
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-accent/20 bg-accent/10 px-3.5 py-3 text-sm text-ink lg:hidden">
+          <div className="mt-2.5 flex items-center justify-between gap-3 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2 text-xs text-ink lg:hidden">
             <p><span aria-hidden="true">&#10024;</span> Ordered around your taste.</p>
             <button type="button" onClick={toggleForYou} className="shrink-0 text-xs font-semibold text-accent-deep underline underline-offset-2">
               All pieces
@@ -907,11 +901,11 @@ export function ProductBrowser({
           </div>
         ) : null}
 
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             onClick={clearAll}
-            className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+            className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium transition ${
               activeCount === 0
                 ? "border-ink bg-ink text-white"
                 : "border-line bg-white text-ink hover:border-ink/40"
@@ -940,7 +934,7 @@ export function ProductBrowser({
               key={chip.label}
               type="button"
               onClick={chip.onClick}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+              className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium transition ${
                 chip.active
                   ? "border-ink bg-ink text-white"
                   : "border-line bg-white text-ink hover:border-ink/40"
@@ -983,7 +977,7 @@ export function ProductBrowser({
           </div>
         ) : (
           <>
-            <div className="mt-5 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
+            <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
               {sorted.slice(0, visible).map((product) => (
                 <ProductCard
                   key={product.id}

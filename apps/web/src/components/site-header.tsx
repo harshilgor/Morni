@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart";
-import { useLocation } from "@/lib/location";
+import { useLocation, isDeliverableEmirate } from "@/lib/location";
 import { useAuthUser } from "@/lib/use-auth-user";
 import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
@@ -20,6 +20,20 @@ function PinIcon({ className }: { className?: string }) {
         strokeWidth="1.8"
       />
       <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 9l6 6 6-6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -170,6 +184,7 @@ export function SiteHeader() {
   }
 
   function applyLocation(nextEmirate: UaeEmirate, nextArea: string) {
+    if (!isDeliverableEmirate(nextEmirate)) return;
     setLocation(nextEmirate, nextArea);
     setLocationOpen(false);
     // On search, keep the URL in sync so results reflect the new emirate.
@@ -571,7 +586,9 @@ export function SiteHeader() {
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">
           {firstName ? `Deliver to ${firstName} - ${locationLabel}` : `Deliver to ${locationLabel}`}
         </span>
-        <span aria-hidden="true" className="text-lg leading-none text-white/75">&#8964;</span>
+        <ChevronDownIcon
+          className={`h-4 w-4 shrink-0 text-white/80 transition duration-200 ${locationOpen ? "rotate-180" : ""}`}
+        />
       </button>
 
       {locationOpen ? (
@@ -590,7 +607,7 @@ export function SiteHeader() {
             <div className="flex items-center justify-between border-b border-line px-5 py-4">
               <div>
                 <p id="delivery-location-title" className="font-display text-2xl text-ink">Delivery location</p>
-                <p className="mt-0.5 text-xs text-muted">Choose where you want Morni to deliver.</p>
+                <p className="mt-0.5 text-xs text-muted">Morni currently delivers in Dubai only.</p>
               </div>
               <button
                 type="button"

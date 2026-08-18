@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DeliveryAddressFields, EMPTY_DELIVERY_ADDRESS, type DeliveryAddressDraft } from "@/components/delivery-address-fields";
 import { createClient } from "@/lib/supabase/client";
+import { DELIVERY_EMIRATE, DELIVERY_ONLY_MESSAGE, isDeliverableEmirate } from "@/lib/location";
 import type { DeliveryAddress } from "@/lib/types";
 
 type AddressEditor = DeliveryAddressDraft & { isDefault: boolean };
@@ -41,6 +42,9 @@ function AddressCard({
         {address.building ? <p>{address.building}</p> : null}
         {address.apartment ? <p>{address.apartment}</p> : null}
         <p>{address.area}, {formatEmirate(address.emirate)}</p>
+        {!isDeliverableEmirate(address.emirate) ? (
+          <p className="mt-2 text-xs text-accent-deep">{DELIVERY_ONLY_MESSAGE}</p>
+        ) : null}
         {address.phone ? <p className="mt-2 text-muted">{address.phone}</p> : null}
         {address.notes ? <p className="mt-3 text-xs text-muted">{address.notes}</p> : null}
       </div>
@@ -121,7 +125,7 @@ function AddressesPageContent() {
     setEditor({
       label: address.label,
       phone: address.phone ?? "",
-      emirate: address.emirate,
+      emirate: DELIVERY_EMIRATE,
       area: address.area,
       street: address.street,
       building: address.building ?? "",
@@ -149,13 +153,17 @@ function AddressesPageContent() {
       setError("Add a name, contact number, area, and street address before saving.");
       return;
     }
+    if (!isDeliverableEmirate(editor.emirate)) {
+      setError(DELIVERY_ONLY_MESSAGE);
+      return;
+    }
     setSaving(true);
     setError(null);
     const supabase = createClient();
     const payload = {
       label: editor.label.trim(),
       phone: editor.phone.trim(),
-      emirate: editor.emirate,
+      emirate: DELIVERY_EMIRATE,
       area: editor.area.trim(),
       street: editor.street.trim(),
       building: editor.building.trim() || null,
@@ -228,7 +236,7 @@ function AddressesPageContent() {
       <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-4xl text-ink sm:text-5xl">Your addresses</h1>
-          <p className="mt-2 max-w-xl text-sm text-muted">Save delivery details once, then select the right location in seconds.</p>
+          <p className="mt-2 max-w-xl text-sm text-muted">Save Dubai delivery details once, then select the right location in seconds. {DELIVERY_ONLY_MESSAGE}</p>
         </div>
         <Link href="/" className="text-sm font-semibold text-accent-deep hover:underline">Continue shopping</Link>
       </div>
@@ -240,7 +248,7 @@ function AddressesPageContent() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-3xl text-ink">{editingId ? "Edit address" : "Add a new address"}</h2>
-              <p className="mt-1 text-sm text-muted">Use a clear name like Home, Work, or a recipient&apos;s name.</p>
+              <p className="mt-1 text-sm text-muted">Use a clear name like Home, Work, or a recipient&apos;s name. {DELIVERY_ONLY_MESSAGE}</p>
             </div>
             <button type="button" onClick={closeEditor} disabled={saving} className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink hover:bg-background disabled:opacity-50">Cancel</button>
           </div>

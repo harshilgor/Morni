@@ -5,6 +5,14 @@ import { persist } from "zustand/middleware";
 import type { UaeEmirate } from "@/lib/types";
 import { EMIRATES } from "@/lib/format";
 
+export const DELIVERY_EMIRATE: UaeEmirate = "dubai";
+export const DEFAULT_DELIVERY_AREA = "Dubai Marina";
+export const DELIVERY_ONLY_MESSAGE = "We currently deliver in Dubai only.";
+
+export function isDeliverableEmirate(emirate: string | null | undefined): emirate is UaeEmirate {
+  return emirate === DELIVERY_EMIRATE;
+}
+
 export const UAE_AREAS: Record<UaeEmirate, string[]> = {
   dubai: [
     "Dubai Marina",
@@ -96,9 +104,12 @@ type LocationState = {
 export const useLocation = create<LocationState>()(
   persist(
     (set, get) => ({
-      emirate: "dubai",
-      area: "Dubai Marina",
-      setLocation: (emirate, area) => set({ emirate, area }),
+      emirate: DELIVERY_EMIRATE,
+      area: DEFAULT_DELIVERY_AREA,
+      setLocation: (emirate, area) => {
+        if (!isDeliverableEmirate(emirate)) return;
+        set({ emirate, area });
+      },
       label: () => {
         const { emirate, area } = get();
         const emirateName =
@@ -106,6 +117,20 @@ export const useLocation = create<LocationState>()(
         return area || emirateName;
       },
     }),
-    { name: "morni-location" },
+    {
+      name: "morni-location",
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<LocationState>;
+        if (!isDeliverableEmirate(persisted.emirate)) {
+          return {
+            ...currentState,
+            ...persisted,
+            emirate: DELIVERY_EMIRATE,
+            area: DEFAULT_DELIVERY_AREA,
+          };
+        }
+        return { ...currentState, ...persisted };
+      },
+    },
   ),
 );

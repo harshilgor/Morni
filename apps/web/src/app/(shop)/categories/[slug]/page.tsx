@@ -51,7 +51,7 @@ export default async function CategoryPage({
   const ratings = productPage.ratings;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-8">
       <nav className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
         <Link href="/" className="hover:text-ink">
           Home
@@ -60,26 +60,23 @@ export default async function CategoryPage({
         <span className="text-ink">{category.name}</span>
       </nav>
 
-      <div className="flex items-end justify-between gap-4 border-b border-line pb-4 pt-1 sm:mt-3 sm:flex-wrap sm:pb-5">
+      <div className="flex items-baseline justify-between gap-3 border-b border-line pb-3 pt-0.5 sm:mt-3 sm:items-end sm:pb-5">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.17em] text-accent-deep sm:hidden">
-            Category
-          </p>
-          <h1 className="mt-1 font-display text-[2rem] leading-none text-ink sm:mt-0 sm:text-4xl">
+          <h1 className="font-display text-[1.35rem] leading-tight text-ink sm:text-4xl">
             {category.name}
           </h1>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-1 hidden text-sm text-muted sm:block">
             {products.length}{productPage.hasMore ? "+" : ""} {products.length === 1 ? "piece" : "pieces"} from local boutiques
           </p>
         </div>
         {category.badge ? (
-          <span className="mb-0.5 shrink-0 rounded-full border border-accent/40 px-3 py-1 text-xs font-medium uppercase tracking-wide text-accent-deep">
+          <span className="shrink-0 rounded-full border border-accent/40 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-deep sm:px-3 sm:py-1 sm:text-xs">
             {category.badge}
           </span>
         ) : null}
       </div>
 
-      <div className="mt-5 sm:mt-6">
+      <div className="mt-3 sm:mt-6">
         {products.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line bg-surface/70 p-10 text-center">
             <p className="text-muted">

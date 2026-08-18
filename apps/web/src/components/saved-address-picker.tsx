@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { DeliveryAddress, UaeEmirate } from "@/lib/types";
+import { DELIVERY_ONLY_MESSAGE, isDeliverableEmirate } from "@/lib/location";
 
 function AddressCard({
   address,
@@ -14,15 +15,17 @@ function AddressCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const deliverable = isDeliverableEmirate(address.emirate);
   return (
     <button
       type="button"
       onClick={onSelect}
+      disabled={!deliverable}
       className={`w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-ink/30 ${
         selected
           ? "border-ink bg-sand"
-          : "border-line bg-background hover:border-ink/35 hover:bg-sand/40"
-      }`}
+          : "border-line bg-background"
+      } ${deliverable ? "hover:border-ink/35 hover:bg-sand/40" : "cursor-not-allowed opacity-55"}`}
     >
       <span className="flex items-center justify-between gap-3">
         <span className="text-sm font-semibold text-ink">{address.label}</span>
@@ -42,7 +45,9 @@ function AddressCard({
       {address.phone ? (
         <span className="mt-1 block text-xs text-muted">{address.phone}</span>
       ) : null}
-      {selected ? (
+      {!deliverable ? (
+        <span className="mt-2 block text-xs text-accent-deep">{DELIVERY_ONLY_MESSAGE}</span>
+      ) : selected ? (
         <span className="mt-2 block text-xs font-medium text-ink">Delivering here</span>
       ) : null}
     </button>
@@ -115,7 +120,7 @@ export function SavedAddressPicker({
         <div>
           <p className="font-display text-xl text-ink">Choose your location</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            Delivery options and local stores update for the address you choose.
+            Delivery options and local stores update for the address you choose. {DELIVERY_ONLY_MESSAGE}
           </p>
         </div>
         <Link
@@ -148,7 +153,10 @@ export function SavedAddressPicker({
               key={address.id}
               address={address}
               selected={address.emirate === currentEmirate && address.area === currentArea}
-              onSelect={() => onSelect(address)}
+              onSelect={() => {
+                if (!isDeliverableEmirate(address.emirate)) return;
+                onSelect(address);
+              }}
             />
           ))}
         </div>

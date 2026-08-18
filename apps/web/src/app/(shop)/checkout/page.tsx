@@ -14,7 +14,7 @@ import {
 } from "@/components/delivery-address-fields";
 import type { DeliveryAddress } from "@/lib/types";
 import { ProductRail, type RailProduct } from "@/components/product-rail";
-import { useLocation } from "@/lib/location";
+import { useLocation, DELIVERY_EMIRATE, DELIVERY_ONLY_MESSAGE, isDeliverableEmirate } from "@/lib/location";
 import { calculateCheckoutFees } from "@/lib/fees";
 import {
   OrderFeeLines,
@@ -25,7 +25,7 @@ function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   return {
     label: address.label,
     phone: "phone" in address && typeof address.phone === "string" ? address.phone : "",
-    emirate: address.emirate,
+    emirate: DELIVERY_EMIRATE,
     area: address.area,
     street: address.street,
     building: address.building ?? "",
@@ -70,7 +70,18 @@ export default function CheckoutPage() {
       return;
     }
 
-    const address = selectedAddress ? addressToDraft(selectedAddress) : form;
+    if (selectedAddress && !isDeliverableEmirate(selectedAddress.emirate)) {
+      setMobileAddressOpen(true);
+      return;
+    }
+
+    const address = selectedAddress
+      ? addressToDraft(selectedAddress)
+      : { ...form, emirate: DELIVERY_EMIRATE };
+    if (!isDeliverableEmirate(address.emirate)) {
+      setMobileAddressOpen(true);
+      return;
+    }
     window.sessionStorage.setItem("morni-checkout-address", JSON.stringify(address));
     router.push("/payments");
   }
@@ -120,6 +131,7 @@ export default function CheckoutPage() {
   }, [items]);
 
   function selectSavedAddress(address: DeliveryAddress) {
+    if (!isDeliverableEmirate(address.emirate)) return;
     setSelectedAddressId(address.id);
     setForm(addressToDraft(address));
     setSaveAddress(true);
@@ -130,7 +142,7 @@ export default function CheckoutPage() {
     setSelectedAddressId(null);
     setForm((current) => ({
       ...EMPTY_DELIVERY_ADDRESS,
-      emirate: current.emirate,
+      emirate: DELIVERY_EMIRATE,
       label: "",
     }));
     setSaveAddress(true);
@@ -173,7 +185,9 @@ export default function CheckoutPage() {
         .order("created_at");
       const addresses = (addressData ?? []) as DeliveryAddress[];
       setSavedAddresses(addresses);
-      const defaultAddress = addresses.find((address) => address.is_default);
+      const defaultAddress =
+        addresses.find((address) => address.is_default && isDeliverableEmirate(address.emirate)) ??
+        addresses.find((address) => isDeliverableEmirate(address.emirate));
       if (defaultAddress) selectSavedAddress(defaultAddress);
       else setMakeDefault(addresses.length === 0);
     });
@@ -349,12 +363,14 @@ export default function CheckoutPage() {
                     </div>
                     {savedAddresses.map((address) => {
                       const selected = selectedAddressId === address.id;
+                      const deliverable = isDeliverableEmirate(address.emirate);
                       return (
                         <button
                           key={address.id}
                           type="button"
                           onClick={() => selectSavedAddress(address)}
-                          className={`flex w-full items-start gap-3 border p-4 text-left transition ${selected ? "border-ink bg-background ring-1 ring-ink" : "border-line bg-surface"}`}
+                          disabled={!deliverable}
+                          className={`flex w-full items-start gap-3 border p-4 text-left transition ${selected ? "border-ink bg-background ring-1 ring-ink" : "border-line bg-surface"} ${deliverable ? "" : "cursor-not-allowed opacity-55"}`}
                         >
                           <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border ${selected ? "border-ink" : "border-line"}`} aria-hidden="true">
                             {selected ? <span className="h-2.5 w-2.5 rounded-full bg-ink" /> : null}
@@ -365,6 +381,7 @@ export default function CheckoutPage() {
                               {address.is_default ? <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted">Default</span> : null}
                             </span>
                             <span className="mt-1 block text-xs leading-relaxed text-muted">{address.street}, {address.area}</span>
+                            {!deliverable ? <span className="mt-1 block text-xs text-accent-deep">{DELIVERY_ONLY_MESSAGE}</span> : null}
                           </span>
                         </button>
                       );
@@ -490,16 +507,19 @@ export default function CheckoutPage() {
               </button>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {savedAddresses.map((address) => (
+              {savedAddresses.map((address) => {
+                const deliverable = isDeliverableEmirate(address.emirate);
+                return (
                 <button
                   key={address.id}
                   type="button"
                   onClick={() => selectSavedAddress(address)}
+                  disabled={!deliverable}
                   className={`rounded-xl border p-3 text-left transition ${
                     selectedAddressId === address.id
                       ? "border-accent bg-[#fff0f4]"
-                      : "border-line bg-surface hover:border-ink/30"
-                  }`}
+                      : "border-line bg-surface"
+                  } ${deliverable ? "hover:border-ink/30" : "cursor-not-allowed opacity-55"}`}
                 >
                   <span className="flex items-center gap-2 text-sm font-semibold text-ink">
                     {address.label}
@@ -512,8 +532,12 @@ export default function CheckoutPage() {
                   <span className="mt-1 block text-xs leading-relaxed text-muted">
                     {address.street}, {address.area}
                   </span>
+                  {!deliverable ? (
+                    <span className="mt-1 block text-xs text-accent-deep">{DELIVERY_ONLY_MESSAGE}</span>
+                  ) : null}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </section>
         ) : null}
