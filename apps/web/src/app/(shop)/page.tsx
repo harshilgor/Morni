@@ -1,6 +1,5 @@
 import { FeaturedCategories } from "@/components/featured-categories";
 import { HeroCarousel } from "@/components/hero-carousel";
-import { HomeCollections } from "@/components/home-collections";
 import { HomeDiscovery, type IntentRail } from "@/components/home-discovery";
 import { HomeStores } from "@/components/home-stores";
 import { NewAndPopular, type PopularTab } from "@/components/new-and-popular";
@@ -210,8 +209,6 @@ export default async function HomePage({
           href="/search?sort=rated"
         />
       ) : null}
-
-      <HomeCollections />
 
       <NewAndPopular tabs={popularTabs} />
 
