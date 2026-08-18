@@ -45,26 +45,26 @@ export function HomeStores({
 
   return (
     <section id="stores" className="scroll-mt-28 border-y border-[#e2dfd8] bg-[#f8f7f4]">
-      <div className="mx-auto max-w-6xl px-4 pb-9 pt-10 sm:px-6">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b5a60]">
+      <div className="mx-auto max-w-6xl px-4 pb-7 pt-8 sm:px-6 sm:pb-9 sm:pt-10">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-7 sm:gap-4">
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b5a60] sm:mb-2">
               Shop local
             </p>
-            <h2 className="font-display text-3xl text-ink">
+            <h2 className="shop-section-title">
               {activeSelection === "all"
                 ? "Stores near you"
                 : `Stores in ${emirateLabel(activeSelection)}`}
             </h2>
-            <p className="mt-1 text-sm text-muted">
+            <p className="shop-section-copy">
               Same-day delivery from local retail floors.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={() => setSelected("all")}
-              className={`rounded-full px-3 py-1.5 text-xs transition ${
+              className={`rounded-full px-2.5 py-1 text-[11px] transition sm:px-3 sm:py-1.5 sm:text-xs ${
                 activeSelection === "all"
                   ? "bg-ink text-white"
                   : "border border-[#d9d6cf] bg-transparent text-[#5e5954] hover:border-ink/40 hover:text-ink"
@@ -77,7 +77,7 @@ export function HomeStores({
                 key={emirate.value}
                 type="button"
                 onClick={() => setSelected(emirate.value)}
-                className={`rounded-full px-3 py-1.5 text-xs transition ${
+                className={`rounded-full px-2.5 py-1 text-[11px] transition sm:px-3 sm:py-1.5 sm:text-xs ${
                   activeSelection === emirate.value
                     ? "bg-ink text-white"
                     : "border border-[#d9d6cf] bg-transparent text-[#5e5954] hover:border-ink/40 hover:text-ink"
@@ -90,24 +90,21 @@ export function HomeStores({
         </div>
 
         {filtered.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[#d9d6cf] bg-white/70 p-10 text-center text-muted">
+          <p className="rounded-xl border border-dashed border-[#d9d6cf] bg-white/70 p-8 text-center text-sm text-muted sm:p-10">
             No stores in this emirate yet. Try another delivery location in the
             top bar.
           </p>
         ) : layout === "grid" ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
             {filtered.map((store) => (
               <StoreCard key={store.id} store={store} />
             ))}
           </div>
         ) : (
-          <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="shop-rail">
             {filtered.map((store) => (
-              <div
-                key={store.id}
-                className="w-[min(78vw,280px)] shrink-0 snap-start"
-              >
-                <StoreCard store={store} />
+              <div key={store.id} className="shop-rail-item-wide">
+                <StoreCard store={store} compact />
               </div>
             ))}
           </div>

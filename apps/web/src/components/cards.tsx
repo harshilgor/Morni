@@ -8,7 +8,7 @@ import { WishlistToggle } from "@/components/wishlist-toggle";
 const NEW_STORE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const STORE_CARD_REFERENCE_TIME_MS = Date.now();
 
-export function StoreCard({ store }: { store: Store }) {
+export function StoreCard({ store, compact = false }: { store: Store; compact?: boolean }) {
   const createdAtMs = store.created_at ? Date.parse(store.created_at) : NaN;
   const isNew =
     Number.isFinite(createdAtMs) &&
@@ -20,7 +20,9 @@ export function StoreCard({ store }: { store: Store }) {
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-[#dedbd4] bg-white transition duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_18px_42px_-30px_rgba(28,20,24,0.38)]"
     >
       <div
-        className="relative h-40 bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03]"
+        className={`relative bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03] ${
+          compact ? "h-28 sm:h-40" : "h-40"
+        }`}
         style={{
           backgroundImage: store.cover_url
             ? `url(${store.cover_url})`
@@ -33,17 +35,29 @@ export function StoreCard({ store }: { store: Store }) {
           </span>
         ) : null}
       </div>
-      <div className="flex min-h-[190px] flex-1 flex-col p-4">
-        <h3 className="min-h-14 line-clamp-2 font-display text-xl leading-snug text-ink">{store.name}</h3>
+      <div className={`flex flex-1 flex-col ${compact ? "p-3 sm:min-h-[190px] sm:p-4" : "min-h-[190px] p-4"}`}>
+        <h3
+          className={`line-clamp-2 font-display leading-snug text-ink ${
+            compact ? "text-base sm:min-h-14 sm:text-xl" : "min-h-14 text-xl"
+          }`}
+        >
+          {store.name}
+        </h3>
         <p
-          className="mt-2 truncate text-sm text-muted"
+          className={`truncate text-muted ${compact ? "mt-1 text-xs sm:mt-2 sm:text-sm" : "mt-2 text-sm"}`}
           title={store.area + ", " + emirateLabel(store.emirate)}
         >
           {store.area}, {emirateLabel(store.emirate)}
         </p>
-        <p className="mt-3 min-h-10 line-clamp-2 text-sm leading-5 text-ink/80">
-          {store.description || "A local boutique on Morni."}
-        </p>
+        {!compact ? (
+          <p className="mt-3 min-h-10 line-clamp-2 text-sm leading-5 text-ink/80">
+            {store.description || "A local boutique on Morni."}
+          </p>
+        ) : (
+          <p className="mt-2 hidden line-clamp-2 text-sm leading-5 text-ink/80 sm:mt-3 sm:block sm:min-h-10">
+            {store.description || "A local boutique on Morni."}
+          </p>
+        )}
       </div>
     </Link>
   );
@@ -72,9 +86,9 @@ export function ProductCard({
   return (
     <Link
       href={href}
-      className="group relative block min-w-0 overflow-hidden rounded-xl border border-line/70 bg-white/75 p-2 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5"
+      className="group relative block min-w-0 overflow-hidden rounded-lg border border-line/70 bg-white/75 p-1.5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5"
     >
-      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-sand sm:rounded-xl">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-sand sm:rounded-xl">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -85,7 +99,7 @@ export function ProductCard({
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
           />
         ) : null}
-        <div className="absolute right-2.5 top-2.5 z-10">
+        <div className="absolute right-1.5 top-1.5 z-10 sm:right-2.5 sm:top-2.5">
           <WishlistToggle
             productId={product.id}
             size="sm"
@@ -93,23 +107,23 @@ export function ProductCard({
           />
         </div>
       </div>
-      <div className="space-y-1 px-1 pb-1 pt-2.5 sm:space-y-1.5 sm:pt-3">
-        <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-ink sm:text-sm">
+      <div className="space-y-0.5 px-0.5 pb-0.5 pt-1.5 sm:space-y-1.5 sm:px-1 sm:pb-1 sm:pt-3">
+        <h3 className="line-clamp-2 text-[11px] font-medium leading-snug text-ink sm:text-sm">
           {product.title}
         </h3>
         {showRating ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5">
             <StarRating value={rating.avgRating} />
-            <span className="text-xs font-medium text-ink/85">
+            <span className="text-[10px] font-medium text-ink/85 sm:text-xs">
               {formatRatingLabel(rating.avgRating)}
             </span>
-            <span className="text-xs text-muted">({rating.reviewCount})</span>
+            <span className="hidden text-xs text-muted sm:inline">({rating.reviewCount})</span>
           </div>
         ) : null}
-        <div className="flex items-center gap-1.5 text-sm font-medium">
+        <div className="flex items-center gap-1 text-[11px] font-medium sm:gap-1.5 sm:text-sm">
           <span>{formatAed(product.price_aed)}</span>
           {product.compare_at_price_aed ? (
-            <span className="text-xs font-normal text-muted line-through">
+            <span className="text-[10px] font-normal text-muted line-through sm:text-xs">
               {formatAed(product.compare_at_price_aed)}
             </span>
           ) : null}
