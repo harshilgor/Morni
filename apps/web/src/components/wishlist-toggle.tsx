@@ -1,23 +1,23 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { HeartFilledIcon, HeartIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUser } from "@/lib/use-auth-user";
+import { cn } from "@/lib/utils";
 
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-        <path
-          d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z"
-          fill={filled ? "currentColor" : "none"}
-          stroke="currentColor"
-          strokeWidth="1.65"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-    </svg>
-  );
+function HeartIconComponent({
+  filled,
+  size,
+}: {
+  filled: boolean;
+  size: "sm" | "md" | "lg";
+}) {
+  const iconClass = size === "lg" ? "size-5" : "size-[18px]";
+  const Icon = filled ? HeartFilledIcon : HeartIcon;
+
+  return <Icon aria-hidden className={iconClass} />;
 }
 
 export function WishlistToggle({
@@ -26,7 +26,7 @@ export function WishlistToggle({
   onChange,
 }: {
   productId: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   onChange?: (isWished: boolean) => void;
 }) {
   const router = useRouter();
@@ -109,7 +109,8 @@ export function WishlistToggle({
     }
   }
 
-  const btnClass = size === "sm" ? "h-9 w-9" : "h-10 w-10";
+  const btnClass =
+    size === "sm" ? "h-9 w-9" : size === "lg" ? "h-14 w-14 shrink-0" : "h-10 w-10";
 
   return (
     <button
@@ -117,16 +118,16 @@ export function WishlistToggle({
       onClick={toggleWishlist}
       disabled={busy}
       aria-label={isWished ? "Remove from wishlist" : "Add to wishlist"}
-      className={[
-        "inline-flex items-center justify-center rounded-full border backdrop-blur",
+      className={cn(
+        "inline-flex items-center justify-center rounded-full border bg-white transition backdrop-blur-sm",
         btnClass,
         isWished
-          ? "border-accent-deep/30 bg-white/90 text-accent-deep shadow-sm"
-          : "border-line bg-white/70 text-muted hover:bg-white/95 hover:text-accent-deep",
-        busy ? "opacity-70" : "",
-      ].join(" ")}
+          ? "border-accent-deep/30 text-accent-deep shadow-sm"
+          : "border-line text-muted hover:border-accent-deep/25 hover:text-accent-deep",
+        busy && "opacity-70",
+      )}
     >
-      <HeartIcon filled={isWished} />
+      <HeartIconComponent filled={isWished} size={size} />
     </button>
   );
 }
