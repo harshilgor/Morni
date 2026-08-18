@@ -14,6 +14,13 @@ type Suggestion = {
   href: string;
 };
 
+const DEFAULT_PLACEHOLDER_SUGGESTIONS = [
+  '"stores"',
+  '"items under AED 99"',
+  '"kurtis"',
+  '"lehengas"',
+] as const;
+
 function cleanSearchTerm(value: string) {
   return value.replace(/[,%().]/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -46,15 +53,44 @@ export function SearchTypeahead({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [previousPlaceholder, setPreviousPlaceholder] = useState<string | null>(null);
+  const [placeholderFocused, setPlaceholderFocused] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const placeholderRef = useRef<HTMLSpanElement>(null);
+  const previousPlaceholderRef = useRef<HTMLSpanElement>(null);
+
+  const activePlaceholder = DEFAULT_PLACEHOLDER_SUGGESTIONS[
+    placeholderIndex % DEFAULT_PLACEHOLDER_SUGGESTIONS.length
+  ];
 
   useEffect(() => {
+    if (!wrapRef.current) return;
     function onClick(e: MouseEvent) {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  useEffect(() => {
+    if (query.trim().length > 0 || placeholderFocused) return;
+
+    const timer = window.setInterval(() => {
+      setPlaceholderIndex((current) => {
+        setPreviousPlaceholder(DEFAULT_PLACEHOLDER_SUGGESTIONS[current]);
+        return (current + 1) % DEFAULT_PLACEHOLDER_SUGGESTIONS.length;
+      });
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, [placeholderFocused, query]);
+
+  useEffect(() => {
+    if (!previousPlaceholder) return;
+    const timer = window.setTimeout(() => setPreviousPlaceholder(null), 460);
+    return () => window.clearTimeout(timer);
+  }, [previousPlaceholder]);
 
   useEffect(() => {
     const q = cleanSearchTerm(query);
@@ -152,7 +188,7 @@ export function SearchTypeahead({
     <div ref={wrapRef} className="relative min-w-0 flex-1">
       <form
         onSubmit={onSearch}
-        className="flex overflow-hidden rounded-md bg-white shadow-sm ring-2 ring-transparent focus-within:ring-accent"
+        className="relative flex overflow-hidden rounded-md bg-white shadow-sm ring-2 ring-transparent focus-within:ring-accent"
       >
         <label className="sr-only" htmlFor="morni-search">
           Search Morni
@@ -162,12 +198,49 @@ export function SearchTypeahead({
           value={query}
           onChange={(e) => updateQuery(e.target.value)}
           onFocus={() => {
+            setPlaceholderFocused(true);
             if (suggestions.length > 0) setOpen(true);
           }}
-          placeholder={placeholder}
+          onBlur={() => setPlaceholderFocused(false)}
+          placeholder=""
+          aria-label={placeholder}
           className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-ink outline-none placeholder:text-muted"
           autoComplete="off"
         />
+        {query.trim().length === 0 && !placeholderFocused ? (
+          <span className="pointer-events-none absolute inset-y-0 left-3 right-12 text-sm font-medium text-[#5c4a50]/90">
+            <span className="absolute inset-y-0 left-0 flex items-center">Search for</span>
+            <span className="absolute inset-y-0 left-[4.8rem] right-0 overflow-hidden">
+              {previousPlaceholder ? (
+                <span key={`outgoing-${previousPlaceholder}`} ref={previousPlaceholderRef} className="morni-search-placeholder-out absolute inset-y-0 left-0 flex items-center whitespace-nowrap">
+                  {previousPlaceholder}
+                </span>
+              ) : null}
+              <span key={`incoming-${activePlaceholder}`} ref={placeholderRef} className="morni-search-placeholder-in absolute inset-y-0 left-0 flex items-center whitespace-nowrap">
+                {activePlaceholder}
+              </span>
+            </span>
+          </span>
+        ) : null}
+        <style jsx>{`
+          .morni-search-placeholder-in {
+            animation: morni-search-placeholder-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .morni-search-placeholder-out {
+            animation: morni-search-placeholder-out 420ms cubic-bezier(0.4, 0, 1, 1) both;
+          }
+
+          @keyframes morni-search-placeholder-in {
+            from { opacity: 0; transform: translateY(115%); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          @keyframes morni-search-placeholder-out {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-115%); }
+          }
+        `}</style>
         <button
           type="submit"
           className="flex items-center justify-center bg-accent px-3.5 text-white transition hover:bg-accent-deep sm:px-4"

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { animate } from "animejs";
 import { useCart } from "@/lib/cart";
 import { useLocation, isDeliverableEmirate } from "@/lib/location";
 import { useAuthUser } from "@/lib/use-auth-user";
@@ -117,6 +118,7 @@ export function SiteHeader() {
   const [occasionsOpen, setOccasionsOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
+  const navigationRef = useRef<HTMLDivElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
   const headerRef = useRef<HTMLElement>(null);
 
@@ -133,6 +135,21 @@ export function SiteHeader() {
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  useEffect(() => {
+    const navigation = navigationRef.current;
+    if (!navigation) return;
+
+    navigation.querySelectorAll<HTMLElement>("[data-nav-item]").forEach((item, index) => {
+      animate(item, {
+        opacity: [0, 1],
+        translateY: [6, 0],
+        duration: 420,
+        delay: index * 45,
+        easing: "easeOutCubic",
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -231,6 +248,26 @@ export function SiteHeader() {
   const isStoreOwner = auth?.hasStore ?? false;
   const isAdmin = auth?.profile?.role === "admin";
 
+  function isActiveNavItem(href: string) {
+    if (href === "/") return pathname === "/";
+    if (href === "/for-you") return Boolean(pathname?.startsWith("/for-you"));
+    if (href === "/categories") return Boolean(pathname?.startsWith("/categories"));
+    if (href === "/stores") return Boolean(pathname?.startsWith("/stores"));
+    if (href === "/under-99") return pathname === "/under-99" || pathname?.startsWith("/search?max=99") === true;
+    if (href === "/under-149") return pathname === "/under-149" || pathname?.startsWith("/search?max=149") === true;
+    if (href === "/sell") return Boolean(pathname?.startsWith("/sell"));
+    return Boolean(pathname?.startsWith(href));
+  }
+
+  function getNavPillClasses(active: boolean) {
+    return [
+      "relative inline-flex shrink-0 items-center justify-center px-0.5 py-1 text-sm font-semibold tracking-[0.01em] transition-colors duration-300 after:absolute after:bottom-0 after:left-1/2 after:h-[2px] after:w-5 after:-translate-x-1/2 after:rounded-full after:transition-transform after:duration-300 after:ease-out",
+      active
+        ? "text-[#f3b6c6] after:scale-x-100 after:bg-[#d997ab]"
+        : "text-white/80 after:scale-x-0 after:bg-[#9ac653] hover:text-[#b6d874] hover:after:scale-x-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b6d874] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2a1f24]",
+    ].join(" ");
+  }
+
   return (
     <header
       ref={headerRef}
@@ -266,11 +303,7 @@ export function SiteHeader() {
 
           <div className="order-3 w-full sm:order-none sm:flex-1">
             <SearchTypeahead
-              placeholder={
-                firstName
-                  ? `Search Morni, ${firstName}`
-                  : "Search stores and products"
-              }
+              placeholder="Search stores and products"
             />
           </div>
 
@@ -413,7 +446,7 @@ export function SiteHeader() {
       </div>
 
       <div
-        className="relative border-b border-line/60 bg-[#2a1f24] text-white"
+        className="relative border-b border-[#e7f1eb] bg-[#2a1f24] text-white"
         ref={categoryMenuRef}
         onMouseLeave={scheduleMenusClose}
         onBlur={(event) => {
@@ -425,16 +458,12 @@ export function SiteHeader() {
           if (event.key === "Escape") closeMenus();
         }}
       >
-        <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto px-3 py-2 pr-8 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-4 sm:px-5">
-          <Link href="/" className="shrink-0 font-medium text-white/90 hover:text-white">
+        <div ref={navigationRef} className="relative z-10 mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto px-3 py-3 pr-8 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-7 sm:px-5">
+          <Link data-nav-item href="/" className={getNavPillClasses(isActiveNavItem("/"))}>
             Home
           </Link>
-          <Link
-            href="/for-you"
-            className="shrink-0 rounded-full bg-white px-3.5 py-1 text-sm font-medium shadow-sm transition hover:bg-[#fff6f8]"
-          >
-            <span className="text-accent-deep">For</span>{" "}
-            <span className="text-[#5c4a50]">you</span>
+          <Link data-nav-item href="/for-you" className={getNavPillClasses(isActiveNavItem("/for-you"))}>
+            For you
           </Link>
           <button
             type="button"
@@ -443,9 +472,8 @@ export function SiteHeader() {
             onClick={openCategories}
             aria-expanded={categoriesOpen}
             aria-haspopup="menu"
-            className={`hidden shrink-0 font-medium transition md:inline-flex ${
-              categoriesOpen ? "text-white" : "text-white/90 hover:text-white"
-            }`}
+            data-nav-item
+            className={getNavPillClasses(categoriesOpen || isActiveNavItem("/categories"))}
           >
             Categories
           </button>
@@ -456,33 +484,26 @@ export function SiteHeader() {
             onClick={openOccasions}
             aria-expanded={occasionsOpen}
             aria-haspopup="menu"
-            className={`hidden shrink-0 font-medium transition md:inline-flex ${
-              occasionsOpen ? "text-white" : "text-white/90 hover:text-white"
-            }`}
+            data-nav-item
+            className={getNavPillClasses(occasionsOpen)}
           >
             Occasions
           </button>
-          <Link href="/stores" className="shrink-0 font-medium text-white/90 hover:text-white">
+          <Link data-nav-item href="/stores" className={getNavPillClasses(isActiveNavItem("/stores"))}>
             Stores
           </Link>
-          <Link
-            href="/under-99"
-            className="shrink-0 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium text-white transition hover:border-white/50 hover:bg-white/20"
-          >
+          <Link data-nav-item href="/under-99" className={getNavPillClasses(isActiveNavItem("/under-99"))}>
             Under AED 99
           </Link>
-          <Link
-            href="/under-149"
-            className="shrink-0 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium text-white transition hover:border-white/50 hover:bg-white/20"
-          >
+          <Link data-nav-item href="/under-149" className={getNavPillClasses(isActiveNavItem("/under-149"))}>
             Under AED 149
           </Link>
           {isStoreOwner ? (
-            <Link href="/portal" className="shrink-0 text-white/85 hover:text-white">
+            <Link data-nav-item href="/portal" className={getNavPillClasses(isActiveNavItem("/portal"))}>
               My Store
             </Link>
           ) : (
-            <Link href="/sell" className="shrink-0 text-white/85 hover:text-white">
+            <Link data-nav-item href="/sell" className={getNavPillClasses(isActiveNavItem("/sell"))}>
               Sell on Morni
             </Link>
           )}
