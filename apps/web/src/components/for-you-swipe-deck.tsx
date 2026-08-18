@@ -107,7 +107,7 @@ function SwipeCardFace({
         </>
       ) : null}
 
-      <div className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/45 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+      <div className="pointer-events-none absolute right-4 top-4 rounded-full bg-black/45 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
         Your vibe {vibe}%
       </div>
 
@@ -296,18 +296,18 @@ export function ForYouSwipeDeck({
   return (
     <section
       id="for-you"
-      className="scroll-mt-24 border-y border-line/70 bg-[#fff9f7] py-8 sm:py-10"
+      className="flex min-h-dvh flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+4.5rem)] sm:px-6"
     >
-      <div className="mx-auto flex max-w-md flex-col px-4 sm:px-6">
-        <div className="text-center">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
+        <div className="shrink-0 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">Your edit</p>
           <h2 className="mt-1 font-display text-2xl text-ink sm:text-3xl">What feels like you?</h2>
-          <div className="mt-4">
+          <div className="mt-3">
             <SwipeProgress current={completedSwipes} total={deck.length} />
           </div>
         </div>
 
-        <div className="relative mx-auto mt-6 h-[min(68dvh,560px)] w-full max-w-[min(100%,380px)] touch-none select-none">
+        <div className="relative mx-auto mt-4 min-h-0 w-full max-w-[min(100%,380px)] flex-1 touch-none select-none">
           {deck.slice(activeIndex + 1, activeIndex + 3).map((card, cardIndex) => (
             <motion.div
               key={card.id}
@@ -362,7 +362,7 @@ export function ForYouSwipeDeck({
           passScale={passScale}
         />
 
-        <div className="mt-3 text-center">
+        <div className="mt-2 shrink-0 text-center">
           {canFinish ? (
             <button
               type="button"

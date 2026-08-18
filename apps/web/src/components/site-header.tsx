@@ -172,7 +172,11 @@ export function SiteHeader() {
     pathname && /^\/stores\/[^/]+\/products\/[^/]+$/.test(pathname),
   );
 
-  if (pathname?.startsWith("/portal") || pathname?.startsWith("/founder")) {
+  if (
+    pathname?.startsWith("/portal") ||
+    pathname?.startsWith("/founder") ||
+    pathname === "/for-you"
+  ) {
     return null;
   }
 

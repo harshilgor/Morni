@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ForYouBackButton } from "@/components/for-you-back-button";
 import { ForYouSwipeDeck } from "@/components/for-you-swipe-deck";
 import type { BrowseCategory } from "@/lib/browse-categories";
 import {
@@ -87,7 +88,10 @@ function ForYouResults({
   onNotForMe: (productId: string) => void;
 }) {
   return (
-    <section id="for-you" className="scroll-mt-24 border-y border-line/70 bg-[#fff9f7] py-10 sm:py-12">
+    <section
+      id="for-you"
+      className="bg-[#fff9f7] pb-10 pt-[calc(env(safe-area-inset-top)+4.5rem)] sm:pb-12"
+    >
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -381,45 +385,63 @@ export function ForYouExperience({
 
   if (step === "loading") {
     return (
-      <section id="for-you" className="scroll-mt-24 border-y border-line/70 bg-[#fff9f7] py-16 text-center">
-        <p className="text-sm text-muted">Preparing your edit...</p>
-      </section>
+      <div className="relative min-h-dvh bg-[#fff9f7]">
+        <ForYouBackButton />
+        <section
+          id="for-you"
+          className="flex min-h-dvh items-center justify-center px-4 pt-[calc(env(safe-area-inset-top)+4rem)] text-center"
+        >
+          <p className="text-sm text-muted">Preparing your edit...</p>
+        </section>
+      </div>
     );
   }
 
   if (deck.length === 0) {
     return (
-      <section id="for-you" className="scroll-mt-24 border-y border-line/70 bg-[#fff9f7] py-16 text-center">
-        <h2 className="font-display text-3xl text-ink">Your edit is on its way</h2>
-        <p className="mx-auto mt-3 max-w-md text-sm text-muted">
-          We need a little more available local inventory before we can build your taste test.
-        </p>
-      </section>
+      <div className="relative min-h-dvh bg-[#fff9f7]">
+        <ForYouBackButton />
+        <section
+          id="for-you"
+          className="flex min-h-dvh flex-col items-center justify-center px-4 pt-[calc(env(safe-area-inset-top)+4rem)] text-center"
+        >
+          <h2 className="font-display text-3xl text-ink">Your edit is on its way</h2>
+          <p className="mx-auto mt-3 max-w-md text-sm text-muted">
+            We need a little more available local inventory before we can build your taste test.
+          </p>
+        </section>
+      </div>
     );
   }
 
   if (step === "test") {
     return (
-      <ForYouSwipeDeck
-        deck={deck}
-        activeIndex={activeIndex}
-        profile={profile}
-        completedSwipes={completedSwipes}
-        minimumSwipes={minimumSwipes}
-        canFinish={canFinish}
-        onVote={vote}
-        onFinish={finishEarly}
-      />
+      <div className="relative min-h-dvh bg-[#fff9f7]">
+        <ForYouBackButton />
+        <ForYouSwipeDeck
+          deck={deck}
+          activeIndex={activeIndex}
+          profile={profile}
+          completedSwipes={completedSwipes}
+          minimumSwipes={minimumSwipes}
+          canFinish={canFinish}
+          onVote={vote}
+          onFinish={finishEarly}
+        />
+      </div>
     );
   }
 
   return (
-    <ForYouResults
-      favouriteProducts={favouriteProducts}
-      recommendations={recommendations}
-      strongestCategories={strongestCategories}
-      onReset={resetTaste}
-      onNotForMe={markNotForMe}
-    />
+    <div className="relative min-h-dvh bg-[#fff9f7]">
+      <ForYouBackButton />
+      <ForYouResults
+        favouriteProducts={favouriteProducts}
+        recommendations={recommendations}
+        strongestCategories={strongestCategories}
+        onReset={resetTaste}
+        onNotForMe={markNotForMe}
+      />
+    </div>
   );
 }
