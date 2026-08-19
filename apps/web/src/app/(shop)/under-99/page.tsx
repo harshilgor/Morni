@@ -47,9 +47,6 @@ export default async function Under99Page() {
           <h1 className="font-display text-3xl text-ink sm:text-4xl">
             Under AED 99
           </h1>
-          <p className="mt-1.5 text-sm text-muted">
-            Budget-friendly picks from local UAE boutiques - same-day delivery available
-          </p>
         </div>
       </div>
 

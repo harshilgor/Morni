@@ -119,7 +119,22 @@ export function SiteHeader() {
   const navigationRef = useRef<HTMLDivElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const deliverToDesktopRef = useRef<HTMLButtonElement>(null);
+  const deliverToMobileRef = useRef<HTMLButtonElement>(null);
 
+  useEffect(() => {
+    [deliverToDesktopRef, deliverToMobileRef].forEach((ref) => {
+      const el = ref.current;
+      if (!el) return;
+      animate(el, {
+        opacity: [0, 1],
+        translateY: [10, 0],
+        duration: 500,
+        delay: 300,
+        easing: "easeOutCubic",
+      });
+    });
+  }, []);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -276,9 +291,10 @@ export function SiteHeader() {
 
           <div className="hidden shrink-0 sm:block">
             <button
+              ref={deliverToDesktopRef}
               type="button"
               onClick={toggleLocationPanel}
-              className="flex max-w-[7.5rem] items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-left transition hover:border-white/35 hover:bg-white/5 sm:max-w-[13rem]"
+              className="flex max-w-[7.5rem] items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-left opacity-0 transition hover:border-white/35 hover:bg-white/5 sm:max-w-[13rem]"
               aria-expanded={locationOpen}
               aria-haspopup="dialog"
               aria-controls="delivery-location-dialog"
@@ -316,6 +332,13 @@ export function SiteHeader() {
                   {accountOpen ? (
                     <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-56 rounded-xl border border-line bg-surface p-3 text-ink shadow-[0_20px_50px_-20px_rgba(28,20,24,0.55)]">
                       <p className="px-2 pb-2 text-sm font-medium">{auth.displayName}</p>
+                      <Link
+                        href="/account"
+                        className="block rounded-lg px-2 py-2 text-sm font-medium text-accent-deep hover:bg-background"
+                        onClick={() => setAccountOpen(false)}
+                      >
+                        Your account
+                      </Link>
                       <Link
                         href="/orders"
                         className="block rounded-lg px-2 py-2 text-sm hover:bg-background"
@@ -404,9 +427,9 @@ export function SiteHeader() {
           </nav>
 
           <Link
-            href={auth ? "/orders" : "/auth"}
+            href={auth ? "/account" : "/auth"}
             className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-white transition hover:border-white/35 hover:bg-white/5 md:hidden"
-            aria-label={auth ? "View account and orders" : "Sign in"}
+            aria-label={auth ? "Your account" : "Sign in"}
             title={auth ? "Account" : "Sign in"}
           >
             <AccountIcon className="h-5 w-5" />
@@ -532,9 +555,10 @@ export function SiteHeader() {
       </div>
 
       <button
+        ref={deliverToMobileRef}
         type="button"
         onClick={toggleLocationPanel}
-        className="flex w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 py-2.5 text-left text-white transition hover:bg-[#433038] sm:hidden"
+        className="flex w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 py-2.5 text-left text-white opacity-0 transition hover:bg-[#433038] sm:hidden"
         aria-expanded={locationOpen}
         aria-haspopup="dialog"
         aria-controls="delivery-location-dialog"
