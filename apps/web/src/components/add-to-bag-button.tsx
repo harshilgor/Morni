@@ -25,7 +25,7 @@ export function AddToBagButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "relative w-full justify-between rounded-full border-0 bg-ink px-2 pl-5 text-left font-semibold tracking-normal normal-case text-white shadow-none hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-40",
+        "relative w-full justify-between rounded-full border-0 bg-ink px-2 pl-5 text-left font-semibold tracking-normal normal-case text-white shadow-none transition-all duration-200 hover:bg-accent-deep active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40",
         size === "compact" ? "h-12 pl-4 text-sm lg:h-11" : "h-14 pl-5 text-base sm:h-[3.25rem] sm:text-[0.95rem]",
         className,
       )}
@@ -39,9 +39,9 @@ export function AddToBagButton({
         )}
       >
         {added ? (
-          <CheckIcon className="size-[1.15rem]" />
+          <CheckIcon className="size-[1.15rem] animate-[scaleIn_0.25s_ease-out]" />
         ) : (
-          <ArrowTopRightIcon className="size-[1.15rem]" />
+          <ArrowTopRightIcon className="size-[1.15rem] transition-transform duration-200 group-hover/button:translate-x-0.5 group-hover/button:-translate-y-0.5" />
         )}
       </span>
     </Button>

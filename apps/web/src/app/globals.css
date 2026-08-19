@@ -305,6 +305,23 @@ h3,
   animation: soft-pulse 2.4s ease-in-out infinite;
 }
 
+@keyframes scaleIn {
+  0% { opacity: 0; transform: scale(0.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0ece8 25%, #e8e3de 50%, #f0ece8 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: 8px;
+}
+
 @keyframes add-to-bag-confetti {
   0% {
     opacity: 0;

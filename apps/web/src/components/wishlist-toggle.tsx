@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { HeartFilledIcon, HeartIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -35,6 +35,7 @@ export function WishlistToggle({
 
   const [isWished, setIsWished] = useState(false);
   const [busy, setBusy] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -102,6 +103,10 @@ export function WishlistToggle({
         if (!error) {
           setIsWished(true);
           onChange?.(true);
+          btnRef.current?.animate(
+            [{ transform: "scale(1)" }, { transform: "scale(1.25)" }, { transform: "scale(1)" }],
+            { duration: 300, easing: "ease-out" },
+          );
         }
       }
     } finally {
@@ -114,6 +119,7 @@ export function WishlistToggle({
 
   return (
     <button
+      ref={btnRef}
       type="button"
       onClick={toggleWishlist}
       disabled={busy}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { animate } from "animejs";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUser } from "@/lib/use-auth-user";
 
@@ -81,17 +82,27 @@ const QUICK_ACTIONS = [
 export default function AccountPage() {
   const router = useRouter();
   const { auth, loading: authLoading } = useAuthUser();
-  const [stats, setStats] = useState<Stats>({
-    orderCount: 0,
-    wishlistCount: 0,
-    addressCount: 0,
-    reviewCount: 0,
-  });
-  const [form, setForm] = useState<ProfileForm>({ full_name: "", phone: "" });
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [form, setForm] = useState<ProfileForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [statsLoaded, setStatsLoaded] = useState(false);
+  const cardsRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const el = cardsRef.current;
+    if (!el || authLoading || !auth) return;
+    el.querySelectorAll<HTMLElement>("[data-card]").forEach((card, i) => {
+      animate(card, {
+        opacity: [0, 1],
+        translateY: [16, 0],
+        duration: 500,
+        delay: i * 70,
+        easing: "easeOutCubic",
+      });
+    });
+  }, [auth, authLoading]);
+
+  // Populate form as soon as auth is ready (no extra fetch)
   useEffect(() => {
     if (authLoading) return;
     if (!auth) {
@@ -102,7 +113,12 @@ export default function AccountPage() {
       full_name: auth.profile?.full_name ?? auth.displayName ?? "",
       phone: auth.profile?.phone ?? "",
     });
+  }, [auth, authLoading, router]);
 
+  // Load stats in a separate non-blocking effect
+  useEffect(() => {
+    if (!auth) return;
+    let cancelled = false;
     const supabase = createClient();
     const userId = auth.user.id;
 
@@ -112,18 +128,20 @@ export default function AccountPage() {
       supabase.from("addresses").select("id", { count: "exact", head: true }).eq("user_id", userId),
       supabase.from("product_reviews").select("id", { count: "exact", head: true }).eq("user_id", userId),
     ]).then(([orders, wishlist, addresses, reviews]) => {
+      if (cancelled) return;
       setStats({
         orderCount: orders.count ?? 0,
         wishlistCount: wishlist.count ?? 0,
         addressCount: addresses.count ?? 0,
         reviewCount: reviews.count ?? 0,
       });
-      setStatsLoaded(true);
     });
-  }, [auth, authLoading, router]);
+
+    return () => { cancelled = true; };
+  }, [auth]);
 
   async function handleSave() {
-    if (!auth) return;
+    if (!auth || !form) return;
     setSaving(true);
     const supabase = createClient();
     await supabase
@@ -136,15 +154,22 @@ export default function AccountPage() {
   }
 
   if (authLoading || !auth) {
-    return <div className="mx-auto max-w-3xl px-4 py-14 text-muted">Loading…</div>;
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+        <div className="skeleton h-28 w-full rounded-2xl" />
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton h-36 rounded-2xl" />
+          ))}
+        </div>
+        <div className="mt-10 skeleton h-64 rounded-2xl" />
+      </div>
+    );
   }
 
-  const statMap: Record<string, number> = {
-    Orders: stats.orderCount,
-    Wishlist: stats.wishlistCount,
-    Addresses: stats.addressCount,
-    Reviews: stats.reviewCount,
-  };
+  const statMap: Record<string, number> | null = stats
+    ? { Orders: stats.orderCount, Wishlist: stats.wishlistCount, Addresses: stats.addressCount, Reviews: stats.reviewCount }
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -157,19 +182,20 @@ export default function AccountPage() {
       </div>
 
       {/* Quick actions */}
-      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div ref={cardsRef} className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {QUICK_ACTIONS.map((action) => (
           <Link
             key={action.title}
             href={action.href}
-            className="group flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-6 text-center transition hover:border-accent hover:shadow-sm"
+            data-card
+            className="group flex flex-col items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-6 text-center opacity-0 transition hover:border-accent hover:shadow-sm"
           >
             <span className="text-ink/70 transition group-hover:text-accent-deep">
               {action.icon}
             </span>
             <span className="text-sm font-semibold text-ink">{action.title}</span>
             <span className="text-xs text-muted">{action.description}</span>
-            {statsLoaded && statMap[action.title] > 0 && (
+            {statMap && statMap[action.title] > 0 && (
               <span className="mt-auto rounded-full bg-background px-2.5 py-0.5 text-xs font-medium text-ink">
                 {statMap[action.title]}
               </span>
@@ -189,8 +215,8 @@ export default function AccountPage() {
             <input
               id="fullName"
               type="text"
-              value={form.full_name}
-              onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+              value={form?.full_name ?? ""}
+              onChange={(e) => setForm((f) => f ? { ...f, full_name: e.target.value } : f)}
               className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-1 focus:ring-accent"
             />
           </div>
@@ -201,8 +227,8 @@ export default function AccountPage() {
             <input
               id="phone"
               type="tel"
-              value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              value={form?.phone ?? ""}
+              onChange={(e) => setForm((f) => f ? { ...f, phone: e.target.value } : f)}
               className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-1 focus:ring-accent"
             />
           </div>

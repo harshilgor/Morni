@@ -123,17 +123,31 @@ export function SiteHeader() {
   const deliverToMobileRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    [deliverToDesktopRef, deliverToMobileRef].forEach((ref) => {
-      const el = ref.current;
-      if (!el) return;
-      animate(el, {
-        opacity: [0, 1],
-        translateY: [10, 0],
-        duration: 500,
-        delay: 300,
-        easing: "easeOutCubic",
+    const els = [deliverToDesktopRef.current, deliverToMobileRef.current].filter(Boolean) as HTMLElement[];
+    if (els.length === 0) return;
+
+    let hasPlayed = false;
+
+    function play() {
+      if (hasPlayed) return;
+      hasPlayed = true;
+      els.forEach((el) => {
+        animate(el, {
+          opacity: [0, 1],
+          translateY: [12, 0],
+          duration: 500,
+          easing: "easeOutCubic",
+        });
       });
-    });
+      window.removeEventListener("scroll", onScroll);
+    }
+
+    function onScroll() {
+      if (window.scrollY > 30) play();
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {

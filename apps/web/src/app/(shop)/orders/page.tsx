@@ -33,7 +33,16 @@ export default function OrdersPage() {
   }, []);
 
   if (loading) {
-    return <div className="mx-auto max-w-3xl px-4 py-14 text-muted">Loading orders…</div>;
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <div className="skeleton h-10 w-48" />
+        <div className="mt-8 space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="skeleton h-20 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (needsAuth) {
