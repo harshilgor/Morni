@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { animate } from "animejs";
 import { useCart } from "@/lib/cart";
 import { useLocation, isDeliverableEmirate } from "@/lib/location";
 import { useAuthUser } from "@/lib/use-auth-user";
@@ -116,39 +115,8 @@ export function SiteHeader() {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
-  const navigationRef = useRef<HTMLDivElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
   const headerRef = useRef<HTMLElement>(null);
-  const deliverToDesktopRef = useRef<HTMLButtonElement>(null);
-  const deliverToMobileRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const els = [deliverToDesktopRef.current, deliverToMobileRef.current].filter(Boolean) as HTMLElement[];
-    if (els.length === 0) return;
-
-    let hasPlayed = false;
-
-    function play() {
-      if (hasPlayed) return;
-      hasPlayed = true;
-      els.forEach((el) => {
-        animate(el, {
-          opacity: [0, 1],
-          translateY: [12, 0],
-          duration: 500,
-          easing: "easeOutCubic",
-        });
-      });
-      window.removeEventListener("scroll", onScroll);
-    }
-
-    function onScroll() {
-      if (window.scrollY > 30) play();
-    }
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -161,37 +129,6 @@ export function SiteHeader() {
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-
-  useEffect(() => {
-    const navigation = navigationRef.current;
-    if (!navigation) return;
-
-    // Defer until after React finishes streaming/hydration so animejs
-    // does not race Suspense $RS DOM swaps (parentNode null crashes).
-    let cancelled = false;
-    const frame = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        if (cancelled) return;
-        const items = navigation.querySelectorAll<HTMLElement>("[data-nav-item]");
-        if (!items.length) return;
-        items.forEach((item, index) => {
-          if (!item.isConnected) return;
-          animate(item, {
-            opacity: [0, 1],
-            translateY: [6, 0],
-            duration: 420,
-            delay: index * 45,
-            easing: "easeOutCubic",
-          });
-        });
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frame);
-    };
   }, []);
 
   useEffect(() => {
@@ -321,10 +258,9 @@ export function SiteHeader() {
 
           <div className="hidden shrink-0 sm:block">
             <button
-              ref={deliverToDesktopRef}
               type="button"
               onClick={toggleLocationPanel}
-              className="flex max-w-[7.5rem] items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-left opacity-0 transition hover:border-white/35 hover:bg-white/5 sm:max-w-[13rem]"
+              className="flex max-w-[7.5rem] items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-left transition hover:border-white/35 hover:bg-white/5 sm:max-w-[13rem]"
               aria-expanded={locationOpen}
               aria-haspopup="dialog"
               aria-controls="delivery-location-dialog"
@@ -503,11 +439,11 @@ export function SiteHeader() {
           if (event.key === "Escape") closeMenus();
         }}
       >
-        <div ref={navigationRef} className="relative z-10 mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto px-3 py-3 pr-8 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-7 sm:px-5">
-          <Link data-nav-item href="/" className={getNavPillClasses(isActiveNavItem("/"))}>
+        <div className="relative z-10 mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto px-3 py-3 pr-8 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-7 sm:px-5">
+          <Link href="/" className={getNavPillClasses(isActiveNavItem("/"))}>
             Home
           </Link>
-          <Link data-nav-item href="/for-you" className={getNavPillClasses(isActiveNavItem("/for-you"))}>
+          <Link href="/for-you" className={getNavPillClasses(isActiveNavItem("/for-you"))}>
             For you
           </Link>
           <button
@@ -517,26 +453,25 @@ export function SiteHeader() {
             onClick={openCategories}
             aria-expanded={categoriesOpen}
             aria-haspopup="menu"
-            data-nav-item
             className={getNavPillClasses(categoriesOpen || isActiveNavItem("/categories"))}
           >
             Categories
           </button>
-          <Link data-nav-item href="/stores" className={getNavPillClasses(isActiveNavItem("/stores"))}>
+          <Link href="/stores" className={getNavPillClasses(isActiveNavItem("/stores"))}>
             Stores
           </Link>
-          <Link data-nav-item href="/under-99" className={getNavPillClasses(isActiveNavItem("/under-99"))}>
+          <Link href="/under-99" className={getNavPillClasses(isActiveNavItem("/under-99"))}>
             Under AED 99
           </Link>
-          <Link data-nav-item href="/under-149" className={getNavPillClasses(isActiveNavItem("/under-149"))}>
+          <Link href="/under-149" className={getNavPillClasses(isActiveNavItem("/under-149"))}>
             Under AED 149
           </Link>
           {isStoreOwner ? (
-            <Link data-nav-item href="/portal" className={getNavPillClasses(isActiveNavItem("/portal"))}>
+            <Link href="/portal" className={getNavPillClasses(isActiveNavItem("/portal"))}>
               My Store
             </Link>
           ) : (
-            <Link data-nav-item href="/sell" className={getNavPillClasses(isActiveNavItem("/sell"))}>
+            <Link href="/sell" className={getNavPillClasses(isActiveNavItem("/sell"))}>
               Sell on Morni
             </Link>
           )}
@@ -585,10 +520,9 @@ export function SiteHeader() {
       </div>
 
       <button
-        ref={deliverToMobileRef}
         type="button"
         onClick={toggleLocationPanel}
-        className="flex w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 py-2.5 text-left text-white opacity-0 transition hover:bg-[#433038] sm:hidden"
+        className="flex w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 py-2.5 text-left text-white transition hover:bg-[#433038] sm:hidden"
         aria-expanded={locationOpen}
         aria-haspopup="dialog"
         aria-controls="delivery-location-dialog"

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { emirateLabel, formatAed } from "@/lib/format";
 import { formatRatingLabel } from "@/lib/product-ratings";
 import type { Store } from "@/lib/types";
@@ -78,7 +78,6 @@ export function StoreProfileHeader({
   categoryLine: string;
   promos?: StorePromo[];
 }) {
-  const reduceMotion = useReducedMotion();
   const eta = deliveryEtaLabel(store.delivery_eta_minutes || 60);
   const location = `${store.area}, ${emirateLabel(store.emirate)}`;
 
@@ -106,7 +105,7 @@ export function StoreProfileHeader({
 
       <div className="relative z-10 mx-auto -mt-14 max-w-7xl px-4 sm:-mt-16 sm:px-6">
         <motion.div
-          initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 380, damping: 32 }}
           className="overflow-hidden rounded-[1.65rem] border border-line bg-white shadow-[0_18px_50px_-32px_rgba(28,20,24,0.45)]"
@@ -206,7 +205,7 @@ export function StoreProfileHeader({
 
         {promos.length > 0 ? (
           <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 360, damping: 30, delay: 0.06 }}
             className="mt-4 flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
