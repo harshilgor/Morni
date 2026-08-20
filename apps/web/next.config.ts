@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
       "react/jsx-dev-runtime": "./node_modules/react/jsx-dev-runtime.js",
       "react-dom": "./node_modules/react-dom",
       "react-dom/client": "./node_modules/react-dom/client.js",
+      // Founder (and other extension apps) resolve deps from their own folder;
+      // pin Motion to the web install so turbopack can find it on Vercel.
+      motion: "./node_modules/motion",
+      "motion/react": "./node_modules/motion/dist/es/react.mjs",
     },
   },
   experimental: {
