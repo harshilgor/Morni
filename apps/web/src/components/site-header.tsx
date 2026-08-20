@@ -167,15 +167,31 @@ export function SiteHeader() {
     const navigation = navigationRef.current;
     if (!navigation) return;
 
-    navigation.querySelectorAll<HTMLElement>("[data-nav-item]").forEach((item, index) => {
-      animate(item, {
-        opacity: [0, 1],
-        translateY: [6, 0],
-        duration: 420,
-        delay: index * 45,
-        easing: "easeOutCubic",
+    // Defer until after React finishes streaming/hydration so animejs
+    // does not race Suspense $RS DOM swaps (parentNode null crashes).
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        const items = navigation.querySelectorAll<HTMLElement>("[data-nav-item]");
+        if (!items.length) return;
+        items.forEach((item, index) => {
+          if (!item.isConnected) return;
+          animate(item, {
+            opacity: [0, 1],
+            translateY: [6, 0],
+            duration: 420,
+            delay: index * 45,
+            easing: "easeOutCubic",
+          });
+        });
       });
     });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {

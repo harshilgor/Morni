@@ -1,19 +1,17 @@
 import path from "path";
 import type { NextConfig } from "next";
 
-const repoRoot = path.join(__dirname, "../..");
 const deliverySrc = path.join(__dirname, "../delivery/src");
 const founderSrc = path.join(__dirname, "../founder/src");
 
 const nextConfig: NextConfig = {
-  // Match Vercel outputFileTracingRoot (repo root) so sibling extension apps resolve.
-  outputFileTracingRoot: repoRoot,
+  // Keep tracing at the monorepo root so sibling extension packages are included,
+  // but do not override turbopack.root (that fought Vercel's detected root).
+  outputFileTracingRoot: path.join(__dirname, "../.."),
   turbopack: {
-    root: repoRoot,
     resolveAlias: {
       "@morni/delivery": deliverySrc,
       "@morni/founder": founderSrc,
-      "@": path.join(__dirname, "src"),
     },
   },
   experimental: {
