@@ -34,6 +34,11 @@ function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   } as DeliveryAddressDraft;
 }
 
+/** Matches Tailwind `lg` — mobile checkout sheet is `lg:hidden`. */
+function isMobileCheckoutViewport() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, removeItem, setQuantity, clear } = useCart();
@@ -71,9 +76,24 @@ export default function CheckoutPage() {
     return null;
   }
 
+  function promptForAddress(message?: string) {
+    if (message) setPlaceError(message);
+    // The address sheet is mobile-only (`lg:hidden`). Opening it on desktop
+    // still locked body scroll with no visible UI — the page looked frozen.
+    if (isMobileCheckoutViewport()) {
+      setMobileAddressOpen(true);
+      return;
+    }
+    setMobileAddressOpen(false);
+    document.getElementById("checkout-delivery-section")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
   function confirmMobileAddress() {
     if (!resolveAddress()) {
-      setMobileAddressOpen(true);
+      promptForAddress();
       return;
     }
     setPlaceError(null);
@@ -88,12 +108,11 @@ export default function CheckoutPage() {
 
     const address = resolveAddress();
     if (!address) {
-      setMobileAddressOpen(true);
+      promptForAddress("Add a delivery area and street before placing this order.");
       return;
     }
     if (!address.phone.trim()) {
-      setPlaceError("Add a contact number so the boutique and driver can reach you.");
-      setMobileAddressOpen(true);
+      promptForAddress("Add a contact number so the boutique and driver can reach you.");
       return;
     }
 
@@ -189,34 +208,46 @@ export default function CheckoutPage() {
 
   function useNewAddress() {
     setSelectedAddressId(null);
-    setForm((current) => ({
+    setForm({
       ...EMPTY_DELIVERY_ADDRESS,
       emirate: DELIVERY_EMIRATE,
       label: "",
-    }));
+    });
     setSaveAddress(true);
     setMakeDefault(savedAddresses.length === 0);
-    setMobileAddressOpen(true);
+    if (isMobileCheckoutViewport()) setMobileAddressOpen(true);
   }
 
   function openMobileAddress() {
-    setMobileAddressOpen(true);
+    if (isMobileCheckoutViewport()) setMobileAddressOpen(true);
   }
 
   useEffect(() => {
     if (!mobileAddressOpen) return;
 
+    // Never lock scroll when the sheet isn't actually shown (desktop / lg+).
+    if (!isMobileCheckoutViewport()) {
+      setMobileAddressOpen(false);
+      return;
+    }
+
     const previousOverflow = document.body.style.overflow;
+    const media = window.matchMedia("(max-width: 1023px)");
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMobileAddressOpen(false);
+    };
+    const closeIfDesktop = () => {
+      if (!media.matches) setMobileAddressOpen(false);
     };
 
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
+    media.addEventListener("change", closeIfDesktop);
 
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
+      media.removeEventListener("change", closeIfDesktop);
     };
   }, [mobileAddressOpen]);
 
@@ -532,7 +563,7 @@ export default function CheckoutPage() {
           </div>
         </section>
 
-        <section className="space-y-5 border-b border-line pb-8">
+        <section id="checkout-delivery-section" className="space-y-5 border-b border-line pb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Delivery</p>
             <h2 className="mt-1 font-display text-3xl text-ink">Where should we send it?</h2>

@@ -56,7 +56,7 @@ export function DeliveryAddressFields({
           className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
           value={value.label}
           onChange={(event) => patch({ label: event.target.value })}
-          placeholder="Harshil, Home, Office"
+          placeholder="Home, Office"
           required={requireLabel}
         />
       </label>

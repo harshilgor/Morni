@@ -202,6 +202,12 @@ export function SiteHeader() {
     if (!isHomePage) setDeliveryBarVisible(true);
   }, [isHomePage]);
 
+  useEffect(() => {
+    setLocationOpen(false);
+    setCategoriesOpen(false);
+    setAccountOpen(false);
+  }, [pathname]);
+
   useMotionValueEvent(scrollY, "change", (current) => {
     if (!isHomePage || locationOpen) {
       setDeliveryBarVisible(true);

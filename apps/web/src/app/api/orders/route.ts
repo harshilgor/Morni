@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { sendOrderConfirmationEmail } from "@/lib/email";
+import {
+  sendOrderConfirmationEmail,
+  sendStoreNewOrderEmails,
+} from "@/lib/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { UaeEmirate } from "@/lib/types";
@@ -177,6 +180,12 @@ export async function POST(request: Request) {
     await sendOrderConfirmationEmail(order.id);
   } catch (sendError) {
     console.error("Order placed but confirmation email failed", sendError);
+  }
+
+  try {
+    await sendStoreNewOrderEmails(order.id);
+  } catch (sendError) {
+    console.error("Order placed but store notification email failed", sendError);
   }
 
   return NextResponse.json(

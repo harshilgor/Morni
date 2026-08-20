@@ -12,9 +12,23 @@ import { ReturnRefundPanel } from "@/components/return-refund-panel";
 
 const STEPS = ["placed", "accepted", "picking", "out_for_delivery", "delivered"] as const;
 
+type OrderStore = {
+  name: string;
+  slug: string;
+};
+
+type OrderWithStore = Order & {
+  stores: OrderStore | OrderStore[] | null;
+};
+
+function resolveStore(stores: OrderWithStore["stores"]): OrderStore | null {
+  if (!stores) return null;
+  return Array.isArray(stores) ? (stores[0] ?? null) : stores;
+}
+
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<OrderWithStore | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
@@ -24,10 +38,10 @@ export default function OrderDetailPage() {
     (async () => {
       const { data: orderData } = await supabase
         .from("orders")
-        .select("*")
+        .select("*, stores(name, slug)")
         .eq("id", params.id)
         .maybeSingle();
-      setOrder((orderData as Order) ?? null);
+      setOrder((orderData as OrderWithStore) ?? null);
       const { data: itemData } = await supabase
         .from("order_items")
         .select("*")
@@ -61,6 +75,7 @@ export default function OrderDetailPage() {
     return <div className="mx-auto max-w-3xl px-4 py-14 text-muted">Loading…</div>;
   }
 
+  const store = resolveStore(order.stores);
   const stepIndex = STEPS.indexOf(
     order.status === "cancelled" ? "placed" : (order.status as (typeof STEPS)[number]),
   );
@@ -75,6 +90,17 @@ export default function OrderDetailPage() {
       </Link>
       <h1 className="mt-4 font-display text-4xl text-ink">{order.order_number}</h1>
       <p className="mt-2 text-muted">{orderStatusLabel(order.status)}</p>
+      {store ? (
+        <p className="mt-1 text-sm text-muted">
+          From{" "}
+          <Link
+            href={`/stores/${store.slug}`}
+            className="font-medium text-ink underline-offset-2 hover:text-accent-deep hover:underline"
+          >
+            {store.name}
+          </Link>
+        </p>
+      ) : null}
 
       {order.status !== "cancelled" ? (
         <div className="mt-8 grid grid-cols-5 gap-2">
