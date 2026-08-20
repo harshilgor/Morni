@@ -1,17 +1,21 @@
 import path from "path";
 import type { NextConfig } from "next";
 
+const repoRoot = path.join(__dirname, "../..");
+const deliverySrc = path.join(__dirname, "../delivery/src");
+const founderSrc = path.join(__dirname, "../founder/src");
+
 const nextConfig: NextConfig = {
-  // Include sibling extension apps (delivery, founder) in Turbopack's resolve root.
+  // Match Vercel outputFileTracingRoot (repo root) so sibling extension apps resolve.
+  outputFileTracingRoot: repoRoot,
   turbopack: {
-    root: path.join(__dirname, ".."),
+    root: repoRoot,
     resolveAlias: {
-      "@morni/delivery": path.join(__dirname, "../delivery/src"),
-      "@morni/founder": path.join(__dirname, "../founder/src"),
+      "@morni/delivery": deliverySrc,
+      "@morni/founder": founderSrc,
       "@": path.join(__dirname, "src"),
     },
   },
-  // Allow apps/web to mount extension UI from apps/delivery and apps/founder.
   experimental: {
     externalDir: true,
   },
