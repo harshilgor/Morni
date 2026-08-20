@@ -91,17 +91,11 @@ export function HomeStores({
           }`}
         >
           <div className="min-w-0">
-            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b5a60] sm:mb-2">
-              Shop local
-            </p>
             <h2 className="shop-section-title">
               {activeSelection === "all"
                 ? "Stores near you"
                 : `Stores in ${emirateLabel(activeSelection)}`}
             </h2>
-            <p className="shop-section-copy">
-              Same-day delivery from local retail floors.
-            </p>
           </div>
           {layout === "rail" ? (
             <EmirateFilters

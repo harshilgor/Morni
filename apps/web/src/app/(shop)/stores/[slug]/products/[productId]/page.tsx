@@ -400,7 +400,7 @@ export default function ProductPage() {
 
         <section className="min-w-0 lg:sticky lg:top-20">
           <div className="hidden justify-end lg:flex">
-            <WishlistToggle productId={product.id} />
+            <WishlistToggle productId={product.id} tone="inline" />
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">{store.name}</p>
           <h1 className="mt-2 font-display text-[2.45rem] leading-[0.97] text-ink sm:text-5xl lg:text-[1.95rem] lg:leading-[1.02] xl:text-[2.15rem]">{product.title}</h1>
@@ -450,7 +450,7 @@ export default function ProductPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-background/92 px-4 py-3 shadow-[0_-10px_30px_-18px_rgba(28,20,24,0.18)] backdrop-blur-xl sm:hidden">
         <div className="mx-auto flex max-w-lg items-center gap-3">
-          <WishlistToggle productId={product.id} size="lg" />
+          <WishlistToggle productId={product.id} size="lg" tone="inline" />
           <div className="relative min-w-0 flex-1">
             <AddToBagButton
               label={addLabel}

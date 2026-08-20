@@ -60,6 +60,7 @@ export function ProductCard({
   href,
   rating,
   onWishlistChange,
+  sharp = false,
 }: {
   product: {
     id: string;
@@ -71,6 +72,8 @@ export function ProductCard({
   href: string;
   rating?: ProductRatingSummary | null;
   onWishlistChange?: (isWished: boolean) => void;
+  /** Squared edges to match featured-category aesthetic */
+  sharp?: boolean;
 }) {
   const image = product.image_urls?.[0];
   const showRating = rating && rating.reviewCount > 0;
@@ -78,9 +81,19 @@ export function ProductCard({
   return (
     <Link
       href={href}
-      className="group relative block min-w-0 overflow-hidden rounded-lg border border-line/70 bg-white/75 p-1.5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5"
+      className={
+        sharp
+          ? "group relative block min-w-0"
+          : "group relative block min-w-0 overflow-hidden rounded-lg border border-line/70 bg-white/75 p-1.5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5"
+      }
     >
-      <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-sand sm:rounded-xl">
+      <div
+        className={
+          sharp
+            ? "relative aspect-[4/5] overflow-hidden bg-[#f2ece8]"
+            : "relative aspect-[4/5] overflow-hidden rounded-md bg-sand sm:rounded-xl"
+        }
+      >
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -91,19 +104,37 @@ export function ProductCard({
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
           />
         ) : null}
-        <div className="absolute right-1.5 top-1.5 z-10 sm:right-2.5 sm:top-2.5">
-          <WishlistToggle
-            productId={product.id}
-            size="sm"
-            onChange={onWishlistChange}
-          />
-        </div>
+        {!sharp ? (
+          <div className="absolute right-1.5 top-1.5 z-10 sm:right-2.5 sm:top-2.5">
+            <WishlistToggle
+              productId={product.id}
+              size="sm"
+              onChange={onWishlistChange}
+            />
+          </div>
+        ) : null}
       </div>
-      <div className="space-y-0.5 px-0.5 pb-0.5 pt-1.5 sm:space-y-1.5 sm:px-1 sm:pb-1 sm:pt-3">
-        <h3 className="line-clamp-2 text-[11px] font-medium leading-snug text-ink sm:text-sm">
-          {product.title}
-        </h3>
-        {showRating ? (
+      <div
+        className={
+          sharp
+            ? "mt-2 space-y-0 sm:mt-2.5"
+            : "space-y-0.5 px-0.5 pb-0.5 pt-1.5 sm:space-y-1.5 sm:px-1 sm:pb-1 sm:pt-3"
+        }
+      >
+        <div className="flex items-start gap-0.5">
+          <h3 className="min-w-0 flex-1 line-clamp-2 text-[11px] font-medium leading-snug text-ink sm:text-sm">
+            {product.title}
+          </h3>
+          {sharp ? (
+            <WishlistToggle
+              productId={product.id}
+              size="sm"
+              tone="inline"
+              onChange={onWishlistChange}
+            />
+          ) : null}
+        </div>
+        {!sharp && showRating ? (
           <div className="flex items-center gap-1 sm:gap-1.5">
             <StarRating value={rating.avgRating} />
             <span className="text-[10px] font-medium text-ink/85 sm:text-xs">
@@ -112,7 +143,11 @@ export function ProductCard({
             <span className="hidden text-xs text-muted sm:inline">({rating.reviewCount})</span>
           </div>
         ) : null}
-        <div className="flex items-center gap-1 text-[11px] font-medium sm:gap-1.5 sm:text-sm">
+        <div
+          className={`flex items-center gap-1 text-[11px] font-medium sm:gap-1.5 sm:text-sm ${
+            sharp ? "mt-0.5" : ""
+          }`}
+        >
           <span>{formatAed(product.price_aed)}</span>
           {product.compare_at_price_aed ? (
             <span className="text-[10px] font-normal text-muted line-through sm:text-xs">

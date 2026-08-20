@@ -22,14 +22,12 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
   return (
     <section className="w-full bg-white py-8 sm:py-12">
       <div className="px-4 text-center sm:px-6">
-        <h2 className="text-xs font-bold uppercase tracking-[0.24em] text-ink sm:text-sm sm:tracking-[0.28em]">
-          New and popular
-        </h2>
+        <h2 className="shop-section-title">New and popular</h2>
       </div>
 
-      <div className="sticky top-[var(--site-header-height,0px)] z-40 mt-4 border-y border-[#e8e8e8] bg-white/95 px-4 py-2 shadow-[0_8px_18px_-16px_rgba(28,20,24,0.5)] backdrop-blur sm:mt-5 sm:px-6 sm:py-3">
+      <div className="sticky top-[var(--site-header-height,0px)] z-40 mt-4 border-y border-[#e8e8e8] bg-white/95 px-4 py-3 shadow-[0_8px_18px_-16px_rgba(28,20,24,0.5)] backdrop-blur sm:mt-5 sm:px-6 sm:py-4">
         <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0">
-          <div className="mx-auto flex max-h-[3.875rem] w-max min-w-full flex-col flex-wrap content-start gap-1.5 sm:max-h-none sm:w-auto sm:max-w-7xl sm:flex-row sm:flex-wrap sm:content-normal sm:justify-center sm:gap-2">
+          <div className="mx-auto flex w-max min-w-full flex-wrap justify-center gap-x-5 gap-y-2.5 sm:w-auto sm:max-w-7xl sm:gap-x-6 sm:gap-y-3">
             {tabs.map((tab) => {
               const isActive = tab.slug === active.slug;
               return (
@@ -38,10 +36,10 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
                   type="button"
                   onClick={() => setActiveSlug(tab.slug)}
                   aria-pressed={isActive}
-                  className={`h-7 shrink-0 border px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] transition sm:h-auto sm:px-4 sm:py-1.5 sm:text-[11px] sm:tracking-[0.12em] ${
+                  className={`shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] transition sm:text-[11px] sm:tracking-[0.12em] ${
                     isActive
-                      ? "border-ink bg-ink text-white"
-                      : "border-line bg-white text-ink hover:border-ink/40"
+                      ? "text-ink underline underline-offset-4"
+                      : "text-muted hover:text-ink"
                   }`}
                 >
                   {tab.label}
@@ -68,13 +66,15 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
                   className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                 />
               ) : null}
-              <div className="absolute right-1 top-1 z-10 sm:right-2 sm:top-2">
-                <WishlistToggle productId={product.id} size="sm" />
-              </div>
             </div>
-            <div className="space-y-0.5 p-1.5 sm:space-y-1 sm:p-3">
-              <h3 className="line-clamp-1 text-[11px] text-ink sm:text-xs">{product.title}</h3>
-              <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="space-y-0 p-1.5 sm:p-3">
+              <div className="flex items-start gap-0.5">
+                <h3 className="min-w-0 flex-1 line-clamp-1 text-[11px] leading-snug text-ink sm:text-xs">
+                  {product.title}
+                </h3>
+                <WishlistToggle productId={product.id} size="sm" tone="inline" />
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5 sm:gap-2">
                 <span className="text-[11px] font-semibold text-ink sm:text-xs">
                   {formatAed(product.price_aed)}
                 </span>

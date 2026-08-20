@@ -22,10 +22,7 @@ export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-deep sm:text-[11px]">
-        Shop by intent
-      </p>
-      <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-1 sm:mt-3 sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {intents.map((intent) => {
           const selected = intent.id === active.id;
           return (
@@ -59,8 +56,13 @@ export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
       {active.products.length > 0 ? (
         <div className="shop-rail mt-4 sm:mt-5">
           {active.products.map((product) => (
-            <div key={product.id} className="shop-rail-item">
-              <ProductCard product={product} href={product.href} rating={product.rating} />
+            <div key={product.id} className="shop-rail-item-lg">
+              <ProductCard
+                product={product}
+                href={product.href}
+                rating={product.rating}
+                sharp
+              />
             </div>
           ))}
         </div>

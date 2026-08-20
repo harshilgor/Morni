@@ -1,32 +1,46 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
-import { HeartFilledIcon, HeartIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUser } from "@/lib/use-auth-user";
 import { cn } from "@/lib/utils";
 
-function HeartIconComponent({
+function HeartIcon({
   filled,
   size,
 }: {
   filled: boolean;
   size: "sm" | "md" | "lg";
 }) {
-  const iconClass = size === "lg" ? "size-5" : "size-[18px]";
-  const Icon = filled ? HeartFilledIcon : HeartIcon;
+  const dim = size === "lg" ? "size-5" : size === "sm" ? "size-5" : "size-[18px]";
 
-  return <Icon aria-hidden className={iconClass} />;
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={filled ? 1.25 : 1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={dim}
+    >
+      <path d="M12 20.25S3.75 15.1 3.75 9.4A4.65 4.65 0 0 1 12 6.75 4.65 4.65 0 0 1 20.25 9.4C20.25 15.1 12 20.25 12 20.25Z" />
+    </svg>
+  );
 }
 
 export function WishlistToggle({
   productId,
   size = "md",
+  tone = "onImage",
   onChange,
 }: {
   productId: string;
   size?: "sm" | "md" | "lg";
+  /** onImage = light stroke on photos; inline = muted ink beside product names */
+  tone?: "onImage" | "inline";
   onChange?: (isWished: boolean) => void;
 }) {
   const router = useRouter();
@@ -104,8 +118,8 @@ export function WishlistToggle({
           setIsWished(true);
           onChange?.(true);
           btnRef.current?.animate(
-            [{ transform: "scale(1)" }, { transform: "scale(1.25)" }, { transform: "scale(1)" }],
-            { duration: 300, easing: "ease-out" },
+            [{ transform: "scale(1)" }, { transform: "scale(1.12)" }, { transform: "scale(1)" }],
+            { duration: 280, easing: "ease-out" },
           );
         }
       }
@@ -115,7 +129,13 @@ export function WishlistToggle({
   }
 
   const btnClass =
-    size === "sm" ? "h-9 w-9" : size === "lg" ? "h-14 w-14 shrink-0" : "h-10 w-10";
+    size === "sm"
+      ? tone === "inline"
+        ? "size-5"
+        : "h-7 w-7"
+      : size === "lg"
+        ? "h-11 w-11 shrink-0"
+        : "h-8 w-8";
 
   return (
     <button
@@ -125,15 +145,20 @@ export function WishlistToggle({
       disabled={busy}
       aria-label={isWished ? "Remove from wishlist" : "Add to wishlist"}
       className={cn(
-        "inline-flex items-center justify-center rounded-full border bg-white transition backdrop-blur-sm",
+        "inline-flex shrink-0 items-center justify-center rounded-full transition",
         btnClass,
-        isWished
-          ? "border-accent-deep/30 text-accent-deep shadow-sm"
-          : "border-line text-muted hover:border-accent-deep/25 hover:text-accent-deep",
+        tone === "inline" && size === "sm" && "mt-px",
+        tone === "inline"
+          ? isWished
+            ? "text-accent-deep/75 hover:text-accent-deep"
+            : "text-ink/35 hover:text-ink/70"
+          : isWished
+            ? "text-accent-deep/80 hover:text-accent-deep"
+            : "text-white/80 drop-shadow-[0_1px_2px_rgba(28,20,24,0.45)] hover:text-white",
         busy && "opacity-70",
       )}
     >
-      <HeartIconComponent filled={isWished} size={size} />
+      <HeartIcon filled={isWished} size={size} />
     </button>
   );
 }

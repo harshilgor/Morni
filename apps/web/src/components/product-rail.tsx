@@ -18,12 +18,15 @@ export function ProductRail({
   subtitle,
   products,
   href,
+  sharp = false,
 }: {
   id?: string;
   title: string;
   subtitle?: string;
   products: RailProduct[];
   href?: string;
+  /** Match Shop by intent: bare photo + name + price, larger cards */
+  sharp?: boolean;
 }) {
   if (products.length === 0) return null;
 
@@ -45,8 +48,16 @@ export function ProductRail({
       </div>
       <div className="shop-rail">
         {products.map((product) => (
-          <div key={product.id} className="shop-rail-item">
-            <ProductCard product={product} href={product.href} rating={product.rating} />
+          <div
+            key={product.id}
+            className={sharp ? "shop-rail-item-lg" : "shop-rail-item"}
+          >
+            <ProductCard
+              product={product}
+              href={product.href}
+              rating={product.rating}
+              sharp={sharp}
+            />
           </div>
         ))}
       </div>

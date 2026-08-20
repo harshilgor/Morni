@@ -88,11 +88,6 @@ export default async function HomePage({
     .slice(0, 10)
     .map((product) => toRailProduct(product));
 
-  const inStock = productList
-    .filter((product) => product.stock > 0)
-    .slice(0, 10)
-    .map((product) => toRailProduct(product));
-
   const newIn = productList
     .slice(0, 10)
     .map((product) => toRailProduct(product));
@@ -152,14 +147,6 @@ export default async function HomePage({
       href: "/search?sort=rated",
       products: topRated.length > 0 ? topRated : newIn,
     },
-    {
-      id: "in-stock",
-      label: "In stock",
-      title: "In stock",
-      subtitle: "Available now from boutiques near you.",
-      href: "/search?instock=1",
-      products: inStock,
-    },
   ];
 
   const categoryTabs: PopularTab[] = featured
@@ -214,9 +201,9 @@ export default async function HomePage({
 
       <ProductRail
         title="New in"
-        subtitle="Fresh drops from boutiques across the UAE."
         products={newIn}
         href="/search?sort=new"
+        sharp
       />
 
       <RecentlyViewedRail />
