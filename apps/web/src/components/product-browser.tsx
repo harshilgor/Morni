@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/cards";
+import { StoreProductRow } from "@/components/store-product-row";
 import { emirateLabel } from "@/lib/format";
 import { profileFromSwipes, type TasteProfile, type TasteSwipe } from "@/lib/for-you";
 import { readStoredForYouTaste } from "@/lib/for-you-storage";
@@ -23,6 +24,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export type BrowsableProduct = {
   id: string;
+  store_id?: string;
   title: string;
   description: string | null;
   price_aed: number;
@@ -294,6 +296,8 @@ export function ProductBrowser({
   ratings = {},
   hasMore: initialHasMore = false,
   loadMoreUrl,
+  variant = "default",
+  storeName,
 }: {
   products: BrowsableProduct[];
   categories?: { name: string; slug: string }[];
@@ -301,7 +305,10 @@ export function ProductBrowser({
   ratings?: Record<string, ProductRatingSummary>;
   hasMore?: boolean;
   loadMoreUrl?: string;
+  variant?: "default" | "store";
+  storeName?: string;
 }) {
+  const isStore = variant === "store";
   const supabase = useMemo(() => createClient(), []);
   const [loadedProducts, setLoadedProducts] = useState(products);
   const [loadedRatings, setLoadedRatings] = useState(ratings);
@@ -314,6 +321,7 @@ export function ProductBrowser({
   const loadTriggerRef = useRef<HTMLDivElement>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState("recommended");
+  const [storeTab, setStoreTab] = useState("all");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [tasteProfile, setTasteProfile] = useState<TasteProfile | null>(null);
@@ -565,6 +573,33 @@ export function ProductBrowser({
   function clearAll() {
     setVisible(PAGE_SIZE);
     setFilters(EMPTY_FILTERS);
+    if (isStore) {
+      setStoreTab("all");
+      setSort("recommended");
+    }
+  }
+
+  function selectStoreTab(tab: string) {
+    setVisible(PAGE_SIZE);
+    setStoreTab(tab);
+    setForYouActive(false);
+    if (tab === "all") {
+      setFilters((prev) => ({ ...prev, category: [] }));
+      setSort("recommended");
+      return;
+    }
+    if (tab === "bestselling") {
+      setFilters((prev) => ({ ...prev, category: [] }));
+      setSort("rated");
+      return;
+    }
+    if (tab === "new") {
+      setFilters((prev) => ({ ...prev, category: [] }));
+      setSort("new");
+      return;
+    }
+    setFilters((prev) => ({ ...prev, category: [tab] }));
+    setSort("recommended");
   }
 
   function toggleForYou() {
@@ -601,10 +636,12 @@ export function ProductBrowser({
       label: storeOptions.find(([slug]) => slug === id)?.[1] ?? id,
       onRemove: () => toggle("stores", id),
     })),
-    ...filters.category.map((id) => ({
-      label: categoryOptions.find(([slug]) => slug === id)?.[1] ?? id,
-      onRemove: () => toggle("category", id),
-    })),
+    ...(isStore
+      ? []
+      : filters.category.map((id) => ({
+          label: categoryOptions.find(([slug]) => slug === id)?.[1] ?? id,
+          onRemove: () => toggle("category", id),
+        }))),
     ...(filters.onSale
       ? [{ label: "On sale", onRemove: () => toggleFlag("onSale") }]
       : []),
@@ -640,7 +677,7 @@ export function ProductBrowser({
         </div>
       ) : null}
 
-      {categoryOptions.length > 1 ? (
+      {categoryOptions.length > 1 && !isStore ? (
         <FilterSection
           title="Category"
           defaultOpen
@@ -742,7 +779,7 @@ export function ProductBrowser({
         </FilterSection>
       ) : null}
 
-      {emirateOptions.length > 1 ? (
+      {emirateOptions.length > 1 && !isStore ? (
         <FilterSection title="Emirate" activeCount={filters.emirates.length}>
           {emirateOptions.map((value) => (
             <OptionRow
@@ -756,7 +793,7 @@ export function ProductBrowser({
         </FilterSection>
       ) : null}
 
-      {storeOptions.length > 1 ? (
+      {storeOptions.length > 1 && !isStore ? (
         <FilterSection title="Store" activeCount={filters.stores.length}>
           {storeOptions.map(([slug, name]) => (
             <OptionRow
@@ -794,8 +831,15 @@ export function ProductBrowser({
     </div>
   );
 
+  const storeTabs = [
+    { id: "all", label: "All" },
+    { id: "bestselling", label: "Bestselling" },
+    { id: "new", label: "New in" },
+    ...categoryOptions.map(([slug, name]) => ({ id: slug, label: name })),
+  ];
+
   return (
-    <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-10">
+    <div className={isStore ? "lg:grid lg:grid-cols-[220px_1fr] lg:gap-8" : "lg:grid lg:grid-cols-[240px_1fr] lg:gap-10"}>
       <aside className="hidden lg:block">
         <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pr-2">
           <div className="flex items-center justify-between">
@@ -815,7 +859,7 @@ export function ProductBrowser({
 
           <div className="mt-3">{panel}</div>
 
-          {categories && categories.length > 0 ? (
+          {!isStore && categories && categories.length > 0 ? (
             <div className="border-t border-line/70 pt-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink">
                 Categories
@@ -841,9 +885,52 @@ export function ProductBrowser({
       </aside>
 
       <div>
-        <div className="sticky top-[7.35rem] z-20 -mx-4 border-b border-line/80 bg-background/95 px-4 py-2 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
-          <div className="flex items-center gap-2 lg:flex-wrap lg:justify-between lg:gap-3">
-            {categoryIsPreferred ? (
+        {isStore ? (
+          <div
+            className="sticky z-30 -mx-4 mb-3 border-b border-line bg-white/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:mx-0 lg:rounded-2xl lg:border lg:px-3"
+            style={{ top: "var(--site-header-height, 0px)" }}
+          >
+            <div className="flex items-center gap-1 overflow-x-auto py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {storeTabs.map((tab) => {
+                const active = storeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => selectStoreTab(tab.id)}
+                    className={`shrink-0 border-b-2 px-3 py-2 text-sm transition ${
+                      active
+                        ? "border-ink font-semibold text-ink"
+                        : "border-transparent text-muted hover:text-ink"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(true)}
+                className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-ink transition hover:border-ink/40 lg:hidden"
+                aria-label="Open filters"
+              >
+                <span aria-hidden className="text-base leading-none">
+                  &#9776;
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div
+          className={
+            isStore
+              ? "flex flex-wrap items-center justify-between gap-2"
+              : "sticky top-[7.35rem] z-20 -mx-4 border-b border-line/80 bg-background/95 px-4 py-2 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0"
+          }
+        >
+          <div className={`flex items-center gap-2 ${isStore ? "" : "lg:flex-wrap lg:justify-between lg:gap-3"}`}>
+            {!isStore && categoryIsPreferred ? (
               <button
                 type="button"
                 onClick={toggleForYou}
@@ -858,14 +945,16 @@ export function ProductBrowser({
                 For you
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(true)}
-              className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-line bg-surface px-2.5 text-[11px] font-semibold text-ink transition hover:border-ink/40 lg:hidden"
-            >
-              <span aria-hidden="true">&#9881;</span>
-              Filters{activeCount > 0 ? ` (${activeCount})` : ""}
-            </button>
+            {!isStore ? (
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(true)}
+                className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-line bg-surface px-2.5 text-[11px] font-semibold text-ink transition hover:border-ink/40 lg:hidden"
+              >
+                <span aria-hidden="true">&#9881;</span>
+                Filters{activeCount > 0 ? ` (${activeCount})` : ""}
+              </button>
+            ) : null}
             <label className="relative inline-flex h-8 min-w-0 max-w-[9.5rem] items-center gap-1 overflow-hidden rounded-full border border-line bg-surface px-2.5 text-[11px] text-ink lg:max-w-none lg:h-auto lg:overflow-visible lg:px-3 lg:py-1.5 lg:text-xs">
               <span className="hidden shrink-0 text-muted lg:inline">Sort</span>
               <span className="min-w-0 flex-1 truncate font-semibold lg:hidden">
@@ -873,7 +962,13 @@ export function ProductBrowser({
               </span>
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value)}
+                onChange={(e) => {
+                  setSort(e.target.value);
+                  if (isStore && (storeTab === "bestselling" || storeTab === "new")) {
+                    setStoreTab("all");
+                    setFilters((prev) => ({ ...prev, category: [] }));
+                  }
+                }}
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0 lg:static lg:h-auto lg:w-auto lg:flex-1 lg:cursor-default lg:opacity-100"
                 aria-label="Sort products"
               >
@@ -901,49 +996,51 @@ export function ProductBrowser({
           </div>
         ) : null}
 
-        <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <button
-            type="button"
-            onClick={clearAll}
-            className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium transition ${
-              activeCount === 0
-                ? "border-ink bg-ink text-white"
-                : "border-line bg-white text-ink hover:border-ink/40"
-            }`}
-          >
-            All
-          </button>
-          {[
-            {
-              label: "On sale",
-              active: filters.onSale,
-              onClick: () => toggleFlag("onSale"),
-            },
-            {
-              label: "Under AED 199",
-              active: filters.price.includes("99-199"),
-              onClick: () => toggle("price", "99-199"),
-            },
-            {
-              label: "In stock",
-              active: filters.inStock,
-              onClick: () => toggleFlag("inStock"),
-            },
-          ].map((chip) => (
+        {!isStore ? (
+          <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
-              key={chip.label}
               type="button"
-              onClick={chip.onClick}
+              onClick={clearAll}
               className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium transition ${
-                chip.active
+                activeCount === 0
                   ? "border-ink bg-ink text-white"
                   : "border-line bg-white text-ink hover:border-ink/40"
               }`}
             >
-              {chip.label}
+              All
             </button>
-          ))}
-        </div>
+            {[
+              {
+                label: "On sale",
+                active: filters.onSale,
+                onClick: () => toggleFlag("onSale"),
+              },
+              {
+                label: "Under AED 199",
+                active: filters.price.includes("99-199"),
+                onClick: () => toggle("price", "99-199"),
+              },
+              {
+                label: "In stock",
+                active: filters.inStock,
+                onClick: () => toggleFlag("inStock"),
+              },
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={chip.onClick}
+                className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium transition ${
+                  chip.active
+                    ? "border-ink bg-ink text-white"
+                    : "border-line bg-white text-ink hover:border-ink/40"
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {activePills.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -977,22 +1074,46 @@ export function ProductBrowser({
           </div>
         ) : (
           <>
-            <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
-              {sorted.slice(0, visible).map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={{
-                    id: product.id,
-                    title: product.title,
-                    price_aed: Number(product.price_aed),
-                    compare_at_price_aed: product.compare_at_price_aed,
-                    image_urls: product.image_urls ?? [],
-                  }}
-                  rating={loadedRatings[product.id] ?? null}
-                  href={`/stores/${product.stores.slug}/products/${product.id}`}
-                />
-              ))}
-            </div>
+            {isStore ? (
+              <div className="mt-1 rounded-[1.35rem] border border-line bg-white px-4 sm:px-5">
+                {sorted.slice(0, visible).map((product) => (
+                  <StoreProductRow
+                    key={product.id}
+                    product={{
+                      id: product.id,
+                      store_id: product.store_id ?? "",
+                      title: product.title,
+                      description: product.description,
+                      price_aed: Number(product.price_aed),
+                      compare_at_price_aed: product.compare_at_price_aed,
+                      image_urls: product.image_urls,
+                      sizes: product.sizes,
+                      stock: product.stock,
+                    }}
+                    storeName={storeName ?? product.stores.name}
+                    rating={loadedRatings[product.id] ?? null}
+                    href={`/stores/${product.stores.slug}/products/${product.id}`}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
+                {sorted.slice(0, visible).map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={{
+                      id: product.id,
+                      title: product.title,
+                      price_aed: Number(product.price_aed),
+                      compare_at_price_aed: product.compare_at_price_aed,
+                      image_urls: product.image_urls ?? [],
+                    }}
+                    rating={loadedRatings[product.id] ?? null}
+                    href={`/stores/${product.stores.slug}/products/${product.id}`}
+                  />
+                ))}
+              </div>
+            )}
             {loadMoreUrl && hasMore ? (
               <div ref={loadTriggerRef} className="mt-8 flex min-h-12 justify-center">
                 <button
@@ -1020,7 +1141,7 @@ export function ProductBrowser({
                 We could not load more pieces. Please try again.
               </p>
             ) : null}
-            {sorted.length > 0 && sorted.length <= 4 && categories && categories.length > 0 ? (
+            {!isStore && sorted.length > 0 && sorted.length <= 4 && categories && categories.length > 0 ? (
               <div className="mt-10 border-t border-line pt-7">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">
                   Keep exploring

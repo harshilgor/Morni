@@ -18,8 +18,11 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@morni/delivery/*": ["../delivery/src/*"],
+      "@morni/founder/*": ["../founder/src/*"]
     }
   },
   "include": [
@@ -28,7 +31,11 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "../delivery/src/**/*.ts",
+    "../delivery/src/**/*.tsx",
+    "../founder/src/**/*.ts",
+    "../founder/src/**/*.tsx"
   ],
   "exclude": ["node_modules"]
 }

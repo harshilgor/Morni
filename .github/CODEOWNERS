@@ -1,0 +1,14 @@
+# CODEOWNERS — keep extension work in separate trees
+# Update GitHub usernames when teammates join.
+
+# Marketplace + store portal
+/apps/web/ @harshilgor
+
+# Delivery extension (partner + rider)
+/apps/delivery/ @harshilgor
+
+# Founder extension
+/apps/founder/ @harshilgor
+
+# Shared backend
+/supabase/ @harshilgor

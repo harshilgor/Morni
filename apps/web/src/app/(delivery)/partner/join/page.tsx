@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { DeliveryInviteJoin } from "@/components/delivery-invite-join";
+import { DeliveryInviteJoin } from "@morni/delivery/components/delivery-invite-join";
 
-export default function DriverJoinPage() {
+export default function PartnerJoinPage() {
   return (
     <Suspense fallback={<main className="grid min-h-dvh place-items-center text-sm text-[#65756d]">Loading invite…</main>}>
-      <DeliveryInviteJoin target="driver" />
+      <DeliveryInviteJoin target="partner" />
     </Suspense>
   );
 }

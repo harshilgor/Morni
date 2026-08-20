@@ -4,11 +4,15 @@ UAE marketplace for local retail — browse boutiques, shop online, same-day del
 
 ## Monorepo
 
-| Path | What |
-|---|---|
-| `apps/web` | Next.js shopper site + store-owner portal |
-| `apps/ios` | Native SwiftUI shopper app |
-| `supabase` | Schema, RLS, seed migrations |
+| Path | What | Typical owner |
+|---|---|---|
+| `apps/web` | Shopper marketplace + store-owner portal | Marketplace team |
+| `apps/delivery` | Partner dispatch + rider apps (`/partner`, `/driver`) | Delivery team |
+| `apps/founder` | Founder control tower (`/founder`) | Founder/ops team |
+| `apps/ios` | Native SwiftUI shopper app | Mobile team |
+| `supabase` | Schema, RLS, seed migrations | Shared |
+
+Extension apps (`delivery`, `founder`) are separate folders so teammates can work without stepping on marketplace files. They are mounted into `apps/web` via thin route re-exports until they get their own Vercel projects.
 
 ## Quick start (web)
 
@@ -24,6 +28,15 @@ Open http://localhost:3000
 - Shopper: `/`
 - Auth: `/auth`
 - Store portal: `/portal`
+- Delivery partner: `/partner`
+- Rider: `/driver`
+- Founder: `/founder`
+
+## Team workflow
+
+1. Prefer editing files inside your owned app folder (`apps/web`, `apps/delivery`, or `apps/founder`).
+2. Push to `main` (or open a PR) — Vercel deploys from `apps/web`.
+3. See each app’s `README.md` for ownership boundaries.
 
 ## Supabase
 

@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { formatAed } from "@/lib/format";
 import { WishlistToggle } from "@/components/wishlist-toggle";
-import { useRevealOnce } from "@/lib/use-scroll-reveal";
 import type { RailProduct } from "@/components/product-rail";
 
 export type PopularTab = {
@@ -17,13 +16,12 @@ export type PopularTab = {
 export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
   const [activeSlug, setActiveSlug] = useState(tabs[0]?.slug ?? "");
   const active = tabs.find((tab) => tab.slug === activeSlug) ?? tabs[0];
-  const headingRef = useRevealOnce<HTMLDivElement>({ distance: 10 });
 
   if (!active || active.products.length === 0) return null;
 
   return (
     <section className="w-full bg-white py-8 sm:py-12">
-      <div ref={headingRef} className="px-4 text-center sm:px-6">
+      <div className="px-4 text-center sm:px-6">
         <h2 className="text-xs font-bold uppercase tracking-[0.24em] text-ink sm:text-sm sm:tracking-[0.28em]">
           New and popular
         </h2>

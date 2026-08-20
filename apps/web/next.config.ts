@@ -1,6 +1,20 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Include sibling extension apps (delivery, founder) in Turbopack's resolve root.
+  turbopack: {
+    root: path.join(__dirname, ".."),
+    resolveAlias: {
+      "@morni/delivery": path.join(__dirname, "../delivery/src"),
+      "@morni/founder": path.join(__dirname, "../founder/src"),
+      "@": path.join(__dirname, "src"),
+    },
+  },
+  // Allow apps/web to mount extension UI from apps/delivery and apps/founder.
+  experimental: {
+    externalDir: true,
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     qualities: [75],

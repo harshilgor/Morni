@@ -1,17 +1,11 @@
-"use client";
-
 import Link from "next/link";
 import type { BrowseCategory } from "@/lib/browse-categories";
-import { useRevealOnce, useScrollReveal } from "@/lib/use-scroll-reveal";
 
 export function FeaturedCategories({
   categories,
 }: {
   categories: BrowseCategory[];
 }) {
-  const headingRef = useRevealOnce<HTMLDivElement>({ distance: 10 });
-  const gridRef = useScrollReveal<HTMLDivElement>({ selector: "[data-reveal]", stagger: 45, distance: 14 });
-
   if (categories.length === 0) return null;
 
   const imageFor = (category: BrowseCategory) =>
@@ -34,7 +28,7 @@ export function FeaturedCategories({
   return (
     <section className="w-full border-y border-[#dfd8d3] bg-[#faf7f5] py-14 sm:py-18">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div ref={headingRef} className="mb-8 flex flex-col items-center text-center sm:mb-10">
+        <div className="mb-8 flex flex-col items-center text-center sm:mb-10">
           <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-accent-deep sm:text-xs">
             Find your signature look
           </p>
@@ -44,12 +38,11 @@ export function FeaturedCategories({
         </div>
 
         <div className="-mx-4 sm:mx-0">
-          <div ref={gridRef} className="grid grid-cols-3 gap-[2px] bg-[#ded7d2] sm:gap-0 sm:border-l sm:border-t sm:border-[#ded7d2] sm:bg-transparent lg:grid-cols-4 xl:grid-cols-6">
+          <div className="grid grid-cols-3 gap-[2px] bg-[#ded7d2] sm:gap-0 sm:border-l sm:border-t sm:border-[#ded7d2] sm:bg-transparent lg:grid-cols-4 xl:grid-cols-6">
             {categories.map((category, index) => (
               <Link
                 key={category.id}
                 href={`/categories/${category.slug}`}
-                data-reveal
                 className="group relative flex min-w-0 flex-col bg-white transition duration-300 hover:z-10 sm:border-b sm:border-r sm:border-[#ded7d2] sm:hover:border-[#9d5369] sm:hover:shadow-[0_18px_45px_-30px_rgba(53,31,38,0.7)]"
               >
                 <div className="flex h-[4.75rem] shrink-0 items-start justify-between gap-1.5 px-2.5 pb-2 pt-3 sm:h-[6.5rem] sm:gap-2 sm:px-5 sm:pb-3 sm:pt-5">

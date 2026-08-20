@@ -9,6 +9,7 @@ export async function proxy(request: NextRequest) {
     "/cart",
     "/checkout",
     "/driver",
+    "/founder",
     "/orders",
     "/partner",
     "/portal",

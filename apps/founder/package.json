@@ -1,0 +1,14 @@
+{
+  "name": "@morni/founder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Morni founder control-tower extension.",
+  "exports": {
+    "./components/*": "./src/components/*"
+  },
+  "peerDependencies": {
+    "next": ">=15",
+    "react": ">=19",
+    "react-dom": ">=19"
+  }
+}

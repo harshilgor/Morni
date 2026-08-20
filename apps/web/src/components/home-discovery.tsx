@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ProductCard } from "@/components/cards";
-import { useRevealOnce, useScrollReveal } from "@/lib/use-scroll-reveal";
 import type { RailProduct } from "@/components/product-rail";
 
 export type IntentRail = {
@@ -18,13 +17,11 @@ export type IntentRail = {
 export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
   const [activeId, setActiveId] = useState(intents[0]?.id ?? "");
   const active = intents.find((intent) => intent.id === activeId) ?? intents[0];
-  const sectionRef = useRevealOnce<HTMLElement>({ distance: 10 });
-  const railRef = useScrollReveal<HTMLDivElement>({ selector: ".shop-rail-item", stagger: 50, distance: 16 });
 
   if (!active) return null;
 
   return (
-    <section ref={sectionRef} className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-deep sm:text-[11px]">
         Shop by intent
       </p>
@@ -60,7 +57,7 @@ export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
       </div>
 
       {active.products.length > 0 ? (
-        <div ref={railRef} className="shop-rail mt-4 sm:mt-5">
+        <div className="shop-rail mt-4 sm:mt-5">
           {active.products.map((product) => (
             <div key={product.id} className="shop-rail-item">
               <ProductCard product={product} href={product.href} rating={product.rating} />
