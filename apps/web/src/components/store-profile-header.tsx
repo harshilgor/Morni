@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { emirateLabel, formatAed } from "@/lib/format";
+import { emirateLabel } from "@/lib/format";
 import { formatRatingLabel } from "@/lib/product-ratings";
 import type { Store } from "@/lib/types";
 
@@ -21,35 +21,25 @@ function deliveryEtaLabel(minutes: number) {
   return `${min}–${max} mins`;
 }
 
-function StarIcon() {
+function RatingCircles({ value }: { value: number }) {
+  const clamped = Math.max(0, Math.min(5, value));
   return (
-    <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5 fill-current">
-      <path d="M8 1.4 9.9 5.6l4.6.4-3.5 3 1.1 4.5L8 11.4 3.9 13.5l1.1-4.5-3.5-3 4.6-.4L8 1.4Z" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4 fill-none stroke-current">
-      <circle cx="10" cy="10" r="7.25" strokeWidth="1.5" />
-      <path d="M10 6.5V10l2.5 1.75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function BikeIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4 fill-none stroke-current">
-      <circle cx="5.5" cy="13.5" r="2.75" strokeWidth="1.5" />
-      <circle cx="14.5" cy="13.5" r="2.75" strokeWidth="1.5" />
-      <path
-        d="M8 13.5h3.2l2-5.2H16M5.5 13.5 8.2 6.8H11"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <span className="inline-flex items-center gap-0.5" aria-hidden>
+      {Array.from({ length: 5 }, (_, index) => {
+        const fill = Math.max(0, Math.min(1, clamped - index));
+        return (
+          <span
+            key={index}
+            className="relative inline-block h-2.5 w-2.5 overflow-hidden rounded-full border border-mint bg-white"
+          >
+            <span
+              className="absolute inset-y-0 left-0 bg-mint"
+              style={{ width: `${fill * 100}%` }}
+            />
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
@@ -65,8 +55,6 @@ export function StoreProfileHeader({
   hours,
   rating,
   reviewCount,
-  deliveryFeeAed = 7,
-  categoryLine,
   promos = [],
 }: {
   store: Store;
@@ -74,12 +62,11 @@ export function StoreProfileHeader({
   hours: string;
   rating: number | null;
   reviewCount: number;
-  deliveryFeeAed?: number;
-  categoryLine: string;
   promos?: StorePromo[];
 }) {
   const eta = deliveryEtaLabel(store.delivery_eta_minutes || 60);
   const location = `${store.area}, ${emirateLabel(store.emirate)}`;
+  const showRating = rating != null && reviewCount > 0;
 
   return (
     <section className="relative">
@@ -141,65 +128,26 @@ export function StoreProfileHeader({
                 <h1 className="mt-1.5 font-display text-[1.85rem] leading-none tracking-tight text-ink sm:text-4xl">
                   {store.name}
                 </h1>
-                <p className="mt-1.5 truncate text-sm text-muted">{categoryLine}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 divide-x divide-line border-t border-line">
-              <div className="px-1 py-3 text-center sm:px-3 sm:py-4">
-                {rating != null && reviewCount > 0 ? (
-                  <>
-                    <p className="flex items-center justify-center gap-1 text-base font-semibold text-mint sm:text-lg">
-                      {formatRatingLabel(rating)}
-                      <span className="text-mint">
-                        <StarIcon />
-                      </span>
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-muted sm:text-xs">
-                      {reviewCount >= 100
-                        ? `${reviewCount}+ ratings`
-                        : `${reviewCount} rating${reviewCount === 1 ? "" : "s"}`}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-semibold text-ink sm:text-base">New</p>
-                    <p className="mt-0.5 text-[11px] text-muted sm:text-xs">Be the first to rate</p>
-                  </>
-                )}
-              </div>
-
-              <div className="px-1 py-3 text-center sm:px-3 sm:py-4">
-                <p className="flex items-center justify-center gap-1 text-sm font-semibold text-mint sm:text-base">
-                  <ClockIcon />
-                  <span>{eta}</span>
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted sm:text-xs">Delivery by Morni</p>
-              </div>
-
-              <div className="px-1 py-3 text-center sm:px-3 sm:py-4">
-                <p className="flex items-center justify-center gap-1 text-sm font-semibold text-ink sm:text-base">
-                  <BikeIcon />
-                  <span>{formatAed(deliveryFeeAed)}</span>
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted sm:text-xs">Delivery fee</p>
+                {showRating ? (
+                  <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink">
+                    <span className="font-medium">{formatRatingLabel(rating)}</span>
+                    <RatingCircles value={rating} />
+                    <span className="text-muted">
+                      ({reviewCount.toLocaleString()}{" "}
+                      {reviewCount === 1 ? "review" : "reviews"})
+                    </span>
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-[#f0d9df] bg-[#fff6f8] px-4 py-3 sm:px-6">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-ink">
-                {openNow === false ? `Opens ${hours}` : `Today ${hours}`}
-              </p>
-              <p className="truncate text-xs text-muted">{location}</p>
-            </div>
-            <Link
-              href="#shop"
-              className="shrink-0 text-sm font-semibold text-accent-deep transition hover:text-ink"
-            >
-              Shop now
-            </Link>
+          <div className="border-t border-line px-4 py-3 sm:px-6">
+            <p className="truncate text-sm font-medium text-ink">
+              {openNow === false ? `Opens ${hours}` : `Today ${hours}`}
+              <span className="font-normal text-muted"> · {eta}</span>
+            </p>
+            <p className="truncate text-xs text-muted">{location}</p>
           </div>
         </motion.div>
 
@@ -239,12 +187,6 @@ export function StoreProfileHeader({
               );
             })}
           </motion.div>
-        ) : null}
-
-        {store.description ? (
-          <p className="mt-4 max-w-3xl text-sm leading-relaxed text-ink/80">
-            {store.description}
-          </p>
         ) : null}
       </div>
     </section>

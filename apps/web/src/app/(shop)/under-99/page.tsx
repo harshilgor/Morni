@@ -73,7 +73,12 @@ export default async function Under99Page() {
             </Link>
           </div>
         ) : (
-          <ProductBrowser products={products} categories={categories} ratings={ratings} />
+          <ProductBrowser
+            products={products}
+            categories={categories}
+            ratings={ratings}
+            showInStockFilter={false}
+          />
         )}
       </div>
     </div>

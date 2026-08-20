@@ -139,18 +139,6 @@ export default async function StorePage({
   const storeRating =
     reviewCount > 0 ? Number((ratingSum / reviewCount).toFixed(1)) : null;
 
-  const categoryNames = [
-    ...new Set(
-      browsable
-        .map((product) => product.category?.name)
-        .filter((name): name is string => Boolean(name)),
-    ),
-  ].slice(0, 3);
-  const categoryLine =
-    categoryNames.length > 0
-      ? `${categoryNames.join(", ")} · ${s.area}`
-      : `Local boutique · ${s.area}, ${emirateLabel(s.emirate)}`;
-
   const onSaleCount = browsable.filter(
     (product) =>
       product.compare_at_price_aed != null &&
@@ -178,13 +166,6 @@ export default async function StorePage({
       href: "#shop",
     });
   }
-  promos.push({
-    id: "same-day",
-    title: "Same-day delivery",
-    description: `Order from ${s.area} and get it today`,
-    tone: "sand",
-    cta: "Auto applied",
-  });
 
   return (
     <div className="min-h-screen bg-[#f8f7f4] pb-12">
@@ -209,7 +190,6 @@ export default async function StorePage({
           hours={hours}
           rating={storeRating}
           reviewCount={reviewCount}
-          categoryLine={categoryLine}
           promos={promos}
         />
       </div>
@@ -232,7 +212,6 @@ export default async function StorePage({
             products={browsable}
             ratings={ratings}
             variant="store"
-            storeName={s.name}
           />
         )}
       </div>

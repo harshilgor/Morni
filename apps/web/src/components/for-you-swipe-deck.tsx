@@ -9,8 +9,7 @@ import {
   type PanInfo,
 } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ForYouCard, TasteProfile } from "@/lib/for-you";
-import { vibeScoreForCard } from "@/lib/for-you";
+import type { ForYouCard } from "@/lib/for-you";
 import { formatAed } from "@/lib/format";
 
 const SWIPE_THRESHOLD = 55;
@@ -63,12 +62,10 @@ function SwipeProgress({ current, total }: { current: number; total: number }) {
 
 function SwipeCardFace({
   card,
-  vibe,
   likeOpacity,
   passOpacity,
 }: {
   card: ForYouCard;
-  vibe: number;
   likeOpacity?: ReturnType<typeof useTransform<number, number>>;
   passOpacity?: ReturnType<typeof useTransform<number, number>>;
 }) {
@@ -107,10 +104,6 @@ function SwipeCardFace({
         </>
       ) : null}
 
-      <div className="pointer-events-none absolute right-4 top-4 rounded-full bg-black/45 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-        Your vibe {vibe}%
-      </div>
-
       <div className="absolute inset-x-0 bottom-0 space-y-2 p-5">
         <div className="flex justify-center">
           <span className="rounded-full bg-white/95 px-4 py-1.5 text-sm font-semibold text-ink shadow-sm">
@@ -136,14 +129,12 @@ function ExitingCard({
   startX,
   targetX,
   velocity,
-  vibe,
   onComplete,
 }: {
   card: ForYouCard;
   startX: number;
   targetX: number;
   velocity: number;
-  vibe: number;
   onComplete: () => void;
 }) {
   const x = useMotionValue(startX);
@@ -164,7 +155,7 @@ function ExitingCard({
       className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px] bg-ink shadow-[0_24px_60px_-18px_rgba(28,20,24,0.45)]"
       aria-hidden
     >
-      <SwipeCardFace card={card} vibe={vibe} />
+      <SwipeCardFace card={card} />
     </motion.div>
   );
 }
@@ -211,7 +202,6 @@ function SwipeActions({
 export function ForYouSwipeDeck({
   deck,
   activeIndex,
-  profile,
   completedSwipes,
   minimumSwipes,
   canFinish,
@@ -220,7 +210,6 @@ export function ForYouSwipeDeck({
 }: {
   deck: ForYouCard[];
   activeIndex: number;
-  profile: TasteProfile;
   completedSwipes: number;
   minimumSwipes: number;
   canFinish: boolean;
@@ -242,7 +231,6 @@ export function ForYouSwipeDeck({
       startX: number;
       targetX: number;
       velocity: number;
-      vibe: number;
     }>
   >([]);
 
@@ -272,7 +260,6 @@ export function ForYouSwipeDeck({
           startX,
           targetX,
           velocity,
-          vibe: vibeScoreForCard(profile, current.categorySlug),
         },
       ]);
 
@@ -280,7 +267,7 @@ export function ForYouSwipeDeck({
       onVote(decision);
       busyRef.current = false;
     },
-    [current, onVote, profile, x],
+    [current, onVote, x],
   );
 
   const onDragEnd = (_: unknown, info: PanInfo) => {
@@ -290,8 +277,6 @@ export function ForYouSwipeDeck({
   };
 
   if (!current) return null;
-
-  const vibe = vibeScoreForCard(profile, current.categorySlug);
 
   return (
     <section
@@ -339,7 +324,7 @@ export function ForYouSwipeDeck({
             role="img"
             aria-label={`${current.title}. Swipe right to like or left to pass.`}
           >
-            <SwipeCardFace card={current} vibe={vibe} likeOpacity={likeOpacity} passOpacity={passOpacity} />
+            <SwipeCardFace card={current} likeOpacity={likeOpacity} passOpacity={passOpacity} />
           </motion.div>
 
           {exitingCards.map((entry) => (
@@ -349,7 +334,6 @@ export function ForYouSwipeDeck({
               startX={entry.startX}
               targetX={entry.targetX}
               velocity={entry.velocity}
-              vibe={entry.vibe}
               onComplete={() => removeExit(entry.key)}
             />
           ))}

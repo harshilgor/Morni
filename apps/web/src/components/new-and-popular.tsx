@@ -28,25 +28,27 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
       </div>
 
       <div className="sticky top-[var(--site-header-height,0px)] z-40 mt-4 border-y border-[#e8e8e8] bg-white/95 px-4 py-2 shadow-[0_8px_18px_-16px_rgba(28,20,24,0.5)] backdrop-blur sm:mt-5 sm:px-6 sm:py-3">
-        <div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-1.5 sm:gap-2">
-          {tabs.map((tab) => {
-            const isActive = tab.slug === active.slug;
-            return (
-              <button
-                key={tab.slug}
-                type="button"
-                onClick={() => setActiveSlug(tab.slug)}
-                aria-pressed={isActive}
-                className={`border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] transition sm:px-4 sm:py-1.5 sm:text-[11px] sm:tracking-[0.12em] ${
-                  isActive
-                    ? "border-ink bg-ink text-white"
-                    : "border-line bg-white text-ink hover:border-ink/40"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+        <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0">
+          <div className="mx-auto flex max-h-[3.875rem] w-max min-w-full flex-col flex-wrap content-start gap-1.5 sm:max-h-none sm:w-auto sm:max-w-7xl sm:flex-row sm:flex-wrap sm:content-normal sm:justify-center sm:gap-2">
+            {tabs.map((tab) => {
+              const isActive = tab.slug === active.slug;
+              return (
+                <button
+                  key={tab.slug}
+                  type="button"
+                  onClick={() => setActiveSlug(tab.slug)}
+                  aria-pressed={isActive}
+                  className={`h-7 shrink-0 border px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] transition sm:h-auto sm:px-4 sm:py-1.5 sm:text-[11px] sm:tracking-[0.12em] ${
+                    isActive
+                      ? "border-ink bg-ink text-white"
+                      : "border-line bg-white text-ink hover:border-ink/40"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

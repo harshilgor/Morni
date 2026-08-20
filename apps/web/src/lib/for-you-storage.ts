@@ -1,6 +1,10 @@
 "use client";
 
-import { emptyTasteProfile, type TasteProfile } from "@/lib/for-you";
+import {
+  emptyTasteProfile,
+  isTasteProfile,
+  type TasteProfile,
+} from "@/lib/for-you";
 
 export const FOR_YOU_STORAGE_KEY = "morni-for-you-taste";
 
@@ -17,8 +21,14 @@ export function readStoredForYouTaste(): StoredForYouTaste {
     const raw = window.localStorage.getItem(FOR_YOU_STORAGE_KEY);
     if (!raw) return { profile: emptyTasteProfile(), dismissedProductIds: [] };
     const value = JSON.parse(raw) as StoredForYouTaste;
-    if (!value.profile) throw new Error("Missing taste profile");
-    return { profile: value.profile, dismissedProductIds: value.dismissedProductIds ?? [] };
+    if (!isTasteProfile(value.profile)) {
+      window.localStorage.removeItem(FOR_YOU_STORAGE_KEY);
+      return { profile: emptyTasteProfile(), dismissedProductIds: [] };
+    }
+    return {
+      profile: value.profile,
+      dismissedProductIds: value.dismissedProductIds ?? [],
+    };
   } catch {
     return { profile: emptyTasteProfile(), dismissedProductIds: [] };
   }

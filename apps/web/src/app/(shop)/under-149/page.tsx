@@ -47,9 +47,6 @@ export default async function Under149Page() {
           <h1 className="font-display text-3xl text-ink sm:text-4xl">
             Under AED 149
           </h1>
-          <p className="mt-1.5 text-sm text-muted">
-            More budget-friendly picks from local UAE boutiques - same-day delivery available
-          </p>
         </div>
       </div>
 
@@ -76,7 +73,12 @@ export default async function Under149Page() {
             </Link>
           </div>
         ) : (
-          <ProductBrowser products={products} categories={categories} ratings={ratings} />
+          <ProductBrowser
+            products={products}
+            categories={categories}
+            ratings={ratings}
+            showInStockFilter={false}
+          />
         )}
       </div>
     </div>

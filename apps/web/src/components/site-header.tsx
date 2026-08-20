@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  motion,
+  useMotionValueEvent,
+  useReducedMotion,
+  useScroll,
+} from "motion/react";
 import { useCart } from "@/lib/cart";
 import { useLocation, isDeliverableEmirate } from "@/lib/location";
 import { useAuthUser } from "@/lib/use-auth-user";
@@ -113,17 +119,24 @@ export function SiteHeader() {
   const [locationOpen, setLocationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [deliveryBarVisible, setDeliveryBarVisible] = useState(true);
   const accountRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
+  const categoriesMobileRef = useRef<HTMLDivElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
+  const { scrollY } = useScroll();
+  const isHomePage = pathname === "/";
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (!accountRef.current?.contains(e.target as Node)) {
         setAccountOpen(false);
       }
-      if (!categoryMenuRef.current?.contains(e.target as Node)) {
+      const inCategoryBar = categoryMenuRef.current?.contains(e.target as Node);
+      const inMobileCategories = categoriesMobileRef.current?.contains(e.target as Node);
+      if (!inCategoryBar && !inMobileCategories) {
         setCategoriesOpen(false);
       }
     }
@@ -167,6 +180,43 @@ export function SiteHeader() {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [locationOpen]);
+
+  useEffect(() => {
+    if (!categoriesOpen) return;
+    const media = window.matchMedia("(max-width: 767px)");
+    if (!media.matches) return;
+
+    const previousOverflow = document.body.style.overflow;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setCategoriesOpen(false);
+    }
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [categoriesOpen]);
+
+  useEffect(() => {
+    if (!isHomePage) setDeliveryBarVisible(true);
+  }, [isHomePage]);
+
+  useMotionValueEvent(scrollY, "change", (current) => {
+    if (!isHomePage || locationOpen) {
+      setDeliveryBarVisible(true);
+      return;
+    }
+    if (current < 24) {
+      setDeliveryBarVisible(true);
+      return;
+    }
+    const previous = scrollY.getPrevious() ?? 0;
+    const diff = current - previous;
+    if (Math.abs(diff) < 6) return;
+    setDeliveryBarVisible(diff < 0);
+  });
+
   const isProductDetailPage = Boolean(
     pathname && /^\/stores\/[^/]+\/products\/[^/]+$/.test(pathname),
   );
@@ -194,12 +244,23 @@ export function SiteHeader() {
     }
   }
 
+  function isDesktopCategoriesMenu() {
+    return typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
+  }
+
   function openCategories() {
+    if (!isDesktopCategoriesMenu()) return;
     if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
     setCategoriesOpen(true);
   }
 
+  function toggleCategories() {
+    if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
+    setCategoriesOpen((current) => !current);
+  }
+
   function scheduleMenusClose() {
+    if (!isDesktopCategoriesMenu()) return;
     if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
     menuCloseTimer.current = window.setTimeout(() => {
       setCategoriesOpen(false);
@@ -431,6 +492,7 @@ export function SiteHeader() {
         ref={categoryMenuRef}
         onMouseLeave={scheduleMenusClose}
         onBlur={(event) => {
+          if (!isDesktopCategoriesMenu()) return;
           if (!event.currentTarget.contains(event.relatedTarget as Node)) {
             closeMenus();
           }
@@ -450,9 +512,10 @@ export function SiteHeader() {
             type="button"
             onMouseEnter={openCategories}
             onFocus={openCategories}
-            onClick={openCategories}
+            onClick={toggleCategories}
             aria-expanded={categoriesOpen}
             aria-haspopup="menu"
+            aria-controls="categories-menu"
             className={getNavPillClasses(categoriesOpen || isActiveNavItem("/categories"))}
           >
             Categories
@@ -483,6 +546,7 @@ export function SiteHeader() {
         </div>
         {categoriesOpen ? (
           <div
+            id="categories-menu"
             className="absolute inset-x-0 top-full z-50 hidden border-b border-line bg-surface text-ink shadow-[0_24px_48px_-30px_rgba(28,20,24,0.7)] md:block"
             onMouseEnter={openCategories}
             role="menu"
@@ -519,22 +583,126 @@ export function SiteHeader() {
         ) : null}
       </div>
 
-      <button
-        type="button"
-        onClick={toggleLocationPanel}
-        className="flex w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 py-2.5 text-left text-white transition hover:bg-[#433038] sm:hidden"
-        aria-expanded={locationOpen}
-        aria-haspopup="dialog"
-        aria-controls="delivery-location-dialog"
+      {categoriesOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/55 backdrop-blur-[2px] md:hidden"
+          onMouseDown={() => setCategoriesOpen(false)}
+        >
+          <div
+            ref={categoriesMobileRef}
+            id="categories-menu-mobile"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="categories-menu-title"
+            className="flex max-h-[min(85dvh,40rem)] w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-surface text-ink shadow-[0_28px_80px_-28px_rgba(18,12,15,0.8)]"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
+              <div>
+                <p id="categories-menu-title" className="font-display text-2xl text-ink">
+                  Categories
+                </p>
+                <p className="mt-0.5 text-xs text-muted">Shop by style and occasion</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCategoriesOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-xl text-ink transition hover:bg-background"
+                aria-label="Close categories"
+              >
+                ×
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-5">
+              <div className="grid grid-cols-3 gap-3">
+                {CATEGORY_MENU_FEATURES.map((feature) => (
+                  <Link
+                    key={feature.href}
+                    href={feature.href}
+                    onClick={() => setCategoriesOpen(false)}
+                    className="group"
+                  >
+                    <div className="aspect-[3/4] overflow-hidden rounded-xl bg-sand">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={feature.image}
+                        alt=""
+                        className="h-full w-full object-cover transition duration-500 group-active:scale-105"
+                      />
+                    </div>
+                    <p className="mt-2 text-center text-xs font-medium text-ink">{feature.name}</p>
+                  </Link>
+                ))}
+              </div>
+              <div className="mt-6 space-y-5">
+                {CATEGORY_MENU_GROUPS.map((group) => (
+                  <div key={group.title}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">
+                      {group.title}
+                    </p>
+                    <div className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-background">
+                      {group.links.map(([label, href]) => (
+                        <Link
+                          key={href}
+                          href={href}
+                          onClick={() => setCategoriesOpen(false)}
+                          className="block px-4 py-3 text-sm font-medium text-ink transition active:bg-surface"
+                        >
+                          {label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <motion.div
+        className="overflow-hidden sm:hidden"
+        initial={false}
+        animate={
+          reducedMotion || deliveryBarVisible
+            ? { height: "auto", opacity: 1 }
+            : { height: 0, opacity: 0 }
+        }
+        transition={
+          reducedMotion
+            ? { duration: 0 }
+            : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+        }
       >
-        <PinIcon className="h-5 w-5 shrink-0 text-white/90" />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-          {firstName ? `Deliver to ${firstName} - ${locationLabel}` : `Deliver to ${locationLabel}`}
-        </span>
-        <ChevronDownIcon
-          className={`h-4 w-4 shrink-0 text-white/80 transition duration-200 ${locationOpen ? "rotate-180" : ""}`}
-        />
-      </button>
+        <motion.button
+          type="button"
+          onClick={toggleLocationPanel}
+          initial={false}
+          animate={
+            reducedMotion || deliveryBarVisible
+              ? { y: 0, opacity: 1 }
+              : { y: -12, opacity: 0 }
+          }
+          transition={
+            reducedMotion
+              ? { duration: 0 }
+              : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+          }
+          className="flex w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 py-2.5 text-left text-white transition hover:bg-[#433038]"
+          aria-expanded={locationOpen}
+          aria-haspopup="dialog"
+          aria-controls="delivery-location-dialog"
+          style={{ willChange: "transform, opacity" }}
+        >
+          <PinIcon className="h-5 w-5 shrink-0 text-white/90" />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {firstName ? `Deliver to ${firstName} - ${locationLabel}` : `Deliver to ${locationLabel}`}
+          </span>
+          <ChevronDownIcon
+            className={`h-4 w-4 shrink-0 text-white/80 transition duration-200 ${locationOpen ? "rotate-180" : ""}`}
+          />
+        </motion.button>
+      </motion.div>
 
       {locationOpen ? (
         <div

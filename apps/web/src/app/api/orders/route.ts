@@ -29,8 +29,10 @@ type CheckoutBody = {
   makeDefault?: boolean;
 };
 
+// Postgres accepts any 8-4-4-4-12 hex uuid; seed ids like
+// c1000000-0000-0000-0000-000000000001 are valid but not RFC version/variant.
 const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUuid(value: string | null | undefined): value is string {
   return Boolean(value && UUID_PATTERN.test(value));

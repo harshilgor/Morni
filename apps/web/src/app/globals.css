@@ -56,9 +56,10 @@
   --color-ink: var(--ink);
   --color-sand: var(--sand);
   --color-mint: var(--mint);
-  --font-sans: var(--font-sans);
-  --font-display: var(--font-display);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-satoshi);
+  --font-body: var(--font-satoshi);
+  --font-display: var(--font-satoshi);
+  --font-heading: var(--font-satoshi);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -97,7 +98,7 @@
 
 body {
   background: #f8f7f4;
-  font-family: var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-satoshi), system-ui, sans-serif;
 }
 
 /* Seller mode: clearly cooler sage background vs shopper blush */
@@ -268,7 +269,7 @@ h1,
 h2,
 h3,
 .font-display {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-satoshi), system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
 
@@ -373,7 +374,7 @@ h3,
 }
 
 .shop-section-title {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-satoshi), system-ui, sans-serif;
   font-size: 1.5rem;
   letter-spacing: -0.02em;
   line-height: 1.15;

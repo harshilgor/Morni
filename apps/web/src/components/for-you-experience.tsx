@@ -78,15 +78,23 @@ function ForYouResults({
   favouriteProducts,
   recommendations,
   strongestCategories,
+  hasLikes,
   onReset,
   onNotForMe,
 }: {
   favouriteProducts: ForYouProduct[];
   recommendations: ForYouProduct[];
   strongestCategories: BrowseCategory[];
+  hasLikes: boolean;
   onReset: () => void;
   onNotForMe: (productId: string) => void;
 }) {
+  const introCopy = !hasLikes
+    ? "You passed on everything this round. Like a few pieces and we will build an edit around them."
+    : strongestCategories.length > 0
+      ? null
+      : "We are shaping this edit around the pieces you liked.";
+
   return (
     <section
       id="for-you"
@@ -102,7 +110,7 @@ function ForYouResults({
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">Your edit</p>
           <h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">Picked for you</h2>
           <p className="mx-auto mt-3 max-w-xl text-sm text-muted">
-            {strongestCategories.length > 0 ? (
+            {strongestCategories.length > 0 && hasLikes ? (
               <>
                 You are leaning toward{" "}
                 {strongestCategories.map((category, categoryIndex) => (
@@ -119,10 +127,10 @@ function ForYouResults({
                 .
               </>
             ) : (
-              "Keep exploring and we will shape this edit around what you love."
+              introCopy
             )}
           </p>
-          {strongestCategories.length > 0 ? (
+          {strongestCategories.length > 0 && hasLikes ? (
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {strongestCategories.map((category) => (
                 <Link
@@ -177,7 +185,9 @@ function ForYouResults({
             </div>
           ) : (
             <p className="rounded-2xl border border-dashed border-line bg-surface px-5 py-10 text-center text-sm text-muted">
-              There are no more matching local products right now. Check back as stores add new pieces.
+              {!hasLikes
+                ? "No personalized picks yet — like at least one piece and we will recommend similar styles."
+                : "There are no more matching local products right now. Check back as stores add new pieces."}
             </p>
           )}
         </section>
@@ -421,7 +431,6 @@ export function ForYouExperience({
         <ForYouSwipeDeck
           deck={deck}
           activeIndex={activeIndex}
-          profile={profile}
           completedSwipes={completedSwipes}
           minimumSwipes={minimumSwipes}
           canFinish={canFinish}
@@ -439,6 +448,7 @@ export function ForYouExperience({
         favouriteProducts={favouriteProducts}
         recommendations={recommendations}
         strongestCategories={strongestCategories}
+        hasLikes={profile.likes > 0}
         onReset={resetTaste}
         onNotForMe={markNotForMe}
       />

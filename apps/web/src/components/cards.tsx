@@ -20,9 +20,7 @@ export function StoreCard({ store, compact = false }: { store: Store; compact?: 
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-[#dedbd4] bg-white transition duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_18px_42px_-30px_rgba(28,20,24,0.38)]"
     >
       <div
-        className={`relative bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03] ${
-          compact ? "h-28 sm:h-40" : "h-40"
-        }`}
+        className="relative h-28 bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03] sm:h-40"
         style={{
           backgroundImage: store.cover_url
             ? `url(${store.cover_url})`
@@ -30,34 +28,28 @@ export function StoreCard({ store, compact = false }: { store: Store; compact?: 
         }}
       >
         {isNew ? (
-          <span className="absolute left-3 top-3 rounded-full bg-ink px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+          <span className="absolute left-2 top-2 rounded-full bg-ink px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[10px]">
             New
           </span>
         ) : null}
       </div>
-      <div className={`flex flex-1 flex-col ${compact ? "p-3 sm:min-h-[190px] sm:p-4" : "min-h-[190px] p-4"}`}>
-        <h3
-          className={`line-clamp-2 font-display leading-snug text-ink ${
-            compact ? "text-base sm:min-h-14 sm:text-xl" : "min-h-14 text-xl"
-          }`}
-        >
+      <div
+        className={`flex flex-1 flex-col p-3 sm:p-4 ${
+          compact ? "" : "sm:min-h-[190px]"
+        }`}
+      >
+        <h3 className="line-clamp-2 font-display text-sm leading-snug text-ink sm:min-h-14 sm:text-xl">
           {store.name}
         </h3>
         <p
-          className={`truncate text-muted ${compact ? "mt-1 text-xs sm:mt-2 sm:text-sm" : "mt-2 text-sm"}`}
+          className="mt-1 truncate text-xs text-muted sm:mt-2 sm:text-sm"
           title={store.area + ", " + emirateLabel(store.emirate)}
         >
           {store.area}, {emirateLabel(store.emirate)}
         </p>
-        {!compact ? (
-          <p className="mt-3 min-h-10 line-clamp-2 text-sm leading-5 text-ink/80">
-            {store.description || "A local boutique on Morni."}
-          </p>
-        ) : (
-          <p className="mt-2 hidden line-clamp-2 text-sm leading-5 text-ink/80 sm:mt-3 sm:block sm:min-h-10">
-            {store.description || "A local boutique on Morni."}
-          </p>
-        )}
+        <p className="mt-2 hidden text-sm leading-5 text-ink/80 sm:mt-3 sm:min-h-10 sm:line-clamp-2">
+          {store.description || "A local boutique on Morni."}
+        </p>
       </div>
     </Link>
   );

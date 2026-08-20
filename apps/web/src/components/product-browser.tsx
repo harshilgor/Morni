@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/cards";
-import { StoreProductRow } from "@/components/store-product-row";
 import { emirateLabel } from "@/lib/format";
-import { profileFromSwipes, type TasteProfile, type TasteSwipe } from "@/lib/for-you";
+import { FEATURED_CATEGORY_CATALOG } from "@/lib/browse-categories";
+import {
+  isTasteProfile,
+  profileFromSwipes,
+  scoreProductForTaste,
+  type TasteProfile,
+  type TasteSwipe,
+} from "@/lib/for-you";
 import { readStoredForYouTaste } from "@/lib/for-you-storage";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import {
@@ -120,21 +126,10 @@ function annotate(
 }
 
 function personalScore(product: Annotated, profile: TasteProfile, activeSlug?: string) {
-  const text = `${product.title} ${product.description ?? ""}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .split(" ");
-  let score = activeSlug ? (profile.categoryScores[activeSlug] ?? 0) * 4 : 0;
-  for (const word of text) score += profile.tagScores[word] ?? 0;
-  for (const color of product.colors) score += profile.tagScores[color] ?? 0;
-  for (const fabric of product.fabrics) score += profile.tagScores[fabric] ?? 0;
-
-  if (profile.likedPriceCount > 0) {
-    const average = profile.likedPriceSum / profile.likedPriceCount;
-    const difference = Math.abs(Number(product.price_aed) - average) / Math.max(average, 1);
-    score += Math.max(0, 2 - difference * 2);
-  }
-  return score;
+  return scoreProductForTaste(product, FEATURED_CATEGORY_CATALOG, profile, {
+    categorySlug: product.category?.slug ?? activeSlug ?? null,
+    extraTags: [...product.colors, ...product.fabrics, ...product.fits],
+  });
 }
 
 function matchesDimension(
@@ -297,7 +292,7 @@ export function ProductBrowser({
   hasMore: initialHasMore = false,
   loadMoreUrl,
   variant = "default",
-  storeName,
+  showInStockFilter = true,
 }: {
   products: BrowsableProduct[];
   categories?: { name: string; slug: string }[];
@@ -306,7 +301,7 @@ export function ProductBrowser({
   hasMore?: boolean;
   loadMoreUrl?: string;
   variant?: "default" | "store";
-  storeName?: string;
+  showInStockFilter?: boolean;
 }) {
   const isStore = variant === "store";
   const supabase = useMemo(() => createClient(), []);
@@ -336,7 +331,7 @@ export function ProductBrowser({
       if (!mounted) return;
 
       if (!auth.user) {
-        setTasteProfile(stored.profile);
+        setTasteProfile(isTasteProfile(stored.profile) ? stored.profile : null);
         setDismissedProductIds(stored.dismissedProductIds);
         return;
       }
@@ -362,7 +357,13 @@ export function ProductBrowser({
         tags: swipe.tags ?? [],
         priceAed: Number(swipe.price_aed ?? 0),
       }));
-      setTasteProfile(remoteSwipes.length ? profileFromSwipes(remoteSwipes) : stored.profile);
+      setTasteProfile(
+        remoteSwipes.length
+          ? profileFromSwipes(remoteSwipes)
+          : isTasteProfile(stored.profile)
+            ? stored.profile
+            : null,
+      );
       setDismissedProductIds([
         ...new Set([...(feedback ?? []).map((item) => item.product_id), ...stored.dismissedProductIds]),
       ]);
@@ -541,9 +542,7 @@ export function ProductBrowser({
     }
   }, [activeSlug, filtered, forYouActive, sort, tasteProfile]);
 
-  const categoryIsPreferred = Boolean(
-    activeSlug && tasteProfile && (tasteProfile.categoryScores[activeSlug] ?? 0) > 0,
-  );
+  const categoryIsPreferred = Boolean(tasteProfile && tasteProfile.likes > 0);
   const currentSort = SORTS.find((option) => option.id === sort) ?? SORTS[0];
   const activeCount =
     (Object.keys(EMPTY_FILTERS) as (keyof Filters)[]).reduce((sum, key) => {
@@ -817,16 +816,18 @@ export function ProductBrowser({
           checked={filters.onSale}
           onToggle={() => toggleFlag("onSale")}
         />
-        <OptionRow
-          label="In stock"
-          count={
-            annotated.filter(
-              (p) => matches(p, { ...filters, inStock: false }) && p.inStock,
-            ).length
-          }
-          checked={filters.inStock}
-          onToggle={() => toggleFlag("inStock")}
-        />
+        {showInStockFilter ? (
+          <OptionRow
+            label="In stock"
+            count={
+              annotated.filter(
+                (p) => matches(p, { ...filters, inStock: false }) && p.inStock,
+              ).length
+            }
+            checked={filters.inStock}
+            onToggle={() => toggleFlag("inStock")}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -1020,11 +1021,15 @@ export function ProductBrowser({
                 active: filters.price.includes("99-199"),
                 onClick: () => toggle("price", "99-199"),
               },
-              {
-                label: "In stock",
-                active: filters.inStock,
-                onClick: () => toggleFlag("inStock"),
-              },
+              ...(showInStockFilter
+                ? [
+                    {
+                      label: "In stock",
+                      active: filters.inStock,
+                      onClick: () => toggleFlag("inStock"),
+                    },
+                  ]
+                : []),
             ].map((chip) => (
               <button
                 key={chip.label}
@@ -1074,46 +1079,22 @@ export function ProductBrowser({
           </div>
         ) : (
           <>
-            {isStore ? (
-              <div className="mt-1 rounded-[1.35rem] border border-line bg-white px-4 sm:px-5">
-                {sorted.slice(0, visible).map((product) => (
-                  <StoreProductRow
-                    key={product.id}
-                    product={{
-                      id: product.id,
-                      store_id: product.store_id ?? "",
-                      title: product.title,
-                      description: product.description,
-                      price_aed: Number(product.price_aed),
-                      compare_at_price_aed: product.compare_at_price_aed,
-                      image_urls: product.image_urls,
-                      sizes: product.sizes,
-                      stock: product.stock,
-                    }}
-                    storeName={storeName ?? product.stores.name}
-                    rating={loadedRatings[product.id] ?? null}
-                    href={`/stores/${product.stores.slug}/products/${product.id}`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
-                {sorted.slice(0, visible).map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={{
-                      id: product.id,
-                      title: product.title,
-                      price_aed: Number(product.price_aed),
-                      compare_at_price_aed: product.compare_at_price_aed,
-                      image_urls: product.image_urls ?? [],
-                    }}
-                    rating={loadedRatings[product.id] ?? null}
-                    href={`/stores/${product.stores.slug}/products/${product.id}`}
-                  />
-                ))}
-              </div>
-            )}
+            <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
+              {sorted.slice(0, visible).map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={{
+                    id: product.id,
+                    title: product.title,
+                    price_aed: Number(product.price_aed),
+                    compare_at_price_aed: product.compare_at_price_aed,
+                    image_urls: product.image_urls ?? [],
+                  }}
+                  rating={loadedRatings[product.id] ?? null}
+                  href={`/stores/${product.stores.slug}/products/${product.id}`}
+                />
+              ))}
+            </div>
             {loadMoreUrl && hasMore ? (
               <div ref={loadTriggerRef} className="mt-8 flex min-h-12 justify-center">
                 <button
