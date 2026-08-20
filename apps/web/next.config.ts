@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
     resolveAlias: {
       "@morni/delivery": deliverySrc,
       "@morni/founder": founderSrc,
+      // tsconfig paths map react → @types for typechecking sibling apps.
+      // Override those for the bundler with relative paths to the real packages
+      // (absolute Windows paths are rejected by Turbopack).
+      react: "./node_modules/react",
+      "react/jsx-runtime": "./node_modules/react/jsx-runtime.js",
+      "react/jsx-dev-runtime": "./node_modules/react/jsx-dev-runtime.js",
+      "react-dom": "./node_modules/react-dom",
+      "react-dom/client": "./node_modules/react-dom/client.js",
     },
   },
   experimental: {
