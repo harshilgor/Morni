@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUser } from "@/lib/use-auth-user";
 import { formatAed, orderStatusLabel } from "@/lib/format";
@@ -1101,17 +1100,9 @@ export function FounderWorkspace() {
           {!data && !error ? <FounderLoading /> : null}
           {error ? <FounderError error={error} onRetry={refreshData} /> : null}
           {data && deliveryData ? (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeView}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <WorkspaceContent data={data} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} />
-              </motion.div>
-            </AnimatePresence>
+            <div key={activeView}>
+              <WorkspaceContent data={data} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} />
+            </div>
           ) : null}
         </main>
       </div>
