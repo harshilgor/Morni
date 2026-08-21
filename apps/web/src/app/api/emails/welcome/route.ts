@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { sendWelcomeEmail } from "@/lib/email";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const limited = rateLimit(`welcome-email:${clientIp(request)}`, 5, 60_000);
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
+
   const supabase = await createClient();
   const {
     data: { user },

@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   AfsError,
-  amountsMatchAed,
   getAfsPaymentStatus,
-  paymentStatusIsSuccessful,
 } from "@/lib/afs/client";
-import {
-  sendOrderConfirmationEmail,
-  sendStoreNewOrderEmails,
-} from "@/lib/email";
+import { fulfillAfsPayment } from "@/lib/afs/fulfill";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -33,6 +29,11 @@ export async function GET(request: Request) {
   const resourcePath = url.searchParams.get("resourcePath")?.trim() ?? "";
   const orderIdParam = url.searchParams.get("orderId")?.trim() ?? "";
   const origin = siteOrigin(request);
+
+  const limited = rateLimit(`afs-result:${clientIp(request)}`, 30, 60_000);
+  if (!limited.ok) {
+    return NextResponse.redirect(`${origin}/checkout?payment=rate_limited`);
+  }
 
   if (!resourcePath.startsWith("/v1/")) {
     return NextResponse.redirect(`${origin}/checkout?payment=invalid`);
@@ -69,7 +70,7 @@ export async function GET(request: Request) {
 
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("id, shopper_id, payment_method, payment_status, total_aed, status")
+    .select("id, shopper_id, payment_status")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -86,78 +87,21 @@ export async function GET(request: Request) {
 
   try {
     const status = await getAfsPaymentStatus(resourcePath);
+    const result = await fulfillAfsPayment({
+      orderId: order.id,
+      checkoutId: checkoutIdFromPath,
+      status,
+    });
 
-    const merchantOk = status.merchantTransactionId === order.id;
-    const amountOk = amountsMatchAed(Number(order.total_aed), status.amount);
-    const currencyOk = (status.currency ?? "AED").toUpperCase() === "AED";
-
-    if (
-      paymentStatusIsSuccessful(status) &&
-      status.id &&
-      merchantOk &&
-      amountOk &&
-      currencyOk
-    ) {
-      const { data: markResult, error: markError } = await admin.rpc(
-        "mark_order_paid_from_afs",
-        {
-          p_order_id: order.id,
-          p_afs_checkout_id: checkoutIdFromPath,
-          p_afs_payment_id: status.id,
-          p_result_code: status.resultCode,
-          p_result_description: status.resultDescription,
-          p_amount_aed: Number(order.total_aed),
-          p_raw_status: status.raw,
-        },
-      );
-
-      if (markError) {
-        console.error("Failed to mark order paid from AFS", {
-          orderId: order.id,
-          message: markError.message,
-          resultCode: status.resultCode,
-        });
-        return redirectToOrder(request, order.id, "payment=failed");
-      }
-
-      const firstPaid =
-        markResult &&
-        typeof markResult === "object" &&
-        "first_paid" in markResult &&
-        Boolean((markResult as { first_paid?: boolean }).first_paid);
-
-      if (firstPaid) {
-        try {
-          await sendOrderConfirmationEmail(order.id);
-        } catch (sendError) {
-          console.error("Paid order confirmation email failed", sendError);
-        }
-        try {
-          await sendStoreNewOrderEmails(order.id);
-        } catch (sendError) {
-          console.error("Paid order store email failed", sendError);
-        }
-      }
-
+    if (result.outcome === "paid" || result.outcome === "already_paid") {
       return redirectToOrder(request, order.id, "paid=1");
     }
-
-    await admin.rpc("mark_order_payment_failed_from_afs", {
-      p_order_id: order.id,
-      p_afs_checkout_id: checkoutIdFromPath,
-      p_result_code: status.resultCode,
-      p_result_description: status.resultDescription,
-      p_raw_status: status.raw,
-    });
 
     console.error("AFS payment not successful", {
       orderId: order.id,
       resultCode: status.resultCode,
-      amountOk,
-      currencyOk,
-      merchantOk,
+      reason: result.outcome === "failed" || result.outcome === "ignored" ? result.reason : null,
     });
-
     return redirectToOrder(request, order.id, "payment=failed");
   } catch (error) {
     if (error instanceof AfsError) {

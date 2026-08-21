@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ForYouBackButton } from "@/components/for-you-back-button";
 import { ForYouSwipeDeck } from "@/components/for-you-swipe-deck";
 import type { BrowseCategory } from "@/lib/browse-categories";
@@ -11,7 +11,6 @@ import {
   buildUniversalTasteDeck,
   emptyTasteProfile,
   MIN_SWIPES_FOR_RESULTS,
-  profileFromSwipes,
   recommendForYouProducts,
   topCategories,
   type ForYouProduct,
@@ -27,7 +26,11 @@ import {
 import { useLocation } from "@/lib/location";
 import { createClient } from "@/lib/supabase/client";
 
-type Step = "loading" | "test" | "results";
+type Step = "test" | "results";
+
+function stepFromProfile(profile: TasteProfile, minimumSwipes: number): Step {
+  return profile.likes + profile.passes >= minimumSwipes ? "results" : "test";
+}
 
 function ProductResultCard({
   product,
@@ -199,19 +202,29 @@ function ForYouResults({
 export function ForYouExperience({
   categories,
   products,
+  initialProfile,
+  initialDismissedProductIds = [],
+  initialShopperId = null,
+  hasServerTaste = false,
 }: {
   categories: BrowseCategory[];
   products: ForYouProduct[];
+  initialProfile?: TasteProfile;
+  initialDismissedProductIds?: string[];
+  initialShopperId?: string | null;
+  hasServerTaste?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const emirate = useLocation((state) => state.emirate);
-  const [step, setStep] = useState<Step>("loading");
-  const [profile, setProfile] = useState<TasteProfile>(emptyTasteProfile());
-  const [dismissedProductIds, setDismissedProductIds] = useState<string[]>([]);
+  const seedProfile = initialProfile ?? emptyTasteProfile();
+  const seedHasTaste = seedProfile.likes + seedProfile.passes > 0;
+  const [profile, setProfile] = useState<TasteProfile>(seedProfile);
+  const [dismissedProductIds, setDismissedProductIds] = useState<string[]>(initialDismissedProductIds);
   const [index, setIndex] = useState(0);
-  const [shopperId, setShopperId] = useState<string | null>(null);
+  const shopperId = initialShopperId;
   const sessionIdRef = useRef<string | null>(null);
   const sessionPromiseRef = useRef<Promise<string | null> | null>(null);
+  const hydratedLocalRef = useRef(false);
 
   const localProducts = useMemo(
     () => products.filter((product) => !emirate || product.stores.emirate === emirate),
@@ -223,60 +236,35 @@ export function ForYouExperience({
   );
   const activeIndex = Math.min(index, Math.max(deck.length - 1, 0));
   const minimumSwipes = Math.min(MIN_SWIPES_FOR_RESULTS, deck.length);
+  const [step, setStep] = useState<Step>(() => stepFromProfile(seedProfile, minimumSwipes));
   const completedSwipes = profile.likes + profile.passes;
   const canFinish = completedSwipes >= minimumSwipes;
 
-  useEffect(() => {
-    let mounted = true;
-    async function loadTaste() {
-      const stored = readStoredForYouTaste();
-      const { data: auth } = await supabase.auth.getUser();
-      if (!mounted) return;
+  // Restore guest taste (and signed-in empty accounts) before paint — no loading screen.
+  useLayoutEffect(() => {
+    if (hydratedLocalRef.current) return;
+    hydratedLocalRef.current = true;
 
-      const user = auth.user;
-      if (!user) {
-        setProfile(stored.profile);
-        setDismissedProductIds(stored.dismissedProductIds);
-        setStep(stored.profile.likes + stored.profile.passes >= minimumSwipes ? "results" : "test");
-        return;
+    const stored = readStoredForYouTaste();
+
+    if (hasServerTaste && seedHasTaste) {
+      if (stored.dismissedProductIds.length) {
+        setDismissedProductIds((current) => [
+          ...new Set([...current, ...stored.dismissedProductIds]),
+        ]);
       }
-
-      setShopperId(user.id);
-      const [{ data: swipes }, { data: feedback }] = await Promise.all([
-        supabase
-          .from("taste_swipes")
-          .select("product_id, category_slug, decision, tags, price_aed")
-          .eq("shopper_id", user.id)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("product_feedback")
-          .select("product_id")
-          .eq("shopper_id", user.id)
-          .eq("feedback_type", "not_interested"),
-      ]);
-      if (!mounted) return;
-
-      const savedSwipes: TasteSwipe[] = (swipes ?? []).map((swipe) => ({
-        productId: swipe.product_id,
-        categorySlug: swipe.category_slug,
-        decision: swipe.decision as TasteSwipe["decision"],
-        tags: swipe.tags ?? [],
-        priceAed: Number(swipe.price_aed ?? 0),
-      }));
-      const nextProfile = savedSwipes.length ? profileFromSwipes(savedSwipes) : stored.profile;
-      const nextDismissed = [
-        ...new Set([...(feedback ?? []).map((item) => item.product_id), ...stored.dismissedProductIds]),
-      ];
-      setProfile(nextProfile);
-      setDismissedProductIds(nextDismissed);
-      setStep(nextProfile.likes + nextProfile.passes >= minimumSwipes ? "results" : "test");
+      return;
     }
 
-    void loadTaste();
-    return () => {
-      mounted = false;
-    };
-  }, [minimumSwipes, supabase]);
+    if (stored.profile.likes + stored.profile.passes > 0 || stored.dismissedProductIds.length > 0) {
+      const nextProfile = seedHasTaste ? seedProfile : stored.profile;
+      setProfile(nextProfile);
+      setDismissedProductIds([
+        ...new Set([...initialDismissedProductIds, ...stored.dismissedProductIds]),
+      ]);
+      setStep(stepFromProfile(nextProfile, minimumSwipes));
+    }
+  }, [hasServerTaste, initialDismissedProductIds, minimumSwipes, seedHasTaste, seedProfile]);
 
   const ensureSession = useCallback(async () => {
     if (!shopperId) return null;
@@ -392,20 +380,6 @@ export function ForYouExperience({
     [categories, dismissedProductIds, localProducts, profile],
   );
   const strongestCategories = topCategories(profile, categories);
-
-  if (step === "loading") {
-    return (
-      <div className="relative min-h-dvh bg-[#fff9f7]">
-        <ForYouBackButton />
-        <section
-          id="for-you"
-          className="flex min-h-dvh items-center justify-center px-4 pt-[calc(env(safe-area-inset-top)+4rem)] text-center"
-        >
-          <p className="text-sm text-muted">Preparing your edit...</p>
-        </section>
-      </div>
-    );
-  }
 
   if (deck.length === 0) {
     return (

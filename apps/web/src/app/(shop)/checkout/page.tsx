@@ -17,6 +17,7 @@ import { ProductRail, type RailProduct } from "@/components/product-rail";
 import { useLocation, DELIVERY_EMIRATE, DELIVERY_ONLY_MESSAGE, isDeliverableEmirate } from "@/lib/location";
 import { calculateCheckoutFees } from "@/lib/fees";
 import {
+  FreeDeliveryNudge,
   OrderFeeLines,
   SmallOrderNudge,
 } from "@/components/order-fee-summary";
@@ -374,6 +375,7 @@ export default function CheckoutPage() {
           </section>
 
           <section aria-labelledby="mobile-price-details" className="border-t border-line py-6">
+            <FreeDeliveryNudge fees={fees} />
             <SmallOrderNudge fees={fees} />
             <div className="flex items-center justify-between gap-4">
               <h2 id="mobile-price-details" className="text-base font-semibold uppercase tracking-[0.08em] text-ink">Price details</h2>
@@ -753,6 +755,7 @@ export default function CheckoutPage() {
       </div>
 
       <aside className="h-fit border border-line bg-surface p-5 sm:sticky sm:top-24 sm:p-6">
+        <FreeDeliveryNudge fees={fees} />
         <SmallOrderNudge fees={fees} />
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Order total</p>
         <h2 className="mt-1 font-display text-3xl text-ink">Price details</h2>

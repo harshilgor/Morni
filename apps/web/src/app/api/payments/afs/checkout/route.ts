@@ -4,6 +4,7 @@ import {
   getAfsWidgetScriptUrl,
   prepareAfsCheckout,
 } from "@/lib/afs/client";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,6 +16,9 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: Request) {
+  const limited = rateLimit(`afs-checkout:${clientIp(request)}`, 15, 60_000);
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
+
   const body = (await request.json().catch(() => null)) as CheckoutBody | null;
   const orderId = body?.orderId?.trim() ?? "";
   if (!UUID_PATTERN.test(orderId)) {

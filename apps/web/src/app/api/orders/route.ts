@@ -4,6 +4,7 @@ import {
   sendOrderConfirmationEmail,
   sendStoreNewOrderEmails,
 } from "@/lib/email";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { UaeEmirate } from "@/lib/types";
@@ -48,6 +49,9 @@ function trimTo(value: string | null | undefined, max: number) {
 }
 
 export async function POST(request: Request) {
+  const limited = rateLimit(`orders:${clientIp(request)}`, 20, 60_000);
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
+
   const body = (await request.json().catch(() => null)) as CheckoutBody | null;
   const items = Array.isArray(body?.items) ? body.items : [];
   const address = body?.address;

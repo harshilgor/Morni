@@ -40,6 +40,24 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    const supabaseHost = "https://xobagxgagarnzxujxfag.supabase.co";
+    const csp = [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com",
+      // Inline $RS polyfill + Next/Vercel runtime; AFS payment widget from OPPWA.
+      "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      `connect-src 'self' ${supabaseHost} https://*.supabase.co wss://*.supabase.co https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://vitals.vercel-insights.com https://va.vercel-scripts.com`,
+      "frame-src 'self' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com",
+      "worker-src 'self' blob:",
+      "upgrade-insecure-requests",
+    ].join("; ");
+
     return [
       {
         source: "/:path*",
@@ -49,6 +67,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          { key: "Content-Security-Policy", value: csp },
         ],
       },
     ];

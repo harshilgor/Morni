@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { sendOrderConfirmationEmail } from "@/lib/email";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: RouteContext<"/api/orders/[orderId]/confirmation">,
 ) {
+  const limited = rateLimit(`order-confirm:${clientIp(request)}`, 10, 60_000);
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
+
   const { orderId } = await context.params;
   const supabase = await createClient();
   const {

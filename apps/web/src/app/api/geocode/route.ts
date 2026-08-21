@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { createClient } from "@/lib/supabase/server";
 
 const NOMINATIM = "https://nominatim.openstreetmap.org";
 const UA = "MorniMarketplace/1.0 (store-location; https://morni-eosin.vercel.app)";
 const LOOKUP_HEADERS = {
-  "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+  "Cache-Control": "private, max-age=60",
 };
 
 type NominatimResult = {
@@ -53,6 +55,17 @@ function normalize(hit: NominatimResult) {
 }
 
 export async function GET(request: NextRequest) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limited = rateLimit(`geocode:${user.id}:${clientIp(request)}`, 40, 60_000);
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSec);
+
   const { searchParams } = request.nextUrl;
   const q = searchParams.get("q")?.trim().replace(/\s+/g, " ");
   const lat = searchParams.get("lat");

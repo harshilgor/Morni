@@ -937,7 +937,7 @@ function CatalogueView({ products }: { products: FounderData["top_products"] }) 
 function FinanceView({ data }: { data: FounderData }) {
   const financeRows = [
     { label: "Product sales", value: data.finance.product_sales, detail: "Merchandise before fees" },
-    { label: "Delivery fees", value: data.finance.delivery_fees, detail: "Charged to customers" },
+    { label: "Delivery fees", value: data.finance.delivery_fees, detail: "Free above AED 199" },
     { label: "Service fees", value: data.finance.service_fees, detail: "Marketplace service revenue" },
     { label: "Small order fees", value: data.finance.small_order_fees, detail: "Orders below AED 99" },
   ];
