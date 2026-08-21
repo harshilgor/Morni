@@ -14,7 +14,8 @@ export async function HomeCatalog({
 }: {
   initialEmirate?: UaeEmirate;
 }) {
-  const { stores, featured, products, ratings } = await getCachedHomeCatalog();
+  const { stores, featured, products, under99, under199, luxuryPicks, ratings } =
+    await getCachedHomeCatalog();
   const ratingRecord = ratings as Record<string, ProductRatingSummary>;
 
   const toRailProduct = (product: ProductWithStore, includeRating = false) => ({
@@ -27,18 +28,11 @@ export async function HomeCatalog({
     rating: includeRating ? ratingRecord[product.id] ?? null : undefined,
   });
 
-  const under99 = products
-    .filter((product) => Number(product.price_aed) <= 99)
-    .slice(0, 10)
-    .map((product) => toRailProduct(product));
+  const under99Rail = under99.slice(0, 10).map((product) => toRailProduct(product));
 
-  const under199 = products
-    .filter((product) => Number(product.price_aed) <= 199)
-    .slice(0, 10)
-    .map((product) => toRailProduct(product));
+  const under199Rail = under199.slice(0, 10).map((product) => toRailProduct(product));
 
-  const luxuryPicks = products
-    .filter((product) => Number(product.price_aed) >= 500)
+  const luxuryPicksRail = luxuryPicks
     .slice(0, 10)
     .map((product) => toRailProduct(product));
 
@@ -65,7 +59,7 @@ export async function HomeCatalog({
       title: "Under AED 99",
       subtitle: "Budget-friendly picks from local boutiques.",
       href: "/search?max=99",
-      products: under99,
+      products: under99Rail,
     },
     {
       id: "under-199",
@@ -73,7 +67,7 @@ export async function HomeCatalog({
       title: "Under AED 199",
       subtitle: "More to love, still easy on the budget.",
       href: "/search?max=199",
-      products: under199,
+      products: under199Rail,
     },
     {
       id: "luxury",
@@ -81,7 +75,7 @@ export async function HomeCatalog({
       title: "Luxury picks",
       subtitle: "Statement pieces made for special plans.",
       href: "/search?min=500",
-      products: luxuryPicks,
+      products: luxuryPicksRail,
     },
     {
       id: "new-in",

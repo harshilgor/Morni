@@ -15,9 +15,10 @@ $$;
 
 revoke all on function public.touch_order_payments_updated_at() from public, anon, authenticated;
 
--- Pricing is computed only inside service_role checkout — never via PostgREST.
-revoke all on function public.sale_price_for_product(uuid, numeric) from public, anon, authenticated;
-grant execute on function public.sale_price_for_product(uuid, numeric) to service_role;
+-- Pricing helper is used by storefront_products (security_invoker) for public catalog reads.
+-- Drop PUBLIC default, but keep anon/authenticated so product pages can select priced rows.
+revoke all on function public.sale_price_for_product(uuid, numeric) from public;
+grant execute on function public.sale_price_for_product(uuid, numeric) to anon, authenticated, service_role;
 
 -- Delivery / admin helpers are not needed for anonymous storefront reads.
 revoke execute on function public.is_morni_admin() from public, anon;

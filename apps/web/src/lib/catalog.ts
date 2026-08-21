@@ -80,21 +80,45 @@ export async function getCachedBrowseCategories() {
   return mergeBrowseCategories((data ?? []) as BrowseCategory[]);
 }
 
+async function fetchHomeProductBand(options: {
+  limit: number;
+  maxPrice?: number;
+  minPrice?: number;
+  tag: string;
+}) {
+  const supabase = createPublicClient();
+  let query = supabase
+    .from("storefront_products")
+    .select("*, stores!inner(slug, name, is_active)")
+    .eq("is_available", true)
+    .eq("stores.is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(options.limit);
+
+  if (options.maxPrice != null) {
+    query = query.lte("price_aed", options.maxPrice);
+  }
+  if (options.minPrice != null) {
+    query = query.gte("price_aed", options.minPrice);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error(`Home catalog query failed (${options.tag})`, error.message);
+    // Throw so "use cache" does not persist a false empty catalog.
+    throw new Error(`Home catalog query failed (${options.tag}): ${error.message}`);
+  }
+
+  return (data ?? []) as ProductWithStore[];
+}
+
 export async function getCachedHomeProducts(limit = 48) {
   "use cache";
   cacheLife("minutes");
   tagCatalog("products", "home-products");
 
   const supabase = createPublicClient();
-  const { data } = await supabase
-    .from("storefront_products")
-    .select("*, stores!inner(slug, name, is_active)")
-    .eq("is_available", true)
-    .eq("stores.is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  const products = (data ?? []) as ProductWithStore[];
+  const products = await fetchHomeProductBand({ limit, tag: "home-products" });
   const ratingMap = await fetchProductRatingMap(
     supabase,
     products.map((product) => product.id),
@@ -106,17 +130,42 @@ export async function getCachedHomeProducts(limit = 48) {
   };
 }
 
+export async function getCachedHomePriceBand(options: {
+  maxPrice?: number;
+  minPrice?: number;
+  limit?: number;
+  tag: string;
+}) {
+  "use cache";
+  cacheLife("minutes");
+  tagCatalog("products", "home-products", options.tag);
+
+  return fetchHomeProductBand({
+    limit: options.limit ?? 12,
+    maxPrice: options.maxPrice,
+    minPrice: options.minPrice,
+    tag: options.tag,
+  });
+}
+
 export async function getCachedHomeCatalog() {
-  const [stores, featured, homeProducts] = await Promise.all([
-    getCachedActiveStores(),
-    getCachedFeaturedCategories(),
-    getCachedHomeProducts(48),
-  ]);
+  const [stores, featured, homeProducts, under99, under199, luxuryPicks] =
+    await Promise.all([
+      getCachedActiveStores(),
+      getCachedFeaturedCategories(),
+      getCachedHomeProducts(48),
+      getCachedHomePriceBand({ maxPrice: 99, limit: 12, tag: "home-price-max:99" }),
+      getCachedHomePriceBand({ maxPrice: 199, limit: 12, tag: "home-price-max:199" }),
+      getCachedHomePriceBand({ minPrice: 500, limit: 12, tag: "home-luxury" }),
+    ]);
 
   return {
     stores,
     featured,
     products: homeProducts.products,
+    under99,
+    under199,
+    luxuryPicks,
     ratings: homeProducts.ratings,
   };
 }
