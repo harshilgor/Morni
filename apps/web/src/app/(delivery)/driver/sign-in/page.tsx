@@ -18,6 +18,7 @@ function DriverSignInForm() {
   const authError = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState<string | null>(
     authError ? "This sign-in link is invalid or has expired. Please request a new one." : null,
   );
@@ -119,14 +120,26 @@ function DriverSignInForm() {
           </label>
           <label className="block space-y-1.5 text-sm">
             <span className="text-[#65756d]">Password</span>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-xl border border-[#d6e1db] bg-[#fbfdfc] px-3 py-2.5 outline-none focus:border-[#4e8875]"
-            />
+            <span className="relative block">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={6}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                className="w-full rounded-xl border border-[#d6e1db] bg-[#fbfdfc] px-3 py-2.5 pr-11 outline-none focus:border-[#4e8875]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-[#8a9790] transition hover:text-[#19342b]"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+              >
+                <PortalIcon name={showPassword ? "eyeOff" : "eye"} className="h-4 w-4" />
+              </button>
+            </span>
           </label>
           {message ? <p className="text-sm leading-6 text-[#b14a3f]">{message}</p> : null}
           <button

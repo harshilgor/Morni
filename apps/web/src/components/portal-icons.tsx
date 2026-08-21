@@ -22,8 +22,12 @@ export type PortalIconName =
   | "location"
   | "more"
   | "eye"
+  | "eyeOff"
   | "sparkle"
-  | "refresh";
+  | "refresh"
+  | "camera"
+  | "close"
+  | "image";
 
 export function PortalIcon({
   name,
@@ -54,8 +58,12 @@ export function PortalIcon({
     location: <><path d="M12 21s6-5.5 6-11a6 6 0 1 0-12 0c0 5.5 6 11 6 11Z" /><circle cx="12" cy="10" r="2" /></>,
     more: <><circle cx="5" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="19" cy="12" r="1" fill="currentColor" /></>,
     eye: <><path d="M2.5 12s3.4-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.4 5.5-9.5 5.5S2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.4" /></>,
+    eyeOff: <><path d="M2.5 12s3.4-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.4 5.5-9.5 5.5S2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.4" /><path d="m4 4 16 16" /></>,
     sparkle: <><path d="M12 2.8 13.7 9 20 10.7l-6.3 1.7L12 18.7l-1.7-6.3L4 10.7 10.3 9 12 2.8ZM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7L19 16Z" /></>,
     refresh: <><path d="M20 11a8.1 8.1 0 0 0-14.8-3L3.5 10.5M4 5v5.5h5.5" /><path d="M4 13a8.1 8.1 0 0 0 14.8 3l1.7-2.5M20 19v-5.5h-5.5" /></>,
+    camera: <><path d="M4.5 8.5h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 10v8.5A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5V10A1.5 1.5 0 0 1 4.5 8.5Z" /><circle cx="12" cy="14" r="3.2" /></>,
+    close: <path d="M6 6l12 12M18 6 6 18" />,
+    image: <><rect x="3.5" y="5" width="17" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="m7.5 17 3.5-3.5L14 16l2.5-2.5L20.5 17" /></>,
   };
 
   return <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths[name]}</svg>;

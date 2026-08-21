@@ -3,7 +3,7 @@
 /* Product thumbnails may originate from seller-controlled Supabase storage URLs. */
 /* eslint-disable @next/next/no-img-element */
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import { ColorVariantEditor } from "@/components/color-variant-editor";
 import {
   ImagePreviewDialog,
@@ -33,9 +33,9 @@ type ProductDraft = {
   price_aed: string;
 };
 
-function draftsFromVariants(
-  product: ProductWithVariants,
-): ColorDraft[] {
+type CreateStep = 1 | 2;
+
+function draftsFromVariants(product: ProductWithVariants): ColorDraft[] {
   const variants = [...(product.product_variants ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order,
   );
@@ -59,6 +59,54 @@ function draftsFromVariants(
   );
 }
 
+function StickyActionBar({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="sticky bottom-0 z-20 -mx-4 mt-4 border-t border-[#d5ddd9] bg-white/95 px-4 pt-3 backdrop-blur sm:-mx-5 sm:px-5"
+      style={{
+        paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SheetShell({
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-[#eef2f0]">
+      <div
+        className="flex items-center gap-3 border-b border-[#c6d0cb] bg-white px-4 py-3"
+        style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="grid h-10 w-10 place-items-center rounded-xl border border-[#aebdb6] bg-white text-[#3e514a]"
+          aria-label="Close"
+        >
+          <PortalIcon name="close" className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold text-[#17231f]">{title}</p>
+          {subtitle ? <p className="truncate text-xs text-[#7b8882]">{subtitle}</p> : null}
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
+    </div>
+  );
+}
+
 export default function PortalProductsPage() {
   const { store, loading, error } = useOwnerStore();
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
@@ -71,6 +119,7 @@ export default function PortalProductsPage() {
   const [createColors, setCreateColors] = useState<ColorDraft[]>([
     createColorDraft({ color_name: "Default" }),
   ]);
+  const [createStep, setCreateStep] = useState<CreateStep>(1);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [showLowStock, setShowLowStock] = useState(false);
@@ -80,9 +129,9 @@ export default function PortalProductsPage() {
   );
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStock, setBulkStock] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [drafts, setDrafts] = useState<Record<string, ProductDraft>>({});
-  const [colorDrafts, setColorDrafts] = useState<Record<string, ColorDraft[]>>({});
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<ProductDraft | null>(null);
+  const [editColors, setEditColors] = useState<ColorDraft[]>([]);
   const [savingEdits, setSavingEdits] = useState(false);
   const [editMessage, setEditMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<{
@@ -116,16 +165,21 @@ export default function PortalProductsPage() {
       const requestedQuery = params.get("q");
       if (requestedQuery) setQuery(requestedQuery);
       if (params.get("new") === "1") {
-        setAddProductOpen(true);
-        window.setTimeout(
-          () => document.getElementById("new-product")?.scrollIntoView({ behavior: "smooth", block: "start" }),
-          80,
-        );
+        openCreate();
       }
     };
     if (typeof queueMicrotask === "function") queueMicrotask(syncFromUrl);
     else window.setTimeout(syncFromUrl, 0);
   }, []);
+
+  useEffect(() => {
+    if (!addProductOpen && !editingProductId) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [addProductOpen, editingProductId]);
 
   const visibleProducts = [...products]
     .filter((product) => {
@@ -148,12 +202,60 @@ export default function PortalProductsPage() {
       return 0;
     });
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault();
+  const editingProduct = products.find((product) => product.id === editingProductId) ?? null;
+
+  function openCreate() {
+    setCreateStep(1);
+    setMessage(null);
+    setAddProductOpen(true);
+  }
+
+  function closeCreate() {
+    setAddProductOpen(false);
+    setCreateStep(1);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("new")) {
+        url.searchParams.delete("new");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+      }
+    }
+  }
+
+  function openEdit(product: ProductWithVariants) {
+    setEditingProductId(product.id);
+    setEditDraft({
+      title: product.title,
+      price_aed: String(product.price_aed),
+    });
+    setEditColors(draftsFromVariants(product));
+    setEditMessage(null);
+  }
+
+  function closeEdit() {
+    setEditingProductId(null);
+    setEditDraft(null);
+    setEditColors([]);
+    setEditMessage(null);
+  }
+
+  async function onCreate(e?: FormEvent) {
+    e?.preventDefault();
     if (!store) return;
+    if (!form.title.trim()) {
+      setMessage("Add a product name.");
+      setCreateStep(1);
+      return;
+    }
+    if (!form.price_aed.trim() || Number(form.price_aed) < 0) {
+      setMessage("Enter a valid price.");
+      setCreateStep(1);
+      return;
+    }
     const colorError = validateColorDrafts(createColors);
     if (colorError) {
       setMessage(colorError);
+      setCreateStep(2);
       return;
     }
 
@@ -199,7 +301,61 @@ export default function PortalProductsPage() {
     setCreateColors([createColorDraft({ color_name: "Default" })]);
     setSaving(false);
     setMessage("Product added with color options.");
+    closeCreate();
     await loadProducts(store.id);
+  }
+
+  async function saveEdit() {
+    if (!store || !editingProduct || !editDraft) return;
+    const price = Number(editDraft.price_aed);
+    if (!editDraft.title.trim()) {
+      setEditMessage("Every product needs a name.");
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      setEditMessage("Enter a valid price.");
+      return;
+    }
+    const colorError = validateColorDrafts(editColors);
+    if (colorError) {
+      setEditMessage(colorError);
+      return;
+    }
+
+    setSavingEdits(true);
+    setEditMessage(null);
+    const supabase = createClient();
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({
+        title: editDraft.title.trim(),
+        price_aed: price,
+      })
+      .eq("id", editingProduct.id)
+      .eq("store_id", store.id);
+
+    if (updateError) {
+      setEditMessage(updateError.message);
+      setSavingEdits(false);
+      return;
+    }
+
+    try {
+      await replaceProductVariants({
+        storeId: store.id,
+        productId: editingProduct.id,
+        drafts: editColors,
+      });
+    } catch (err) {
+      setEditMessage(err instanceof Error ? err.message : "Could not update colors.");
+      setSavingEdits(false);
+      return;
+    }
+
+    await loadProducts(store.id);
+    setSavingEdits(false);
+    closeEdit();
+    setMessage("Product updated.");
   }
 
   async function toggleAvailable(product: Product) {
@@ -215,6 +371,7 @@ export default function PortalProductsPage() {
     if (!window.confirm(`Delete “${product.title}”? This cannot be undone.`)) return;
     const supabase = createClient();
     await supabase.from("products").delete().eq("id", product.id);
+    if (editingProductId === product.id) closeEdit();
     if (store) await loadProducts(store.id);
   }
 
@@ -227,10 +384,7 @@ export default function PortalProductsPage() {
   async function bulkSetAvailability(isAvailable: boolean) {
     if (!selectedIds.length) return;
     const supabase = createClient();
-    await supabase
-      .from("products")
-      .update({ is_available: isAvailable })
-      .in("id", selectedIds);
+    await supabase.from("products").update({ is_available: isAvailable }).in("id", selectedIds);
     setSelectedIds([]);
     if (store) await loadProducts(store.id);
   }
@@ -246,10 +400,7 @@ export default function PortalProductsPage() {
       if (!product) continue;
       const variants = product.product_variants ?? [];
       if (variants.length > 0) {
-        await supabase
-          .from("product_variants")
-          .update({ stock })
-          .eq("product_id", productId);
+        await supabase.from("product_variants").update({ stock }).eq("product_id", productId);
       } else {
         await supabase.from("products").update({ stock }).eq("id", productId);
       }
@@ -258,170 +409,6 @@ export default function PortalProductsPage() {
     setSelectedIds([]);
     setBulkStock("");
     await loadProducts(store.id);
-  }
-
-  function startEditing() {
-    setDrafts(
-      Object.fromEntries(
-        products.map((product) => [
-          product.id,
-          {
-            title: product.title,
-            price_aed: String(product.price_aed),
-          },
-        ]),
-      ),
-    );
-    setColorDrafts(
-      Object.fromEntries(
-        products.map((product) => [product.id, draftsFromVariants(product)]),
-      ),
-    );
-    setEditMessage(null);
-    setEditing(true);
-  }
-
-  function cancelEditing() {
-    setDrafts({});
-    setColorDrafts({});
-    setEditMessage(null);
-    setEditing(false);
-  }
-
-  function updateDraft(
-    product: Product,
-    field: keyof ProductDraft,
-    value: string,
-  ) {
-    setDrafts((current) => ({
-      ...current,
-      [product.id]: {
-        ...(current[product.id] ?? {
-          title: product.title,
-          price_aed: String(product.price_aed),
-        }),
-        [field]: value,
-      },
-    }));
-  }
-
-  function colorsChanged(product: ProductWithVariants) {
-    const next = colorDrafts[product.id];
-    if (!next) return false;
-    const current = draftsFromVariants(product);
-    if (next.length !== current.length) return true;
-    return JSON.stringify(
-      next.map((draft) => ({
-        id: draft.id ?? null,
-        color_name: draft.color_name.trim(),
-        color_hex: draft.color_hex,
-        sizes: draft.sizes,
-        stock: Number(draft.stock) || 0,
-        imageCount: draft.images.length,
-        hasNewFiles: draft.images.some((image) => Boolean(image.file)),
-        urls: draft.images.map((image) => image.url),
-      })),
-    ) !==
-      JSON.stringify(
-        current.map((draft) => ({
-          id: draft.id ?? null,
-          color_name: draft.color_name.trim(),
-          color_hex: draft.color_hex,
-          sizes: draft.sizes,
-          stock: Number(draft.stock) || 0,
-          imageCount: draft.images.length,
-          hasNewFiles: false,
-          urls: draft.images.map((image) => image.url),
-        })),
-      );
-  }
-
-  function isProductChanged(product: ProductWithVariants) {
-    const draft = drafts[product.id];
-    return Boolean(
-      colorsChanged(product) ||
-        (draft &&
-          (draft.title.trim() !== product.title ||
-            Number(draft.price_aed) !== Number(product.price_aed))),
-    );
-  }
-
-  async function saveEdits() {
-    if (!store) return;
-
-    const changedProducts = products.filter(isProductChanged);
-    if (changedProducts.length === 0) {
-      cancelEditing();
-      return;
-    }
-
-    for (const product of changedProducts) {
-      const draft = drafts[product.id];
-      const colors = colorDrafts[product.id] ?? [];
-      const price = Number(draft?.price_aed);
-      if (!draft?.title.trim()) {
-        setEditMessage("Every product needs a name.");
-        return;
-      }
-      if (!Number.isFinite(price) || price < 0) {
-        setEditMessage(`Enter a valid price for ${draft.title.trim()}.`);
-        return;
-      }
-      const colorError = validateColorDrafts(colors);
-      if (colorError) {
-        setEditMessage(`${product.title}: ${colorError}`);
-        return;
-      }
-    }
-
-    setSavingEdits(true);
-    setEditMessage(null);
-    const supabase = createClient();
-
-    for (const product of changedProducts) {
-      const draft = drafts[product.id];
-      const colors = colorDrafts[product.id] ?? [];
-
-      const { error: updateError } = await supabase
-        .from("products")
-        .update({
-          title: draft.title.trim(),
-          price_aed: Number(draft.price_aed),
-        })
-        .eq("id", product.id)
-        .eq("store_id", store.id);
-
-      if (updateError) {
-        setEditMessage(`Could not update ${product.title}: ${updateError.message}`);
-        setSavingEdits(false);
-        return;
-      }
-
-      try {
-        await replaceProductVariants({
-          storeId: store.id,
-          productId: product.id,
-          drafts: colors,
-        });
-      } catch (err) {
-        setEditMessage(
-          `Could not update colors for ${product.title}: ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`,
-        );
-        setSavingEdits(false);
-        return;
-      }
-    }
-
-    await loadProducts(store.id);
-    setDrafts({});
-    setColorDrafts({});
-    setSavingEdits(false);
-    setEditing(false);
-    setMessage(
-      `${changedProducts.length} product${changedProducts.length === 1 ? "" : "s"} updated.`,
-    );
   }
 
   if (error === "unauthenticated") {
@@ -454,71 +441,36 @@ export default function PortalProductsPage() {
         title="Products"
         description={`Manage the live catalog, stock levels, options, and availability for ${store.name}.`}
       >
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={cancelEditing}
-              disabled={savingEdits}
-              className="portal-button-secondary disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={saveEdits}
-              disabled={savingEdits}
-              className="portal-button-primary disabled:opacity-50"
-            >
-              {savingEdits ? "Saving…" : "Save changes"}
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={startEditing}
-            disabled={products.length === 0}
-            className="portal-button-primary disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <PortalIcon name="settings" className="h-4 w-4" />
-            Edit catalog
-          </button>
-        )}
-        {!editing ? (
-          <button
-            type="button"
-            onClick={() => {
-              setAddProductOpen(true);
-              window.setTimeout(
-                () => document.getElementById("new-product")?.scrollIntoView({ behavior: "smooth", block: "start" }),
-                0,
-              );
-            }}
-            className="portal-button-secondary"
-          >
-            <PortalIcon name="plus" className="h-4 w-4" />
-            Add product
-          </button>
-        ) : null}
+        <button type="button" onClick={openCreate} className="portal-button-primary">
+          <PortalIcon name="plus" className="h-4 w-4" />
+          Add product
+        </button>
       </PortalPageHeader>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <PortalMetric label="Live products" value={String(products.filter((product) => product.is_available).length)} detail={`${products.length} in catalog`} icon="products" />
-        <PortalMetric label="Low stock" value={String(products.filter((product) => product.stock <= 5).length)} detail="Items with 5 units or fewer" icon="warning" tone={products.some((product) => product.stock <= 5) ? "urgent" : "default"} />
-        <PortalMetric label="Hidden products" value={String(products.filter((product) => !product.is_available).length)} detail="Not visible to shoppers" icon="eye" />
+        <PortalMetric
+          label="Live products"
+          value={String(products.filter((product) => product.is_available).length)}
+          detail={`${products.length} in catalog`}
+          icon="products"
+        />
+        <PortalMetric
+          label="Low stock"
+          value={String(products.filter((product) => product.stock <= 5).length)}
+          detail="Items with 5 units or fewer"
+          icon="warning"
+          tone={products.some((product) => product.stock <= 5) ? "urgent" : "default"}
+        />
+        <PortalMetric
+          label="Hidden products"
+          value={String(products.filter((product) => !product.is_available).length)}
+          detail="Not visible to shoppers"
+          icon="eye"
+        />
       </div>
 
-      {editing ? (
-        <div className="rounded-2xl border border-accent/30 bg-[#fff0f4] px-4 py-3 text-sm text-ink">
-          Editing is on. Update names, prices, and color options (photos, sizes,
-          stock) on this page, then save once.
-        </div>
-      ) : null}
-
-      {editMessage ? (
-        <p role="alert" className="rounded-xl bg-[#fff0f4] px-4 py-3 text-sm text-accent-deep">
-          {editMessage}
-        </p>
+      {message ? (
+        <p className="rounded-xl bg-[#edf7f3] px-4 py-3 text-sm text-[#1f594f]">{message}</p>
       ) : null}
 
       <div className="portal-card p-4">
@@ -604,215 +556,26 @@ export default function PortalProductsPage() {
         </div>
       </div>
 
-      {addProductOpen ? (
-      <form
-        id="new-product"
-        onSubmit={onCreate}
-        className="grid gap-3 rounded-2xl border border-[#cbdad4] bg-white p-5 shadow-[0_12px_30px_-28px_rgba(27,48,39,0.45)] sm:grid-cols-2"
-      >
-        <div className="flex items-center justify-between sm:col-span-2">
-          <div>
-            <p className="portal-eyebrow">New catalog item</p>
-            <h2 className="mt-1 text-lg font-semibold text-[#263530]">Add product</h2>
-          </div>
-          <button type="button" onClick={() => setAddProductOpen(false)} className="text-xs font-semibold text-[#66736e] hover:text-[#2f6f66]">Close</button>
-        </div>
-        <input
-          className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
-          placeholder="Title"
-          value={form.title}
-          onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-          required
-        />
-        <input
-          className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm"
-          placeholder="Price AED"
-          type="number"
-          min="0"
-          step="0.01"
-          value={form.price_aed}
-          onChange={(e) => setForm((f) => ({ ...f, price_aed: e.target.value }))}
-          required
-        />
-        <textarea
-          className="rounded-xl border border-line bg-background px-3 py-2.5 text-sm sm:col-span-2"
-          placeholder="Description"
-          rows={3}
-          value={form.description}
-          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-        />
-        <div className="sm:col-span-2">
-          <ColorVariantEditor
-            value={createColors}
-            onChange={setCreateColors}
-            disabled={saving}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={saving}
-          className="portal-button-primary sm:col-span-2 disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Add product"}
-        </button>
-        {message ? (
-          <p className="text-sm text-accent-deep sm:col-span-2">{message}</p>
-        ) : null}
-      </form>
-      ) : null}
+      <CatalogCards
+        products={visibleProducts}
+        selectedIds={selectedIds}
+        onSelect={toggleSelected}
+        onPreview={(product) =>
+          setPreview({
+            images: product.image_urls.map((url, imageIndex) => ({
+              url,
+              label: `${product.title} photo ${imageIndex + 1}`,
+            })),
+            title: product.title,
+          })
+        }
+        onToggle={toggleAvailable}
+        onDelete={removeProduct}
+        onEdit={openEdit}
+        className="lg:hidden"
+      />
 
-      {editing ? (
-      <ul className="space-y-3">
-        {visibleProducts.map((product) => {
-          const variants = [...(product.product_variants ?? [])].sort(
-            (a, b) => a.sort_order - b.sort_order,
-          );
-          return (
-            <li
-              key={product.id}
-              className="rounded-2xl border border-line bg-surface p-4"
-            >
-              <div className="flex flex-wrap items-start gap-4">
-                <input
-                  type="checkbox"
-                  className="mt-2"
-                  checked={selectedIds.includes(product.id)}
-                  onChange={() => toggleSelected(product.id)}
-                  aria-label={`Select ${product.title}`}
-                />
-                {product.image_urls?.length ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPreview({
-                        images: product.image_urls.map((url, imageIndex) => ({
-                          url,
-                          label: `${product.title} · photo ${imageIndex + 1}`,
-                        })),
-                        title: product.title,
-                      })
-                    }
-                    title={`Preview photos for ${product.title}`}
-                    className="group relative h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-sand"
-                  >
-                    <img
-                      src={product.image_urls[0]}
-                      alt={product.title}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                    <span className="absolute inset-x-0 bottom-0 bg-ink/75 py-0.5 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100">
-                      {product.image_urls.length} photo
-                      {product.image_urls.length === 1 ? "" : "s"}
-                    </span>
-                  </button>
-                ) : (
-                  <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-sand" />
-                )}
-                <div className="min-w-[180px] flex-1 space-y-2">
-                  {editing ? (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={drafts[product.id]?.title ?? product.title}
-                        onChange={(event) =>
-                          updateDraft(product, "title", event.target.value)
-                        }
-                        className="w-full rounded-lg border border-line bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-accent"
-                        aria-label={`Name for ${product.title}`}
-                      />
-                      <label className="flex max-w-44 items-center rounded-lg border border-line bg-background px-3 py-2 text-sm focus-within:border-accent">
-                        <span className="mr-2 text-xs font-medium text-muted">AED</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={
-                            drafts[product.id]?.price_aed ??
-                            String(product.price_aed)
-                          }
-                          onChange={(event) =>
-                            updateDraft(product, "price_aed", event.target.value)
-                          }
-                          className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
-                          aria-label={`Price for ${product.title}`}
-                        />
-                      </label>
-                      {isProductChanged(product) ? (
-                        <span className="inline-flex rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-deep">
-                          Changed
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <>
-                      <p className="font-medium">{product.title}</p>
-                      <p className="text-sm text-muted">
-                        {formatAed(product.price_aed)} · {product.stock} in stock
-                      </p>
-                      {variants.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {variants.map((variant) => (
-                            <span
-                              key={variant.id}
-                              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-background px-2.5 py-1 text-[11px] text-ink"
-                            >
-                              <span
-                                className="h-2.5 w-2.5 rounded-full border border-line"
-                                style={{
-                                  background: variant.color_hex ?? "#c45b7a",
-                                }}
-                              />
-                              {variant.color_name}
-                              <span className="text-muted">· {variant.stock}</span>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted">
-                          No color options yet — use Edit products to add them.
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleAvailable(product)}
-                    className="rounded-full border border-line px-3 py-1.5 text-xs"
-                  >
-                    {product.is_available ? "Available" : "Hidden"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeProduct(product)}
-                    className="text-xs text-accent-deep"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-
-              {editing ? (
-                <div className="mt-4 border-t border-line pt-4">
-                  <ColorVariantEditor
-                    compact
-                    value={colorDrafts[product.id] ?? draftsFromVariants(product)}
-                    onChange={(next) =>
-                      setColorDrafts((current) => ({
-                        ...current,
-                        [product.id]: next,
-                      }))
-                    }
-                    disabled={savingEdits}
-                  />
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-      ) : (
+      <div className="hidden lg:block">
         <CatalogTable
           products={visibleProducts}
           selectedIds={selectedIds}
@@ -828,8 +591,207 @@ export default function PortalProductsPage() {
           }
           onToggle={toggleAvailable}
           onDelete={removeProduct}
+          onEdit={openEdit}
         />
-      )}
+      </div>
+
+      {!editingProductId && !addProductOpen ? (
+        <button
+          type="button"
+          onClick={openCreate}
+          className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-[#21342e] text-white shadow-[0_16px_40px_-18px_rgba(20,35,29,0.65)] lg:hidden"
+          aria-label="Add product"
+        >
+          <PortalIcon name="plus" className="h-6 w-6" />
+        </button>
+      ) : null}
+
+      {addProductOpen ? (
+        <SheetShell
+          title="Add product"
+          subtitle={createStep === 1 ? "Step 1 of 2 · Details" : "Step 2 of 2 · Photos & options"}
+          onClose={closeCreate}
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (createStep === 1) {
+                if (!form.title.trim() || !form.price_aed.trim()) {
+                  setMessage("Add a title and price to continue.");
+                  return;
+                }
+                setMessage(null);
+                setCreateStep(2);
+                return;
+              }
+              void onCreate();
+            }}
+            className="mx-auto flex min-h-full max-w-2xl flex-col"
+          >
+            <div className="mb-4 flex gap-2">
+              {[1, 2].map((step) => (
+                <div
+                  key={step}
+                  className={`h-1.5 flex-1 rounded-full ${
+                    createStep >= step ? "bg-[#2f6f66]" : "bg-[#d5ddd9]"
+                  }`}
+                />
+              ))}
+            </div>
+
+            {createStep === 1 ? (
+              <div className="space-y-3">
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">Title</span>
+                  <input
+                    className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
+                    placeholder="Product name"
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    required
+                    autoFocus
+                  />
+                </label>
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">Price (AED)</span>
+                  <input
+                    className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
+                    placeholder="0.00"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.price_aed}
+                    onChange={(e) => setForm((f) => ({ ...f, price_aed: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">Description</span>
+                  <textarea
+                    className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
+                    placeholder="Optional details for shoppers"
+                    rows={4}
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  />
+                </label>
+              </div>
+            ) : (
+              <ColorVariantEditor
+                value={createColors}
+                onChange={setCreateColors}
+                disabled={saving}
+              />
+            )}
+
+            {message ? <p className="mt-3 text-sm text-accent-deep">{message}</p> : null}
+
+            <StickyActionBar>
+              <div className="flex gap-2">
+                {createStep === 2 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCreateStep(1)}
+                    disabled={saving}
+                    className="portal-button-secondary flex-1 disabled:opacity-50"
+                  >
+                    Back
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={closeCreate}
+                    className="portal-button-secondary flex-1"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="portal-button-primary flex-[1.4] disabled:opacity-50"
+                >
+                  {createStep === 1 ? "Continue" : saving ? "Saving…" : "Save product"}
+                </button>
+              </div>
+            </StickyActionBar>
+          </form>
+        </SheetShell>
+      ) : null}
+
+      {editingProduct && editDraft ? (
+        <SheetShell
+          title="Edit product"
+          subtitle={editingProduct.title}
+          onClose={closeEdit}
+        >
+          <div className="mx-auto flex min-h-full max-w-2xl flex-col">
+            <div className="space-y-3">
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-[#40534d]">Title</span>
+                <input
+                  type="text"
+                  value={editDraft.title}
+                  onChange={(event) =>
+                    setEditDraft((current) =>
+                      current ? { ...current, title: event.target.value } : current,
+                    )
+                  }
+                  className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm outline-none focus:border-accent"
+                />
+              </label>
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-[#40534d]">Price (AED)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editDraft.price_aed}
+                  onChange={(event) =>
+                    setEditDraft((current) =>
+                      current ? { ...current, price_aed: event.target.value } : current,
+                    )
+                  }
+                  className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm outline-none focus:border-accent"
+                />
+              </label>
+              <ColorVariantEditor
+                compact
+                value={editColors}
+                onChange={setEditColors}
+                disabled={savingEdits}
+              />
+            </div>
+
+            {editMessage ? (
+              <p role="alert" className="mt-3 text-sm text-accent-deep">
+                {editMessage}
+              </p>
+            ) : null}
+
+            <StickyActionBar>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeEdit}
+                  disabled={savingEdits}
+                  className="portal-button-secondary flex-1 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveEdit()}
+                  disabled={savingEdits}
+                  className="portal-button-primary flex-[1.4] disabled:opacity-50"
+                >
+                  {savingEdits ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </StickyActionBar>
+          </div>
+        </SheetShell>
+      ) : null}
 
       {preview ? (
         <ImagePreviewDialog
@@ -842,13 +804,15 @@ export default function PortalProductsPage() {
   );
 }
 
-function CatalogTable({
+function CatalogCards({
   products,
   selectedIds,
   onSelect,
   onPreview,
   onToggle,
   onDelete,
+  onEdit,
+  className = "",
 }: {
   products: ProductWithVariants[];
   selectedIds: string[];
@@ -856,24 +820,271 @@ function CatalogTable({
   onPreview: (product: ProductWithVariants) => void;
   onToggle: (product: Product) => void;
   onDelete: (product: Product) => void;
+  onEdit: (product: ProductWithVariants) => void;
+  className?: string;
 }) {
   if (!products.length) {
-    return <PortalEmpty icon="products" title="No products match these filters" description="Try a different search, or add a new product to start building your catalog." action={{ label: "Add product", href: "/portal/products?new=1" }} />;
+    return (
+      <div className={className}>
+        <PortalEmpty
+          icon="products"
+          title="No products match these filters"
+          description="Try a different search, or add a new product to start building your catalog."
+          action={{ label: "Add product", href: "/portal/products?new=1" }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <ul className={`space-y-3 ${className}`}>
+      {products.map((product) => {
+        const variants = [...(product.product_variants ?? [])].sort(
+          (a, b) => a.sort_order - b.sort_order,
+        );
+        return (
+          <li key={product.id} className="portal-card overflow-hidden p-4">
+            <div className="flex gap-3">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={selectedIds.includes(product.id)}
+                onChange={() => onSelect(product.id)}
+                aria-label={`Select ${product.title}`}
+              />
+              <button
+                type="button"
+                onClick={() => onPreview(product)}
+                disabled={!product.image_urls.length}
+                className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-[#edf3f0] disabled:cursor-default"
+              >
+                {product.image_urls.length ? (
+                  <img
+                    src={product.image_urls[0]}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="grid h-full place-items-center text-[10px] text-[#7b8882]">
+                    No photo
+                  </span>
+                )}
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[#263530]">{product.title}</p>
+                    <p className="mt-1 text-sm text-[#5b6a64]">
+                      {formatAed(product.price_aed)} · {product.stock} in stock
+                    </p>
+                  </div>
+                  {product.is_available ? <StatusBadge status="live" /> : <StatusBadge status="paused" />}
+                </div>
+                {variants.length ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {variants.slice(0, 4).map((variant) => (
+                      <span
+                        key={variant.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-[#fbfdfc] px-2 py-1 text-[11px] text-ink"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-full border border-line"
+                          style={{ background: variant.color_hex ?? "#c45b7a" }}
+                        />
+                        {variant.color_name}
+                      </span>
+                    ))}
+                    {variants.length > 4 ? (
+                      <span className="text-[11px] text-muted">+{variants.length - 4}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => onEdit(product)}
+                className="portal-button-primary px-2 py-2.5 text-xs"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => onToggle(product)}
+                className="portal-button-secondary px-2 py-2.5 text-xs"
+              >
+                {product.is_available ? "Hide" : "Show"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(product)}
+                className="rounded-lg px-2 py-2.5 text-xs font-semibold text-[#b34e4e] hover:bg-[#fdf1f1]"
+              >
+                Delete
+              </button>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function CatalogTable({
+  products,
+  selectedIds,
+  onSelect,
+  onPreview,
+  onToggle,
+  onDelete,
+  onEdit,
+}: {
+  products: ProductWithVariants[];
+  selectedIds: string[];
+  onSelect: (productId: string) => void;
+  onPreview: (product: ProductWithVariants) => void;
+  onToggle: (product: Product) => void;
+  onDelete: (product: Product) => void;
+  onEdit: (product: ProductWithVariants) => void;
+}) {
+  if (!products.length) {
+    return (
+      <PortalEmpty
+        icon="products"
+        title="No products match these filters"
+        description="Try a different search, or add a new product to start building your catalog."
+        action={{ label: "Add product", href: "/portal/products?new=1" }}
+      />
+    );
   }
 
   return (
     <div className="portal-card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf1ef] px-5 py-4">
-        <div><p className="text-sm font-semibold text-[#263530]">Catalog inventory</p><p className="mt-1 text-xs text-[#7b8882]">{products.length} product{products.length === 1 ? "" : "s"} in this view</p></div>
+        <div>
+          <p className="text-sm font-semibold text-[#263530]">Catalog inventory</p>
+          <p className="mt-1 text-xs text-[#7b8882]">
+            {products.length} product{products.length === 1 ? "" : "s"} in this view
+          </p>
+        </div>
         <p className="text-xs text-[#7b8882]">Select products above to make bulk changes.</p>
       </div>
       <div className="overflow-x-auto">
-        <table className="portal-table min-w-[800px] w-full text-left">
-          <thead className="bg-[#fbfdfc]"><tr><th className="w-12 px-5 py-3">Select</th><th className="px-3 py-3">Product</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Stock</th><th className="px-4 py-3 text-right">Price</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
-          <tbody>{products.map((product) => {
-            const variants = [...(product.product_variants ?? [])].sort((a, b) => a.sort_order - b.sort_order);
-            return <tr key={product.id} className="transition hover:bg-[#f8faf9]"><td className="px-5 py-4"><input type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => onSelect(product.id)} aria-label={`Select ${product.title}`} /></td><td className="px-3 py-4"><div className="flex items-center gap-3"><button type="button" onClick={() => onPreview(product)} disabled={!product.image_urls.length} className="group h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-[#edf3f0] disabled:cursor-default">{product.image_urls.length ? <><img src={product.image_urls[0]} alt="" className="h-full w-full object-cover transition group-hover:scale-105" /><span className="sr-only">Preview photos</span></> : <span className="text-[10px] text-[#7b8882]">No photo</span>}</button><span className="min-w-0"><span className="block truncate text-sm font-semibold text-[#34423d]">{product.title}</span><span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">{variants.length ? variants.map((variant) => `${variant.color_name} (${variant.stock})`).join(" / ") : "No colour variants"}</span></span></div></td><td className="px-4 py-4">{product.is_available ? <StatusBadge status="live" /> : <StatusBadge status="paused" />}</td><td className="px-4 py-4 text-right"><span className={`text-sm font-semibold ${product.stock <= 5 ? "text-[#a56225]" : "text-[#40534d]"}`}>{product.stock}</span>{product.stock <= 5 ? <span className="ml-2"><StatusBadge status="low_stock" /></span> : null}</td><td className="px-4 py-4 text-right text-sm font-semibold text-[#263530]">{formatAed(product.price_aed)}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button type="button" onClick={() => onToggle(product)} className="portal-button-secondary px-3 py-1.5 text-xs">{product.is_available ? "Hide" : "Show"}</button><button type="button" onClick={() => onDelete(product)} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-[#b34e4e] hover:bg-[#fdf1f1]">Delete</button></div></td></tr>;
-          })}</tbody>
+        <table className="portal-table w-full min-w-[860px] text-left">
+          <thead className="bg-[#fbfdfc]">
+            <tr>
+              <th className="w-12 px-5 py-3">Select</th>
+              <th className="px-3 py-3">Product</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Stock</th>
+              <th className="px-4 py-3 text-right">Price</th>
+              <th className="px-5 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => {
+              const variants = [...(product.product_variants ?? [])].sort(
+                (a, b) => a.sort_order - b.sort_order,
+              );
+              return (
+                <tr key={product.id} className="transition hover:bg-[#f8faf9]">
+                  <td className="px-5 py-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(product.id)}
+                      onChange={() => onSelect(product.id)}
+                      aria-label={`Select ${product.title}`}
+                    />
+                  </td>
+                  <td className="px-3 py-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => onPreview(product)}
+                        disabled={!product.image_urls.length}
+                        className="group h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-[#edf3f0] disabled:cursor-default"
+                      >
+                        {product.image_urls.length ? (
+                          <>
+                            <img
+                              src={product.image_urls[0]}
+                              alt=""
+                              className="h-full w-full object-cover transition group-hover:scale-105"
+                            />
+                            <span className="sr-only">Preview photos</span>
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-[#7b8882]">No photo</span>
+                        )}
+                      </button>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-[#34423d]">
+                          {product.title}
+                        </span>
+                        <span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">
+                          {variants.length
+                            ? variants
+                                .map((variant) => `${variant.color_name} (${variant.stock})`)
+                                .join(" / ")
+                            : "No colour variants"}
+                        </span>
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    {product.is_available ? (
+                      <StatusBadge status="live" />
+                    ) : (
+                      <StatusBadge status="paused" />
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    <span
+                      className={`text-sm font-semibold ${
+                        product.stock <= 5 ? "text-[#a56225]" : "text-[#40534d]"
+                      }`}
+                    >
+                      {product.stock}
+                    </span>
+                    {product.stock <= 5 ? (
+                      <span className="ml-2">
+                        <StatusBadge status="low_stock" />
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-4 text-right text-sm font-semibold text-[#263530]">
+                    {formatAed(product.price_aed)}
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(product)}
+                        className="portal-button-primary px-3 py-1.5 text-xs"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onToggle(product)}
+                        className="portal-button-secondary px-3 py-1.5 text-xs"
+                      >
+                        {product.is_available ? "Hide" : "Show"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(product)}
+                        className="rounded-lg px-2 py-1.5 text-xs font-semibold text-[#b34e4e] hover:bg-[#fdf1f1]"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
         </table>
       </div>
     </div>

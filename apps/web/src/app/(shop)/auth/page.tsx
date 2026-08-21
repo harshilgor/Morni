@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { PortalIcon } from "@/components/portal-icons";
 import { createClient } from "@/lib/supabase/client";
 
 function safeNextPath(value: string | null) {
@@ -16,6 +17,7 @@ function AuthForm() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [message, setMessage] = useState<string | null>(
     authError ? "This sign-in link is invalid or has expired. Please request a new one." : null,
@@ -178,14 +180,26 @@ function AuthForm() {
         </label>
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted">Password</span>
-          <input
-            type="password"
-            className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-          />
+          <span className="relative block">
+            <input
+              type={showPassword ? "text" : "password"}
+              className="w-full rounded-xl border border-line bg-background px-3 py-2.5 pr-11"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-muted transition hover:text-ink"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+            >
+              <PortalIcon name={showPassword ? "eyeOff" : "eye"} className="h-4 w-4" />
+            </button>
+          </span>
         </label>
 
         {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
