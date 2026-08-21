@@ -34,6 +34,10 @@ const satoshi = localFont({
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
+// Incremental Cache Components adoption: allow request-time routes to block
+// until they are converted to Suspense / `use cache`.
+export const instant = false;
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "Morni",

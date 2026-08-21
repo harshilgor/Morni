@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAfsPaymentsEnabled } from "@/lib/afs/client";
 import {
   sendOrderConfirmationEmail,
   sendStoreNewOrderEmails,
@@ -30,6 +31,7 @@ type CheckoutBody = {
   address?: CheckoutAddress;
   saveAddress?: boolean;
   makeDefault?: boolean;
+  paymentMethod?: "cod" | "card";
 };
 
 // Postgres accepts any 8-4-4-4-12 hex uuid; seed ids like
@@ -124,9 +126,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A product in your bag is no longer available." }, { status: 400 });
   }
 
+  const requestedMethod = body?.paymentMethod === "card" ? "card" : "cod";
+  if (requestedMethod === "card" && !isAfsPaymentsEnabled()) {
+    return NextResponse.json(
+      { error: "Card payments are not available right now. Choose pay later or try again later." },
+      { status: 503 },
+    );
+  }
+  const paymentMethod = requestedMethod;
+
   const { data, error } = await admin.rpc("place_order_with_items", {
     p_store_id: storeId,
-    p_payment_method: "cod",
+    p_payment_method: paymentMethod,
     p_subtotal_aed: 0,
     p_delivery_fee_aed: 0,
     p_total_aed: 0,
@@ -176,20 +187,26 @@ export async function POST(request: Request) {
     }
   }
 
-  try {
-    await sendOrderConfirmationEmail(order.id);
-  } catch (sendError) {
-    console.error("Order placed but confirmation email failed", sendError);
-  }
+  // Card orders email only after AFS confirms payment (see /api/payments/afs/result).
+  if (paymentMethod === "cod") {
+    try {
+      await sendOrderConfirmationEmail(order.id);
+    } catch (sendError) {
+      console.error("Order placed but confirmation email failed", sendError);
+    }
 
-  try {
-    await sendStoreNewOrderEmails(order.id);
-  } catch (sendError) {
-    console.error("Order placed but store notification email failed", sendError);
+    try {
+      await sendStoreNewOrderEmails(order.id);
+    } catch (sendError) {
+      console.error("Order placed but store notification email failed", sendError);
+    }
   }
 
   return NextResponse.json(
-    { order: { id: order.id, order_number: order.order_number ?? null } },
+    {
+      order: { id: order.id, order_number: order.order_number ?? null },
+      next: paymentMethod === "card" ? "pay" : "confirmation",
+    },
     { status: 201 },
   );
 }

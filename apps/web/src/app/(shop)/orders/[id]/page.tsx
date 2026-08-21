@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { emirateLabel, formatAed, orderStatusLabel } from "@/lib/format";
@@ -27,11 +27,25 @@ function resolveStore(stores: OrderWithStore["stores"]): OrderStore | null {
 }
 
 export default function OrderDetailPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-3xl px-4 py-14 text-muted">Loading…</div>}>
+      <OrderDetailPageContent />
+    </Suspense>
+  );
+}
+
+function OrderDetailPageContent() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const [order, setOrder] = useState<OrderWithStore | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
+  const paymentFlash = searchParams.get("paid") === "1"
+    ? "paid"
+    : searchParams.get("payment") === "failed"
+      ? "failed"
+      : null;
 
   useEffect(() => {
     const supabase = createClient();
@@ -102,6 +116,30 @@ export default function OrderDetailPage() {
         </p>
       ) : null}
 
+      {paymentFlash === "paid" ? (
+        <p className="mt-6 rounded-xl bg-[#eef8f1] px-4 py-3 text-sm text-ink">
+          Payment received. The boutique has been notified.
+        </p>
+      ) : null}
+      {paymentFlash === "failed" ||
+      (order.payment_method === "card" &&
+        order.payment_status !== "paid" &&
+        order.status !== "cancelled") ? (
+        <div className="mt-6 space-y-3 rounded-xl bg-[#fff0f4] px-4 py-3 text-sm text-accent-deep">
+          <p>
+            {paymentFlash === "failed"
+              ? "Payment was not completed. You can try again below."
+              : "Payment required. Complete card payment so the boutique can start preparing your order."}
+          </p>
+          <Link
+            href={`/checkout/pay/${order.id}`}
+            className="inline-flex border-b border-accent-deep font-semibold uppercase tracking-[0.08em]"
+          >
+            Pay now
+          </Link>
+        </div>
+      ) : null}
+
       {order.status !== "cancelled" ? (
         <div className="mt-8 grid grid-cols-5 gap-2">
           {STEPS.map((step, i) => (
@@ -141,7 +179,11 @@ export default function OrderDetailPage() {
             <span>
               {order.payment_method === "cod"
                 ? "Pay later"
-                : `${order.payment_method.replaceAll("_", " ")} · ${order.payment_status}`}
+                : order.payment_status === "paid"
+                  ? "Card · Paid"
+                  : order.payment_status === "failed"
+                    ? "Card · Payment failed"
+                    : "Card · Payment required"}
             </span>
           </div>
           <div className="mt-2 flex justify-between font-medium">

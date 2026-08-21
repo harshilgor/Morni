@@ -16,10 +16,16 @@ export async function POST(
   const admin = createAdminClient();
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("id, store_id, status")
+    .select("id, store_id, status, payment_method, payment_status")
     .eq("id", orderId)
     .maybeSingle();
   if (orderError || !order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  if (order.payment_method === "card" && order.payment_status !== "paid") {
+    return NextResponse.json(
+      { error: "This order must be paid before it can be fulfilled." },
+      { status: 409 },
+    );
+  }
   if (order.status !== "picking") {
     return NextResponse.json({ error: "Only an order being prepared can be marked ready for pickup." }, { status: 409 });
   }

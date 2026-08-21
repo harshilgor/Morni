@@ -1,53 +1,22 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
-import { createClient } from "@/lib/supabase/server";
-import {
-  CATEGORY_PRODUCT_BATCH_SIZE,
-  getCategoryProductPage,
-} from "@/lib/category-product-page";
-import {
-  getBrowseCategory,
-  mergeBrowseCategories,
-  type BrowseCategory,
-} from "@/lib/browse-categories";
+import { ProductGridSkeleton } from "@/components/catalog-skeletons";
+import { getCachedCategoryPage } from "@/lib/catalog";
 
-export default async function CategoryPage({
+async function CategoryPageContent({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
+  const cached = await getCachedCategoryPage(slug);
+  if (!cached) notFound();
+  if (cached.category.slug === "more") redirect("/");
 
-  const categoryListPromise = supabase
-    .from("browse_categories")
-    .select("name, slug")
-    .neq("slug", "more")
-    .order("sort_order");
-  const { data: categoryData } = await supabase
-    .from("browse_categories")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  const category = getBrowseCategory(
-    slug,
-    categoryData ? [categoryData as BrowseCategory] : [],
-  );
-
-  if (!category) notFound();
-
-  if (category.slug === "more") redirect("/");
-
-  const [productPage, { data: categoryList }] = await Promise.all([
-    getCategoryProductPage(supabase, category, 0, CATEGORY_PRODUCT_BATCH_SIZE),
-    categoryListPromise,
-  ]);
+  const { category, productPage, categories } = cached;
   const products = productPage.products as BrowsableProduct[];
-  const categories = mergeBrowseCategories(
-    (categoryList ?? []) as BrowseCategory[],
-  ).map(({ name, slug: categorySlug }) => ({ name, slug: categorySlug }));
   const ratings = productPage.ratings;
 
   return (
@@ -66,7 +35,9 @@ export default async function CategoryPage({
             {category.name}
           </h1>
           <p className="mt-1 hidden text-sm text-muted sm:block">
-            {products.length}{productPage.hasMore ? "+" : ""} {products.length === 1 ? "piece" : "pieces"} from local boutiques
+            {products.length}
+            {productPage.hasMore ? "+" : ""}{" "}
+            {products.length === 1 ? "piece" : "pieces"} from local boutiques
           </p>
         </div>
         {category.badge ? (
@@ -113,5 +84,23 @@ export default async function CategoryPage({
         )}
       </div>
     </div>
+  );
+}
+
+export default function CategoryPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <ProductGridSkeleton />
+        </div>
+      }
+    >
+      <CategoryPageContent params={params} />
+    </Suspense>
   );
 }

@@ -26,7 +26,7 @@ export async function PATCH(
   const admin = createAdminClient();
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("id, store_id, status")
+    .select("id, store_id, status, payment_method, payment_status")
     .eq("id", orderId)
     .maybeSingle();
   if (orderError || !order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -42,6 +42,13 @@ export async function PATCH(
   ]);
   if (!membership && profile?.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (order.payment_method === "card" && order.payment_status !== "paid") {
+    return NextResponse.json(
+      { error: "This order must be paid before it can be fulfilled." },
+      { status: 409 },
+    );
   }
 
   const expectedStatus = NEXT_STATUS[order.status as OrderStatus];

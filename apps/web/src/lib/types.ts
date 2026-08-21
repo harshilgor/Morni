@@ -88,6 +88,19 @@ export type ProductVariant = {
   sort_order: number;
 };
 
+export type StoreCampaign = {
+  id: string;
+  title: string;
+  description: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  is_active?: boolean;
+};
+
+export type RelatedProduct = Product & {
+  stores: { slug: string; name: string };
+};
+
 export type Order = {
   id: string;
   order_number: string;

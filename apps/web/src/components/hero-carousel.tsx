@@ -71,7 +71,7 @@ const SLIDES: Slide[] = [
     subtitle: "Easy outfits for every moment.",
     cta: "Shop brunch & everyday",
     href: "/categories/casual-wear",
-    image: "/hero/brunch-everyday.png",
+    image: "/hero/brunch-everyday.webp",
     visualOnly: true,
   },
   {
@@ -81,7 +81,7 @@ const SLIDES: Slide[] = [
     subtitle: "Celebrate beautifully with a look they will keep.",
     cta: "Discover gifting",
     href: "/categories/jewelry",
-    image: "/hero/gifting-edit.png",
+    image: "/hero/gifting-edit.webp",
     visualOnly: true,
   },
   {

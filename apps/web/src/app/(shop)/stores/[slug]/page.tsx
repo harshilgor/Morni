@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import { connection } from "next/server";
 import {
   ProductBrowser,
   type BrowsableProduct,
@@ -8,24 +10,15 @@ import {
   StoreProfileHeader,
   type StorePromo,
 } from "@/components/store-profile-header";
-import { createClient } from "@/lib/supabase/server";
+import { ProductGridSkeleton } from "@/components/catalog-skeletons";
+import { getCachedStoreBySlug, getCachedStoreCatalog } from "@/lib/catalog";
 import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
 import { emirateLabel } from "@/lib/format";
-import { fetchProductRatingMap } from "@/lib/product-ratings";
 import type { Product, Store } from "@/lib/types";
 
 type StoreProduct = Product & {
   created_at?: string | null;
   categories: { name: string; slug: string } | null;
-};
-
-type StoreCampaign = {
-  id: string;
-  title: string;
-  description: string | null;
-  starts_at: string | null;
-  ends_at: string | null;
-  is_active: boolean;
 };
 
 function toMinutes(value: string | null) {
@@ -49,48 +42,48 @@ function formatHours(opensAt: string | null, closesAt: string | null) {
   return `${opensAt.slice(0, 5)} – ${closesAt.slice(0, 5)}`;
 }
 
-export default async function StorePage({
+async function LiveStoreHeader({
+  store,
+  hours,
+  rating,
+  reviewCount,
+  promos,
+}: {
+  store: Store;
+  hours: string;
+  rating: number | null;
+  reviewCount: number;
+  promos: StorePromo[];
+}) {
+  await connection();
+  const openNow = isStoreOpenNow(store.opens_at, store.closes_at);
+  return (
+    <StoreProfileHeader
+      store={store}
+      openNow={openNow}
+      hours={hours}
+      rating={rating}
+      reviewCount={reviewCount}
+      promos={promos}
+    />
+  );
+}
+
+async function StorePageContent({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
-
-  const { data: store } = await supabase
-    .from("stores")
-    .select("*")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .maybeSingle();
-
+  const store = await getCachedStoreBySlug(slug);
   if (!store) notFound();
-  const s = store as Store;
 
-  const [{ data: products }, { data: browseCategories }, { data: campaigns }] =
-    await Promise.all([
-      supabase
-        .from("storefront_products")
-        .select("*, categories(name, slug)")
-        .eq("store_id", s.id)
-        .eq("is_available", true)
-        .order("created_at", { ascending: false })
-        .limit(200),
-      supabase
-        .from("browse_categories")
-        .select("name, slug, search_terms")
-        .neq("slug", "more")
-        .order("sort_order"),
-      supabase.rpc("active_store_campaign", { p_store_id: s.id }),
-    ]);
-
-  const list = (products ?? []) as StoreProduct[];
-  const catalog = (browseCategories ?? []) as {
-    name: string;
-    slug: string;
-    search_terms: string[] | null;
-  }[];
-  const activeCampaign = ((campaigns ?? []) as StoreCampaign[])[0] ?? null;
+  const { products, browseCategories, campaign, ratings } =
+    await getCachedStoreCatalog(store.id, slug);
+  const list = products as StoreProduct[];
+  const catalog = browseCategories;
+  const activeCampaign = campaign;
+  const s = store;
 
   function categoryFor(product: StoreProduct) {
     if (product.categories) return product.categories;
@@ -100,7 +93,6 @@ export default async function StorePage({
     return hit ? { name: hit.name, slug: hit.slug } : null;
   }
 
-  const openNow = isStoreOpenNow(s.opens_at, s.closes_at);
   const hours = formatHours(s.opens_at, s.closes_at);
 
   const browsable: BrowsableProduct[] = list.map((product) => ({
@@ -124,12 +116,7 @@ export default async function StorePage({
     },
   }));
 
-  const ratingMap = await fetchProductRatingMap(
-    supabase,
-    browsable.map((product) => product.id),
-  );
-  const ratings = Object.fromEntries(ratingMap);
-
+  const ratingMap = new Map(Object.entries(ratings));
   let ratingSum = 0;
   let reviewCount = 0;
   for (const summary of ratingMap.values()) {
@@ -184,14 +171,26 @@ export default async function StorePage({
       </div>
 
       <div className="lg:mt-3">
-        <StoreProfileHeader
-          store={s}
-          openNow={openNow}
-          hours={hours}
-          rating={storeRating}
-          reviewCount={reviewCount}
-          promos={promos}
-        />
+        <Suspense
+          fallback={
+            <StoreProfileHeader
+              store={s}
+              openNow={null}
+              hours={hours}
+              rating={storeRating}
+              reviewCount={reviewCount}
+              promos={promos}
+            />
+          }
+        >
+          <LiveStoreHeader
+            store={s}
+            hours={hours}
+            rating={storeRating}
+            reviewCount={reviewCount}
+            promos={promos}
+          />
+        </Suspense>
       </div>
 
       <div id="shop" className="mx-auto mt-8 max-w-7xl scroll-mt-28 px-4 sm:px-6">
@@ -216,5 +215,23 @@ export default async function StorePage({
         )}
       </div>
     </div>
+  );
+}
+
+export default function StorePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <ProductGridSkeleton />
+        </div>
+      }
+    >
+      <StorePageContent params={params} />
+    </Suspense>
   );
 }

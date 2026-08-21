@@ -5,6 +5,8 @@ const deliverySrc = path.join(__dirname, "../delivery/src");
 const founderSrc = path.join(__dirname, "../founder/src");
 
 const nextConfig: NextConfig = {
+  // Partial prerendering + `use cache` for instant storefront shells.
+  cacheComponents: true,
   // Keep tracing at the monorepo root so sibling extension packages are included,
   // but do not override turbopack.root (that fought Vercel's detected root).
   outputFileTracingRoot: path.join(__dirname, "../.."),
@@ -29,6 +31,13 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     qualities: [75],
     minimumCacheTTL: 60 * 60 * 24 * 30,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "xobagxgagarnzxujxfag.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
   },
   async headers() {
     return [

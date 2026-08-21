@@ -1,36 +1,9 @@
 import Link from "next/link";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
-import { createClient } from "@/lib/supabase/server";
-import { fetchProductRatingMap } from "@/lib/product-ratings";
+import { getCachedPriceRailProducts } from "@/lib/catalog";
 
 export default async function Under149Page() {
-  const supabase = await createClient();
-
-  const [{ data: productsData }, { data: categoryList }] = await Promise.all([
-    supabase
-      .from("storefront_products")
-      .select(
-        "*, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
-      )
-      .eq("is_available", true)
-      .eq("stores.is_active", true)
-      .lte("price_aed", 149)
-      .order("created_at", { ascending: false })
-      .limit(200),
-    supabase
-      .from("browse_categories")
-      .select("name, slug")
-      .neq("slug", "more")
-      .order("sort_order"),
-  ]);
-
-  const products = (productsData ?? []) as BrowsableProduct[];
-  const categories = (categoryList ?? []) as { name: string; slug: string }[];
-  const ratingMap = await fetchProductRatingMap(
-    supabase,
-    products.map((product) => product.id),
-  );
-  const ratings = Object.fromEntries(ratingMap);
+  const { products, categories, ratings } = await getCachedPriceRailProducts(149);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -74,7 +47,7 @@ export default async function Under149Page() {
           </div>
         ) : (
           <ProductBrowser
-            products={products}
+            products={products as BrowsableProduct[]}
             categories={categories}
             ratings={ratings}
             showInStockFilter={false}

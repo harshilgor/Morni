@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   motion,
   useMotionValueEvent,
@@ -14,8 +15,18 @@ import { useLocation, isDeliverableEmirate } from "@/lib/location";
 import { useAuthUser } from "@/lib/use-auth-user";
 import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
-import { SearchTypeahead } from "@/components/search-typeahead";
 import { SavedAddressPicker } from "@/components/saved-address-picker";
+
+const SearchTypeahead = dynamic(
+  () =>
+    import("@/components/search-typeahead").then((module) => module.SearchTypeahead),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-10 w-full rounded-md bg-white/10" aria-hidden />
+    ),
+  },
+);
 function PinIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { BrowseCategory } from "@/lib/browse-categories";
 
 export function FeaturedCategories({
@@ -63,11 +64,12 @@ export function FeaturedCategories({
                 </div>
 
                 <div className="relative mx-2 mb-2 aspect-[4/5] overflow-hidden bg-[#f2ece8] sm:mx-4 sm:mb-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={imageFor(category)}
                     alt={category.name}
-                    className="absolute inset-0 h-full w-full object-cover object-top transition duration-700 ease-out group-hover:scale-[1.045]"
+                    fill
+                    sizes="(max-width: 640px) 33vw, (max-width: 1280px) 25vw, 16vw"
+                    className="object-cover object-top transition duration-700 ease-out group-hover:scale-[1.045]"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-white/5 opacity-70" />
                   {category.badge ? (

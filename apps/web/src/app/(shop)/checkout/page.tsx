@@ -52,6 +52,8 @@ export default function CheckoutPage() {
   const [mobileAddressOpen, setMobileAddressOpen] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
+  const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "cod">("cod");
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
   const fees = calculateCheckoutFees(orderSubtotal);
@@ -119,6 +121,7 @@ export default function CheckoutPage() {
     setPlacing(true);
     setPlaceError(null);
     try {
+      const method = cardPaymentsEnabled ? paymentMethod : "cod";
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -132,10 +135,11 @@ export default function CheckoutPage() {
           address,
           saveAddress: Boolean(authed && saveAddress && !selectedAddressId),
           makeDefault,
+          paymentMethod: method,
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { order?: { id?: string }; error?: string }
+        | { order?: { id?: string }; next?: string; error?: string }
         | null;
       if (response.status === 401) {
         router.push("/auth?next=/checkout");
@@ -146,6 +150,10 @@ export default function CheckoutPage() {
         return;
       }
       clear();
+      if (payload.next === "pay" || method === "card") {
+        router.push(`/checkout/pay/${payload.order.id}`);
+        return;
+      }
       router.push(`/orders/${payload.order.id}`);
     } catch {
       setPlaceError("Unable to place this order.");
@@ -153,6 +161,27 @@ export default function CheckoutPage() {
       setPlacing(false);
     }
   }
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch("/api/payments/afs/config");
+        const payload = (await response.json().catch(() => null)) as {
+          enabled?: boolean;
+        } | null;
+        if (!active) return;
+        const enabled = Boolean(payload?.enabled);
+        setCardPaymentsEnabled(enabled);
+        if (enabled) setPaymentMethod("card");
+      } catch {
+        if (active) setCardPaymentsEnabled(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -389,11 +418,15 @@ export default function CheckoutPage() {
             {placeError ? <p className="text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
             <button type="button" onClick={() => void placeOrder()} disabled={placing} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
               {placing
-                ? "Placing order..."
+                ? paymentMethod === "card" && cardPaymentsEnabled
+                  ? "Starting payment..."
+                  : "Placing order..."
                 : authed === false
                   ? "Sign in to place order"
                   : mobileAddressReady
-                    ? "Place order"
+                    ? paymentMethod === "card" && cardPaymentsEnabled
+                      ? "Continue to payment"
+                      : "Place order"
                     : "Select address to continue"}
             </button>
           </div>
@@ -665,10 +698,55 @@ export default function CheckoutPage() {
 
         <section aria-labelledby="payment-heading" className="border-t border-line pt-6">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Payment</p>
-          <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Pay later</h2>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-            Online payments are not connected yet. Place the order now and the boutique will receive it immediately.
-          </p>
+          <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">
+            {cardPaymentsEnabled ? "How will you pay?" : "Pay later"}
+          </h2>
+          {cardPaymentsEnabled ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <label
+                className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
+                  paymentMethod === "card"
+                    ? "border-ink bg-background"
+                    : "border-line bg-surface hover:border-ink/30"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment-method"
+                  className="sr-only"
+                  checked={paymentMethod === "card"}
+                  onChange={() => setPaymentMethod("card")}
+                />
+                <span className="block text-sm font-semibold text-ink">Card</span>
+                <span className="mt-1 block text-xs text-muted">
+                  Pay now with Visa or Mastercard via AFS.
+                </span>
+              </label>
+              <label
+                className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
+                  paymentMethod === "cod"
+                    ? "border-ink bg-background"
+                    : "border-line bg-surface hover:border-ink/30"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment-method"
+                  className="sr-only"
+                  checked={paymentMethod === "cod"}
+                  onChange={() => setPaymentMethod("cod")}
+                />
+                <span className="block text-sm font-semibold text-ink">Pay later</span>
+                <span className="mt-1 block text-xs text-muted">
+                  Place the order now and settle payment later.
+                </span>
+              </label>
+            </div>
+          ) : (
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+              Online payments are not connected yet. Place the order now and the boutique will receive it immediately.
+            </p>
+          )}
         </section>
         </section>
 
@@ -691,14 +769,22 @@ export default function CheckoutPage() {
           className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
           {placing
-            ? "Placing order..."
+            ? paymentMethod === "card" && cardPaymentsEnabled
+              ? "Starting payment..."
+              : "Placing order..."
             : authed === false
               ? "Sign in to place order"
               : mobileAddressReady
-                ? "Place order"
+                ? paymentMethod === "card" && cardPaymentsEnabled
+                  ? "Continue to payment"
+                  : "Place order"
                 : "Select address to continue"}
         </button>
-        <p className="mt-3 text-center text-xs leading-relaxed text-muted">Payment will be collected later. Delivery and service fees are included above.</p>
+        <p className="mt-3 text-center text-xs leading-relaxed text-muted">
+          {paymentMethod === "card" && cardPaymentsEnabled
+            ? "You will enter card details on AFS’s secure form next."
+            : "Payment will be collected later. Delivery and service fees are included above."}
+        </p>
       </aside>
       </div>
 

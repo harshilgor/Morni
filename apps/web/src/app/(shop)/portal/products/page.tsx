@@ -22,6 +22,7 @@ import {
   type ColorDraft,
 } from "@/lib/product-variants";
 import { replaceProductVariants } from "@/lib/save-product-variants";
+import { revalidatePublicCatalog } from "@/lib/revalidate-catalog";
 import type { Product, ProductVariant } from "@/lib/types";
 
 type ProductWithVariants = Product & {
@@ -302,6 +303,7 @@ export default function PortalProductsPage() {
     setSaving(false);
     setMessage("Product added with color options.");
     closeCreate();
+    void revalidatePublicCatalog();
     await loadProducts(store.id);
   }
 
@@ -356,6 +358,7 @@ export default function PortalProductsPage() {
     setSavingEdits(false);
     closeEdit();
     setMessage("Product updated.");
+    void revalidatePublicCatalog();
   }
 
   async function toggleAvailable(product: Product) {
@@ -364,6 +367,7 @@ export default function PortalProductsPage() {
       .from("products")
       .update({ is_available: !product.is_available })
       .eq("id", product.id);
+    void revalidatePublicCatalog();
     if (store) await loadProducts(store.id);
   }
 
@@ -371,6 +375,7 @@ export default function PortalProductsPage() {
     if (!window.confirm(`Delete “${product.title}”? This cannot be undone.`)) return;
     const supabase = createClient();
     await supabase.from("products").delete().eq("id", product.id);
+    void revalidatePublicCatalog();
     if (editingProductId === product.id) closeEdit();
     if (store) await loadProducts(store.id);
   }
@@ -386,6 +391,7 @@ export default function PortalProductsPage() {
     const supabase = createClient();
     await supabase.from("products").update({ is_available: isAvailable }).in("id", selectedIds);
     setSelectedIds([]);
+    void revalidatePublicCatalog();
     if (store) await loadProducts(store.id);
   }
 
@@ -408,6 +414,7 @@ export default function PortalProductsPage() {
 
     setSelectedIds([]);
     setBulkStock("");
+    void revalidatePublicCatalog();
     await loadProducts(store.id);
   }
 

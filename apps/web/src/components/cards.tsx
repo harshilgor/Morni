@@ -1,37 +1,31 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Store } from "@/lib/types";
 import { emirateLabel, formatAed } from "@/lib/format";
 import { formatRatingLabel, type ProductRatingSummary } from "@/lib/product-ratings";
 import { StarRating } from "@/components/star-rating";
 import { WishlistToggle } from "@/components/wishlist-toggle";
-
-const NEW_STORE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const STORE_CARD_REFERENCE_TIME_MS = Date.now();
+import { NewStoreBadge } from "@/components/new-store-badge";
 
 export function StoreCard({ store, compact = false }: { store: Store; compact?: boolean }) {
-  const createdAtMs = store.created_at ? Date.parse(store.created_at) : NaN;
-  const isNew =
-    Number.isFinite(createdAtMs) &&
-    STORE_CARD_REFERENCE_TIME_MS - createdAtMs < NEW_STORE_WINDOW_MS;
-
   return (
     <Link
       href={`/stores/${store.slug}`}
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-[#dedbd4] bg-white transition duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_18px_42px_-30px_rgba(28,20,24,0.38)]"
     >
-      <div
-        className="relative h-28 bg-sand bg-cover bg-center transition duration-500 group-hover:scale-[1.03] sm:h-40"
-        style={{
-          backgroundImage: store.cover_url
-            ? `url(${store.cover_url})`
-            : "linear-gradient(135deg, #e8e4dc, #c9c3b8)",
-        }}
-      >
-        {isNew ? (
-          <span className="absolute left-2 top-2 rounded-full bg-ink px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[10px]">
-            New
-          </span>
-        ) : null}
+      <div className="relative h-28 overflow-hidden bg-sand sm:h-40">
+        {store.cover_url ? (
+          <Image
+            src={store.cover_url}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 50vw, 25vw"
+            className="object-cover transition duration-500 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-[#e8e4dc] to-[#c9c3b8]" />
+        )}
+        <NewStoreBadge createdAt={store.created_at} />
       </div>
       <div
         className={`flex flex-1 flex-col p-3 sm:p-4 ${
@@ -61,6 +55,7 @@ export function ProductCard({
   rating,
   onWishlistChange,
   sharp = false,
+  priority = false,
 }: {
   product: {
     id: string;
@@ -74,6 +69,7 @@ export function ProductCard({
   onWishlistChange?: (isWished: boolean) => void;
   /** Squared edges to match featured-category aesthetic */
   sharp?: boolean;
+  priority?: boolean;
 }) {
   const image = product.image_urls?.[0];
   const showRating = rating && rating.reviewCount > 0;
@@ -95,13 +91,13 @@ export function ProductCard({
         }
       >
         {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={image}
             alt={product.title}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+            fill
+            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 180px"
+            priority={priority}
+            className="object-cover transition duration-500 group-hover:scale-[1.04]"
           />
         ) : null}
         {!sharp ? (
