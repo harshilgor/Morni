@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ForYouBackButton } from "@/components/for-you-back-button";
+import { ForYouIntroOverlay } from "@/components/for-you-intro-overlay";
 import { ForYouSwipeDeck } from "@/components/for-you-swipe-deck";
 import type { BrowseCategory } from "@/lib/browse-categories";
 import {
@@ -18,6 +19,10 @@ import {
   type TasteSwipe,
 } from "@/lib/for-you";
 import { formatAed } from "@/lib/format";
+import {
+  hasSeenForYouIntro,
+  markForYouIntroSeen,
+} from "@/lib/for-you-intro-storage";
 import {
   FOR_YOU_STORAGE_KEY,
   readStoredForYouTaste,
@@ -221,10 +226,12 @@ export function ForYouExperience({
   const [profile, setProfile] = useState<TasteProfile>(seedProfile);
   const [dismissedProductIds, setDismissedProductIds] = useState<string[]>(initialDismissedProductIds);
   const [index, setIndex] = useState(0);
+  const [showIntro, setShowIntro] = useState(false);
   const shopperId = initialShopperId;
   const sessionIdRef = useRef<string | null>(null);
   const sessionPromiseRef = useRef<Promise<string | null> | null>(null);
   const hydratedLocalRef = useRef(false);
+  const introHydratedRef = useRef(false);
 
   const localProducts = useMemo(
     () => products.filter((product) => !emirate || product.stores.emirate === emirate),
@@ -265,6 +272,31 @@ export function ForYouExperience({
       setStep(stepFromProfile(nextProfile, minimumSwipes));
     }
   }, [hasServerTaste, initialDismissedProductIds, minimumSwipes, seedHasTaste, seedProfile]);
+
+  // First-visit intro (or force with ?intro=1 for local preview).
+  useLayoutEffect(() => {
+    if (introHydratedRef.current) return;
+    introHydratedRef.current = true;
+
+    const forceIntro =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("intro") === "1";
+
+    if (forceIntro) {
+      setStep("test");
+      setShowIntro(true);
+      return;
+    }
+
+    if (!hasSeenForYouIntro()) {
+      setShowIntro(true);
+    }
+  }, []);
+
+  const dismissIntro = useCallback(() => {
+    markForYouIntroSeen();
+    setShowIntro(false);
+  }, []);
 
   const ensureSession = useCallback(async () => {
     if (!shopperId) return null;
@@ -411,6 +443,7 @@ export function ForYouExperience({
           onVote={vote}
           onFinish={finishEarly}
         />
+        <ForYouIntroOverlay open={showIntro} onStart={dismissIntro} onSkip={dismissIntro} />
       </div>
     );
   }
