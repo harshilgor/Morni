@@ -583,7 +583,7 @@ export function ProductDetail({
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <WishlistToggle productId={product.id} size="lg" tone="inline" />
           <div className="relative min-w-0 flex-1">
-            <AddToBagButton label={addLabel} disabled={!canAdd} added={added} onClick={() => addToBag()} />
+            <AddToBagButton label={addLabel} disabled={!canAdd} added={added} onClick={() => addToBag()} size="compact" />
             <AddToBagConfetti celebrationKey={celebrationKey} />
           </div>
         </div>

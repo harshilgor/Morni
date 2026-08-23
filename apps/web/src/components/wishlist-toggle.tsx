@@ -134,7 +134,7 @@ export function WishlistToggle({
         ? "size-5"
         : "h-7 w-7"
       : size === "lg"
-        ? "h-11 w-11 shrink-0"
+        ? "h-12 w-12 shrink-0"
         : "h-8 w-8";
 
   return (

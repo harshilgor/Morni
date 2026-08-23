@@ -316,6 +316,42 @@ h3,
   100% { background-position: 200% 0; }
 }
 
+.morni-announcement-bar {
+  height: 2rem;
+  overflow: hidden;
+  background: #050505;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.morni-announcement-track {
+  display: flex;
+  width: max-content;
+  min-height: 100%;
+  animation: morni-announcement-scroll 22s linear infinite;
+}
+
+.morni-announcement-group {
+  display: flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 1.4rem;
+  padding: 0 1.4rem;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.morni-announcement-dot {
+  color: #d997ab;
+  font-size: 0.68rem;
+}
+
+@keyframes morni-announcement-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 .skeleton {
   background: linear-gradient(90deg, #f0ece8 25%, #e8e3de 50%, #f0ece8 75%);
   background-size: 200% 100%;
@@ -424,7 +460,8 @@ h3,
   .animate-rise,
   .animate-rise-delay,
   .animate-pulse-soft,
-  .add-to-bag-confetti {
+  .add-to-bag-confetti,
+  .morni-announcement-track {
     animation: none;
   }
 }

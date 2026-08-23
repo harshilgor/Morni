@@ -4,6 +4,7 @@ import { HomeStores } from "@/components/home-stores";
 import { NewAndPopular, type PopularTab } from "@/components/new-and-popular";
 import { ProductRail } from "@/components/product-rail";
 import { RecentlyViewedRail } from "@/components/recently-viewed-rail";
+import { ShopBySize } from "@/components/shop-by-size";
 import { getCachedHomeCatalog, type ProductWithStore } from "@/lib/catalog";
 import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
@@ -125,6 +126,7 @@ export async function HomeCatalog({
   return (
     <>
       <FeaturedCategories categories={featured} />
+      <ShopBySize />
       <HomeDiscovery intents={intentRails} />
       <HomeStores stores={stores} initialEmirate={initialEmirate} />
       {topRated.length > 0 ? (

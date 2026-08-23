@@ -39,12 +39,14 @@ export default async function SearchPage({
     emirate?: string;
     max?: string;
     min?: string;
+    size?: string;
     sort?: string;
     instock?: string;
   }>;
 }) {
-  const { q = "", emirate, max, min, sort, instock } = await searchParams;
+  const { q = "", emirate, max, min, size, sort, instock } = await searchParams;
   const query = q.trim();
+  const sizeFilter = size?.trim().slice(0, 40) || null;
   const queryTerms = searchTerms(query);
   const maxPrice = max ? Number(max) : null;
   const minPrice = min ? Number(min) : null;
@@ -97,6 +99,9 @@ export default async function SearchPage({
   if (instock === "1") {
     productsQuery = productsQuery.gt("stock", 0);
   }
+  if (sizeFilter) {
+    productsQuery = productsQuery.contains("sizes", [sizeFilter]);
+  }
 
   productsQuery = productsQuery.order("created_at", { ascending: false });
 
@@ -136,6 +141,8 @@ export default async function SearchPage({
       ? `Under AED ${maxPrice}`
       : minPrice != null
         ? `From AED ${minPrice}`
+        : sizeFilter
+          ? `Size ${sizeFilter}`
         : sort === "rated"
           ? "Best rated"
           : sort === "new"
@@ -174,6 +181,7 @@ export default async function SearchPage({
       {!query &&
       maxPrice == null &&
       minPrice == null &&
+      !sizeFilter &&
       !sort &&
       instock !== "1" ? (
         <p className="mt-10 rounded-2xl border border-dashed border-line bg-surface/70 p-8 text-center text-muted">

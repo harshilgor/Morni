@@ -4,12 +4,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import {
-  motion,
-  useMotionValueEvent,
-  useReducedMotion,
-  useScroll,
-} from "motion/react";
 import { useCart } from "@/lib/cart";
 import { useLocation, isDeliverableEmirate } from "@/lib/location";
 import { useAuthUser } from "@/lib/use-auth-user";
@@ -117,6 +111,30 @@ const CATEGORY_MENU_FEATURES = [
   { name: "Party wear", href: "/categories/party-wear", image: "/categories/party-wear.jpg" },
   { name: "Kurtis", href: "/categories/kurtis", image: "/categories/kurtis.jpg" },
 ] as const;
+
+const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI";
+
+function LaunchAnnouncement() {
+  return (
+    <div
+      className="morni-announcement-bar"
+      aria-label="Launch sale. Delivery in Dubai."
+      role="region"
+    >
+      <div className="morni-announcement-track" aria-hidden="true">
+        {[0, 1].map((group) => (
+          <div className="morni-announcement-group" key={group}>
+            <span>{LAUNCH_MESSAGE}</span>
+            <span className="morni-announcement-dot">✦</span>
+            <span>{LAUNCH_MESSAGE}</span>
+            <span className="morni-announcement-dot">✦</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
@@ -130,16 +148,11 @@ export function SiteHeader() {
   const [locationOpen, setLocationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [deliveryBarVisible, setDeliveryBarVisible] = useState(true);
-  const deliveryBarVisibleRef = useRef(true);
   const accountRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
   const categoriesMobileRef = useRef<HTMLDivElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
   const headerRef = useRef<HTMLElement>(null);
-  const reducedMotion = useReducedMotion();
-  const { scrollY } = useScroll();
-  const isHomePage = pathname === "/";
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -211,42 +224,10 @@ export function SiteHeader() {
   }, [categoriesOpen]);
 
   useEffect(() => {
-    if (!isHomePage) {
-      deliveryBarVisibleRef.current = true;
-      setDeliveryBarVisible(true);
-    }
-  }, [isHomePage]);
-
-  useEffect(() => {
     setLocationOpen(false);
     setCategoriesOpen(false);
     setAccountOpen(false);
   }, [pathname]);
-
-  useMotionValueEvent(scrollY, "change", (current) => {
-    if (!isHomePage || locationOpen) {
-      if (!deliveryBarVisibleRef.current) {
-        deliveryBarVisibleRef.current = true;
-        setDeliveryBarVisible(true);
-      }
-      return;
-    }
-    if (current < 24) {
-      if (!deliveryBarVisibleRef.current) {
-        deliveryBarVisibleRef.current = true;
-        setDeliveryBarVisible(true);
-      }
-      return;
-    }
-    const previous = scrollY.getPrevious() ?? 0;
-    const diff = current - previous;
-    if (Math.abs(diff) < 6) return;
-    const nextVisible = diff < 0;
-    if (nextVisible !== deliveryBarVisibleRef.current) {
-      deliveryBarVisibleRef.current = nextVisible;
-      setDeliveryBarVisible(nextVisible);
-    }
-  });
 
   const isProductDetailPage = Boolean(
     pathname && /^\/stores\/[^/]+\/products\/[^/]+$/.test(pathname),
@@ -330,7 +311,7 @@ export function SiteHeader() {
       "relative inline-flex shrink-0 items-center justify-center px-0.5 py-1 text-sm font-semibold tracking-[0.01em] transition-colors duration-300 after:absolute after:bottom-0 after:left-1/2 after:h-[2px] after:w-5 after:-translate-x-1/2 after:rounded-full after:transition-transform after:duration-300 after:ease-out",
       active
         ? "text-[#f3b6c6] after:scale-x-100 after:bg-[#d997ab]"
-        : "text-white/80 after:scale-x-0 after:bg-[#9ac653] hover:text-[#b6d874] hover:after:scale-x-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b6d874] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2a1f24]",
+        : "text-white/80 after:scale-x-0 after:bg-[#d997ab] hover:text-[#f3b6c6] hover:after:scale-x-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3b6c6] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2a1f24]",
     ].join(" ");
   }
 
@@ -347,6 +328,28 @@ export function SiteHeader() {
           >
             Morni
           </Link>
+
+          <div className="min-w-0 flex-1 sm:hidden">
+            <button
+              type="button"
+              onClick={toggleLocationPanel}
+              className="flex max-w-[10rem] items-center gap-1 rounded-md border border-transparent px-1.5 py-1 text-left text-white transition hover:border-white/35 hover:bg-white/5"
+              aria-expanded={locationOpen}
+              aria-haspopup="dialog"
+              aria-controls="delivery-location-dialog"
+            >
+              <PinIcon className="h-4 w-4 shrink-0 text-white/90" />
+              <span className="min-w-0 leading-tight">
+                <span className="block text-[9px] text-white/60">Deliver to</span>
+                <span className="block truncate text-[11px] font-semibold">
+                  {locationLabel}
+                </span>
+              </span>
+              <ChevronDownIcon
+                className={`h-3.5 w-3.5 shrink-0 text-white/75 transition duration-200 ${locationOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          </div>
 
           <div className="hidden shrink-0 sm:block">
             <button
@@ -486,7 +489,7 @@ export function SiteHeader() {
 
           <Link
             href={auth ? "/account" : "/auth"}
-            className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-white transition hover:border-white/35 hover:bg-white/5 md:hidden"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-transparent text-white transition hover:border-white/35 hover:bg-white/5 md:hidden"
             aria-label={auth ? "Your account" : "Sign in"}
             title={auth ? "Account" : "Sign in"}
           >
@@ -517,6 +520,8 @@ export function SiteHeader() {
           </Link>
         </div>
       </div>
+
+      <LaunchAnnouncement />
 
       <div
         className="relative border-b border-[#e7f1eb] bg-[#2a1f24] text-white"
@@ -690,45 +695,6 @@ export function SiteHeader() {
           </div>
         </div>
       ) : null}
-
-      <div
-        className="h-[2.55rem] overflow-hidden bg-[#2a1f24] sm:hidden"
-        aria-hidden={!deliveryBarVisible}
-      >
-        <motion.div
-          initial={false}
-          animate={
-            reducedMotion || deliveryBarVisible
-              ? { y: "0%", opacity: 1 }
-              : { y: "-100%", opacity: 0 }
-          }
-          transition={
-            reducedMotion
-              ? { duration: 0 }
-              : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
-          }
-          className={`h-full ${deliveryBarVisible ? "pointer-events-auto" : "pointer-events-none"}`}
-          style={{ willChange: "transform, opacity" }}
-        >
-          <button
-            type="button"
-            onClick={toggleLocationPanel}
-            tabIndex={deliveryBarVisible ? 0 : -1}
-            className="flex h-full w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 text-left text-white transition hover:bg-[#433038]"
-            aria-expanded={locationOpen}
-            aria-haspopup="dialog"
-            aria-controls="delivery-location-dialog"
-          >
-            <PinIcon className="h-5 w-5 shrink-0 text-white/90" />
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-              {firstName ? `Deliver to ${firstName} - ${locationLabel}` : `Deliver to ${locationLabel}`}
-            </span>
-            <ChevronDownIcon
-              className={`h-4 w-4 shrink-0 text-white/80 transition duration-200 ${locationOpen ? "rotate-180" : ""}`}
-            />
-          </button>
-        </motion.div>
-      </div>
 
       {locationOpen ? (
         <div

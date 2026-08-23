@@ -145,13 +145,6 @@ export function ForYouIntroOverlay({
               >
                 Start swiping
               </button>
-              <button
-                type="button"
-                onClick={onSkip}
-                className="flex w-full items-center justify-center px-5 py-2 text-sm font-medium text-muted transition hover:text-ink"
-              >
-                Skip intro
-              </button>
             </div>
           </motion.div>
         </motion.div>
