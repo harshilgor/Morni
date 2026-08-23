@@ -52,6 +52,7 @@ export function StoreNewOrderEmail({
             </strong>
             {item.colorName ? ` · ${item.colorName}` : ""}
             {item.size ? ` · Size ${item.size}` : ""}
+            {item.customization ? ` · Custom: ${item.customization}` : ""}
             <br />
             {item.lineTotal}
           </Text>

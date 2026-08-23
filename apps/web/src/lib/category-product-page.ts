@@ -13,10 +13,11 @@ export const CATEGORY_PRODUCT_BATCH_SIZE = 10;
 const MAX_CATEGORY_CANDIDATES = 500;
 
 const CATEGORY_PRODUCT_SELECT =
-  "id, title, description, price_aed, compare_at_price_aed, image_urls, sizes, stock, created_at, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)";
+  "id, category_id, title, description, price_aed, compare_at_price_aed, image_urls, sizes, stock, created_at, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)";
 
 export type CategoryProduct = {
   id: string;
+  category_id: string | null;
   title: string;
   description: string | null;
   price_aed: number;
@@ -51,6 +52,16 @@ export async function getCategoryProductPage(
     .filter(Boolean);
   const hasCustomRules = hasCustomBrowseCategoryRules(category.slug);
 
+  const { data: categoryRows, error: categoryError } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("slug", category.slug);
+  if (categoryError) throw new Error("Unable to load this category.");
+  const assignedCategoryIds = new Set(
+    ((categoryRows ?? []) as Array<{ id: string }>).map((row) => row.id),
+  );
+  const hasAssignedCategories = assignedCategoryIds.size > 0;
+
   let query = supabase
     .from("storefront_products")
     .select(CATEGORY_PRODUCT_SELECT)
@@ -59,16 +70,19 @@ export async function getCategoryProductPage(
     .order("created_at", { ascending: false })
     // One extra result tells the client whether another batch exists without an expensive count query.
     .range(
-      hasCustomRules ? 0 : offset,
-      hasCustomRules ? MAX_CATEGORY_CANDIDATES : offset + batchSize,
+      hasCustomRules || hasAssignedCategories ? 0 : offset,
+      hasCustomRules || hasAssignedCategories ? MAX_CATEGORY_CANDIDATES : offset + batchSize,
     );
 
-  if (terms.length > 0) {
-    query = query.or(
-      terms
-        .flatMap((term) => [`title.ilike.%${term}%`, `description.ilike.%${term}%`])
-        .join(","),
-    );
+  const legacyTextFilters = terms.flatMap((term) => [
+    `title.ilike.%${term}%`,
+    `description.ilike.%${term}%`,
+  ]);
+  if (hasAssignedCategories) {
+    const assignedCategoryFilter = `category_id.in.(${[...assignedCategoryIds].join(",")})`;
+    query = query.or([assignedCategoryFilter, ...legacyTextFilters].join(","));
+  } else if (legacyTextFilters.length > 0) {
+    query = query.or(legacyTextFilters.join(","));
   }
 
   const { data, error } = await query;
@@ -77,8 +91,11 @@ export async function getCategoryProductPage(
   // PostgREST's generated relation type is an array even though the inner
   // store relationship resolves to one store per product at runtime.
   const results = (data ?? []) as unknown as CategoryProduct[];
-  const matchingResults = hasCustomRules
-    ? results.filter((product) => productMatchesBrowseCategory(category, product))
+  const matchingResults = hasCustomRules || hasAssignedCategories
+    ? results.filter((product) => {
+        if (product.category_id) return assignedCategoryIds.has(product.category_id);
+        return productMatchesBrowseCategory(category, product);
+      })
     : results;
   const products = hasCustomRules
     ? matchingResults.slice(offset, offset + batchSize)

@@ -6,6 +6,7 @@ export type EmailOrderItem = {
   quantity: number;
   size: string | null;
   colorName: string | null;
+  customization: string | null;
   lineTotal: string;
 };
 
@@ -53,6 +54,7 @@ export function OrderConfirmationEmail({
             <strong>{item.quantity}× {item.title}</strong>
             {item.colorName ? ` · ${item.colorName}` : ""}
             {item.size ? ` · Size ${item.size}` : ""}
+            {item.customization ? ` · Custom: ${item.customization}` : ""}
             <br />
             {item.lineTotal}
           </Text>

@@ -6,6 +6,7 @@ dist/
 .env.local
 .DS_Store
 *.log
+*.tsbuildinfo
 .vercel
 apps/web/.env*.local
 supabase/.branches

@@ -16,6 +16,7 @@ import type { DeliveryAddress } from "@/lib/types";
 import { ProductRail, type RailProduct } from "@/components/product-rail";
 import { useLocation, DELIVERY_EMIRATE, DELIVERY_ONLY_MESSAGE, isDeliverableEmirate } from "@/lib/location";
 import { calculateCheckoutFees } from "@/lib/fees";
+import { formatCustomizationValues } from "@/lib/product-customization";
 import {
   FreeDeliveryNudge,
   OrderFeeLines,
@@ -132,6 +133,7 @@ export default function CheckoutPage() {
             variantId: item.variantId ?? null,
             quantity: item.quantity,
             size: item.size ?? null,
+            customization: item.customization ?? null,
           })),
           address,
           saveAddress: Boolean(authed && saveAddress && !selectedAddressId),
@@ -257,7 +259,8 @@ export default function CheckoutPage() {
 
     // Never lock scroll when the sheet isn't actually shown (desktop / lg+).
     if (!isMobileCheckoutViewport()) {
-      setMobileAddressOpen(false);
+      if (typeof queueMicrotask === "function") queueMicrotask(() => setMobileAddressOpen(false));
+      else window.setTimeout(() => setMobileAddressOpen(false), 0);
       return;
     }
 
@@ -345,9 +348,9 @@ export default function CheckoutPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-ink">{item.title}</h3>
-                          {(item.colorName || item.size) ? (
+                          {(item.colorName || item.size || item.customization) ? (
                             <p className="mt-1 text-xs text-muted">
-                              {[item.colorName, item.size ? `Size ${item.size}` : null].filter(Boolean).join(" · ")}
+                              {[item.colorName, item.size ? `Size ${item.size}` : null, item.customization ? `Custom: ${formatCustomizationValues(null, item.customization).map((measurement) => `${measurement.label} ${measurement.value}`).join(", ")}` : null].filter(Boolean).join(" · ")}
                             </p>
                           ) : null}
                         </div>
@@ -570,9 +573,9 @@ export default function CheckoutPage() {
                       <div className="min-w-0">
                         <h3 className="font-display text-xl leading-tight text-ink sm:text-2xl">{item.title}</h3>
                         <p className="mt-1.5 text-xs uppercase tracking-[0.12em] text-muted">{item.storeName}</p>
-                        {(item.colorName || item.size) ? (
+                        {(item.colorName || item.size || item.customization) ? (
                           <p className="mt-3 text-sm text-ink/80">
-                            {[item.colorName, item.size ? `Size ${item.size}` : null].filter(Boolean).join(" · ")}
+                            {[item.colorName, item.size ? `Size ${item.size}` : null, item.customization ? `Custom: ${formatCustomizationValues(null, item.customization).map((measurement) => `${measurement.label} ${measurement.value}`).join(", ")}` : null].filter(Boolean).join(" · ")}
                           </p>
                         ) : null}
                       </div>

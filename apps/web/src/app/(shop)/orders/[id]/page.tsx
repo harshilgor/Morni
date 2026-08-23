@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { emirateLabel, formatAed, orderStatusLabel } from "@/lib/format";
 import type { Order, OrderItem, ProductReview } from "@/lib/types";
+import { formatCustomizationValues } from "@/lib/product-customization";
 import { ProductReviewForm } from "@/components/product-review-form";
 import { StarRating } from "@/components/star-rating";
 import { ReturnRefundPanel } from "@/components/return-refund-panel";
@@ -168,6 +169,7 @@ function OrderDetailPageContent() {
                 {item.title}
                 {item.color_name ? ` · ${item.color_name}` : ""}
                 {item.size ? ` · Size ${item.size}` : ""} × {item.quantity}
+                {formatCustomizationValues(null, item.customization).length ? ` · Custom: ${formatCustomizationValues(null, item.customization).map((measurement) => `${measurement.label} ${measurement.value}`).join(", ")}` : ""}
               </span>
               <span>{formatAed(item.line_total_aed)}</span>
             </li>

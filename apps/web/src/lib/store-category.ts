@@ -1,4 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
+import {
+  mergeBrowseCategories,
+  type BrowseCategory,
+} from "@/lib/browse-categories";
 import { slugify } from "@/lib/format";
 
 export async function ensureStoreCategory(options: {
@@ -46,14 +50,11 @@ export async function loadBrowseCategoryOptions() {
   const supabase = createClient();
   const { data } = await supabase
     .from("browse_categories")
-    .select("name, slug")
+    .select("*")
     .neq("slug", "more")
     .order("sort_order", { ascending: true });
 
-  return (
-    (data as { name: string; slug: string }[] | null)?.map((row) => ({
-      name: row.name,
-      slug: row.slug,
-    })) ?? []
+  return mergeBrowseCategories((data ?? []) as BrowseCategory[]).map(
+    ({ name, slug }) => ({ name, slug }),
   );
 }

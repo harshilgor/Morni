@@ -131,6 +131,7 @@ export function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [deliveryBarVisible, setDeliveryBarVisible] = useState(true);
+  const deliveryBarVisibleRef = useRef(true);
   const accountRef = useRef<HTMLDivElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
   const categoriesMobileRef = useRef<HTMLDivElement>(null);
@@ -210,7 +211,10 @@ export function SiteHeader() {
   }, [categoriesOpen]);
 
   useEffect(() => {
-    if (!isHomePage) setDeliveryBarVisible(true);
+    if (!isHomePage) {
+      deliveryBarVisibleRef.current = true;
+      setDeliveryBarVisible(true);
+    }
   }, [isHomePage]);
 
   useEffect(() => {
@@ -221,17 +225,27 @@ export function SiteHeader() {
 
   useMotionValueEvent(scrollY, "change", (current) => {
     if (!isHomePage || locationOpen) {
-      setDeliveryBarVisible(true);
+      if (!deliveryBarVisibleRef.current) {
+        deliveryBarVisibleRef.current = true;
+        setDeliveryBarVisible(true);
+      }
       return;
     }
     if (current < 24) {
-      setDeliveryBarVisible(true);
+      if (!deliveryBarVisibleRef.current) {
+        deliveryBarVisibleRef.current = true;
+        setDeliveryBarVisible(true);
+      }
       return;
     }
     const previous = scrollY.getPrevious() ?? 0;
     const diff = current - previous;
     if (Math.abs(diff) < 6) return;
-    setDeliveryBarVisible(diff < 0);
+    const nextVisible = diff < 0;
+    if (nextVisible !== deliveryBarVisibleRef.current) {
+      deliveryBarVisibleRef.current = nextVisible;
+      setDeliveryBarVisible(nextVisible);
+    }
   });
 
   const isProductDetailPage = Boolean(
@@ -677,49 +691,44 @@ export function SiteHeader() {
         </div>
       ) : null}
 
-      <motion.div
-        className="overflow-hidden sm:hidden"
-        initial={false}
-        animate={
-          reducedMotion || deliveryBarVisible
-            ? { height: "auto", opacity: 1 }
-            : { height: 0, opacity: 0 }
-        }
-        transition={
-          reducedMotion
-            ? { duration: 0 }
-            : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
-        }
+      <div
+        className="h-[2.55rem] overflow-hidden bg-[#2a1f24] sm:hidden"
+        aria-hidden={!deliveryBarVisible}
       >
-        <motion.button
-          type="button"
-          onClick={toggleLocationPanel}
+        <motion.div
           initial={false}
           animate={
             reducedMotion || deliveryBarVisible
-              ? { y: 0, opacity: 1 }
-              : { y: -12, opacity: 0 }
+              ? { y: "0%", opacity: 1 }
+              : { y: "-100%", opacity: 0 }
           }
           transition={
             reducedMotion
               ? { duration: 0 }
               : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
           }
-          className="flex w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 py-2.5 text-left text-white transition hover:bg-[#433038]"
-          aria-expanded={locationOpen}
-          aria-haspopup="dialog"
-          aria-controls="delivery-location-dialog"
+          className={`h-full ${deliveryBarVisible ? "pointer-events-auto" : "pointer-events-none"}`}
           style={{ willChange: "transform, opacity" }}
         >
-          <PinIcon className="h-5 w-5 shrink-0 text-white/90" />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {firstName ? `Deliver to ${firstName} - ${locationLabel}` : `Deliver to ${locationLabel}`}
-          </span>
-          <ChevronDownIcon
-            className={`h-4 w-4 shrink-0 text-white/80 transition duration-200 ${locationOpen ? "rotate-180" : ""}`}
-          />
-        </motion.button>
-      </motion.div>
+          <button
+            type="button"
+            onClick={toggleLocationPanel}
+            tabIndex={deliveryBarVisible ? 0 : -1}
+            className="flex h-full w-full items-center gap-2 border-b border-white/10 bg-[#382a31] px-3 text-left text-white transition hover:bg-[#433038]"
+            aria-expanded={locationOpen}
+            aria-haspopup="dialog"
+            aria-controls="delivery-location-dialog"
+          >
+            <PinIcon className="h-5 w-5 shrink-0 text-white/90" />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+              {firstName ? `Deliver to ${firstName} - ${locationLabel}` : `Deliver to ${locationLabel}`}
+            </span>
+            <ChevronDownIcon
+              className={`h-4 w-4 shrink-0 text-white/80 transition duration-200 ${locationOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+        </motion.div>
+      </div>
 
       {locationOpen ? (
         <div

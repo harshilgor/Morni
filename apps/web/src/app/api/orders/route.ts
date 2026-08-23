@@ -8,12 +8,19 @@ import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { UaeEmirate } from "@/lib/types";
+import {
+  customizationConfigFromProduct,
+  sanitizeCustomizationValues,
+  validateCustomizationValues,
+  type ProductCustomizationValues,
+} from "@/lib/product-customization";
 
 type CheckoutItem = {
   productId?: string;
   variantId?: string | null;
   quantity?: number;
   size?: string | null;
+  customization?: ProductCustomizationValues | null;
 };
 
 type CheckoutAddress = {
@@ -85,6 +92,7 @@ export async function POST(request: Request) {
     variant_id: string | null;
     quantity: number;
     size: string | null;
+    customization?: ProductCustomizationValues;
   }> = [];
 
   for (const item of items) {
@@ -100,13 +108,14 @@ export async function POST(request: Request) {
       variant_id: isUuid(item.variantId) ? item.variantId : null,
       quantity,
       size: trimTo(item.size, 40) || null,
+      customization: sanitizeCustomizationValues(item.customization),
     });
   }
 
   const admin = createAdminClient();
   const { data: productRows, error: productError } = await admin
     .from("products")
-    .select("id, store_id")
+    .select("id, store_id, customization_enabled, customization_instructions, customization_fields")
     .in("id", rpcItems.map((item) => item.product_id));
   if (productError) {
     return NextResponse.json({ error: "Unable to verify your bag." }, { status: 500 });
@@ -119,6 +128,17 @@ export async function POST(request: Request) {
     const product = productsById.get(item.product_id);
     if (!product) {
       return NextResponse.json({ error: "A product in your bag is no longer available." }, { status: 400 });
+    }
+    const customization = item.customization ?? {};
+    const config = customizationConfigFromProduct(product);
+    const customizationError = Object.keys(customization).length
+      ? validateCustomizationValues(config, customization)
+      : null;
+    if (customizationError) {
+      return NextResponse.json({ error: customizationError }, { status: 400 });
+    }
+    if (Object.keys(customization).length && !config.enabled) {
+      return NextResponse.json({ error: "Custom measurements are not available for this product." }, { status: 400 });
     }
     if (storeId && storeId !== product.store_id) {
       return NextResponse.json({ error: "Checkout is limited to one boutique per order." }, { status: 400 });
@@ -170,6 +190,35 @@ export async function POST(request: Request) {
   } | null;
   if (!order?.id) {
     return NextResponse.json({ error: "Unable to place this order." }, { status: 500 });
+  }
+
+  // The checkout RPC owns pricing and stock. Attach the already-validated
+  // measurements immediately afterwards so the same order item context is
+  // available to the boutique team and shopper order history.
+  if (rpcItems.some((item) => Object.keys(item.customization ?? {}).length > 0)) {
+    const { data: createdItems } = await admin
+      .from("order_items")
+      .select("id, product_id, variant_id, size")
+      .eq("order_id", order.id)
+      .order("id", { ascending: true });
+    const remaining = [...rpcItems];
+    for (const createdItem of createdItems ?? []) {
+      const matchIndex = remaining.findIndex(
+        (item) =>
+          item.product_id === createdItem.product_id &&
+          item.variant_id === createdItem.variant_id &&
+          item.size === createdItem.size,
+      );
+      if (matchIndex < 0) continue;
+      const [match] = remaining.splice(matchIndex, 1);
+      if (Object.keys(match.customization ?? {}).length > 0) {
+        const { error: customizationError } = await admin
+          .from("order_items")
+          .update({ customization: match.customization })
+          .eq("id", createdItem.id);
+        if (customizationError) console.error("Order placed but customization was not saved", customizationError);
+      }
+    }
   }
 
   if (body?.saveAddress) {

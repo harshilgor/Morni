@@ -134,6 +134,31 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
     ["ethnic top", "crop top", "blouse", "top"],
     15,
   ),
+  featuredCategory(
+    "Gifting",
+    "gifting",
+    "/categories/gifting.jpg",
+    ["gift", "gifting", "present", "celebration", "occasion"],
+    16,
+  ),
+  featuredCategory(
+    "Jewelry / Accessories",
+    "jewelry-accessories",
+    "/categories/jewelry-accessories.png",
+    [
+      "jewelry",
+      "jewellery",
+      "accessory",
+      "accessories",
+      "necklace",
+      "earring",
+      "ring",
+      "bracelet",
+      "clutch",
+      "scarf",
+    ],
+    17,
+  ),
 ];
 
 export function mergeFeaturedCategories(

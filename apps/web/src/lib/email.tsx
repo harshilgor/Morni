@@ -35,6 +35,7 @@ type OrderEmailRecord = {
     quantity: number;
     size: string | null;
     color_name: string | null;
+    customization: Record<string, string> | null;
     line_total_aed: number | string;
   }> | null;
 };
@@ -126,7 +127,7 @@ async function getOrderEmailRecord(orderId: string) {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, order_number, shopper_id, store_id, status, total_aed, delivery_area, delivery_phone, delivery_eta_minutes, stores(name), order_items(title, quantity, size, color_name, line_total_aed)",
+      "id, order_number, shopper_id, store_id, status, total_aed, delivery_area, delivery_phone, delivery_eta_minutes, stores(name), order_items(title, quantity, size, color_name, customization, line_total_aed)",
     )
     .eq("id", orderId)
     .single();
@@ -227,6 +228,7 @@ export async function sendOrderConfirmationEmail(orderId: string) {
     quantity: item.quantity,
     size: item.size,
     colorName: item.color_name,
+    customization: item.customization ? Object.entries(item.customization).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(", ") : null,
     lineTotal: formatAed(item.line_total_aed),
   }));
 
@@ -311,6 +313,7 @@ export async function sendStoreNewOrderEmails(orderId: string) {
     quantity: item.quantity,
     size: item.size,
     colorName: item.color_name,
+    customization: item.customization ? Object.entries(item.customization).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(", ") : null,
     lineTotal: formatAed(item.line_total_aed),
   }));
   const storeName = getStoreName(order);

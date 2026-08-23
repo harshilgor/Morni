@@ -360,11 +360,16 @@ export async function getCachedProductPage(
   tagCatalog("products", `product:${productId}`, `store:${slug}`);
 
   const supabase = createPublicClient();
-  const [{ data: storeData }, { data: productData }] = await Promise.all([
+  const [{ data: storeData }, { data: productData }, { data: customizationData }] = await Promise.all([
     supabase.from("stores").select("*").eq("slug", slug).maybeSingle(),
     supabase
       .from("storefront_products")
       .select("*, product_variants(*)")
+      .eq("id", productId)
+      .maybeSingle(),
+    supabase
+      .from("products")
+      .select("customization_enabled, customization_instructions, customization_fields")
       .eq("id", productId)
       .maybeSingle(),
   ]);
@@ -373,7 +378,13 @@ export async function getCachedProductPage(
     return null;
   }
 
-  const row = productData as Product & {
+  const row = {
+    ...(productData as Product),
+    ...((customizationData ?? {}) as Pick<
+      Product,
+      "customization_enabled" | "customization_instructions" | "customization_fields"
+    >),
+  } as Product & {
     product_variants?: ProductVariant[] | null;
   };
   const variants = [...(row.product_variants ?? [])].sort(

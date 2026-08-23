@@ -32,6 +32,7 @@ import {
   loadBrowseCategoryOptions,
 } from "@/lib/store-category";
 import type { Product, Store } from "@/lib/types";
+import { customizationConfigFromProduct } from "@/lib/product-customization";
 import {
   getResumeOnboardingStep,
   isOnboardingComplete,
@@ -162,6 +163,7 @@ export default function SellSetupPage() {
               : "",
             stock: String(first.stock ?? 10),
             sizes: first.sizes?.length ? first.sizes : ["S", "M", "L"],
+            customization: customizationConfigFromProduct(first),
             images: (first.image_urls ?? []).map((url, index) => ({
               id: `existing-${index}`,
               url,
@@ -449,6 +451,13 @@ export default function SellSetupPage() {
               compareAt && Number.isFinite(compareAt) ? compareAt : null,
             stock,
             sizes: productForm.sizes,
+            customization_enabled: productForm.customization.enabled,
+            customization_instructions: productForm.customization.enabled
+              ? productForm.customization.instructions.trim()
+              : null,
+            customization_fields: productForm.customization.enabled
+              ? productForm.customization.fields
+              : [],
             image_urls,
             is_available: true,
           })
@@ -466,6 +475,13 @@ export default function SellSetupPage() {
             compareAt && Number.isFinite(compareAt) ? compareAt : null,
           stock,
           sizes: productForm.sizes,
+          customization_enabled: productForm.customization.enabled,
+          customization_instructions: productForm.customization.enabled
+            ? productForm.customization.instructions.trim()
+            : null,
+          customization_fields: productForm.customization.enabled
+            ? productForm.customization.fields
+            : [],
           image_urls,
           is_available: true,
         });

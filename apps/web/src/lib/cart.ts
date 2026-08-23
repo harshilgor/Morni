@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Product } from "@/lib/types";
+import type { ProductCustomizationValues } from "@/lib/product-customization";
 
 export type CartItem = {
   lineId?: string;
@@ -15,6 +16,7 @@ export type CartItem = {
   imageUrl?: string;
   size?: string;
   colorName?: string;
+  customization?: ProductCustomizationValues;
   quantity: number;
 };
 
@@ -29,6 +31,7 @@ type CartState = {
       variantId?: string;
       colorName?: string;
       imageUrl?: string;
+      customization?: ProductCustomizationValues;
     },
   ) => void;
   removeItem: (lineId: string) => void;
@@ -43,12 +46,16 @@ export function cartLineId(
   productId: string,
   size?: string,
   variantId?: string,
+  customization?: ProductCustomizationValues,
 ) {
-  return `${productId}:${variantId || "default"}:${size || "one-size"}`;
+  const customizationKey = customization && Object.keys(customization).length
+    ? Object.entries(customization).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}=${value}`).join("&")
+    : "standard";
+  return `${productId}:${variantId || "default"}:${size || "one-size"}:${customizationKey}`;
 }
 
 function itemLineId(item: CartItem) {
-  return item.lineId ?? cartLineId(item.productId, item.size, item.variantId);
+  return item.lineId ?? cartLineId(item.productId, item.size, item.variantId, item.customization);
 }
 
 export const useCart = create<CartState>()(
@@ -61,6 +68,7 @@ export const useCart = create<CartState>()(
           product.id,
           options?.size,
           options?.variantId,
+          options?.customization,
         );
         const imageUrl =
           options?.imageUrl ?? product.image_urls?.[0] ?? undefined;
@@ -79,6 +87,7 @@ export const useCart = create<CartState>()(
                 imageUrl,
                 size: options?.size,
                 colorName: options?.colorName,
+                customization: options?.customization,
                 quantity: qty,
               },
             ],
@@ -109,6 +118,7 @@ export const useCart = create<CartState>()(
                 imageUrl,
                 size: options?.size,
                 colorName: options?.colorName,
+                customization: options?.customization,
                 quantity: qty,
               },
             ],

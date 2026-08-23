@@ -5,6 +5,11 @@ import {
   type ProductImageItem,
 } from "@/components/product-images-field";
 import { PRODUCT_SIZES } from "@/lib/product-sizes";
+import { CustomizationEditor } from "@/components/customization-editor";
+import {
+  defaultCustomizationConfig,
+  type ProductCustomizationConfig,
+} from "@/lib/product-customization";
 
 export type ProductFormValue = {
   title: string;
@@ -14,6 +19,7 @@ export type ProductFormValue = {
   compare_at_price_aed: string;
   stock: string;
   sizes: string[];
+  customization: ProductCustomizationConfig;
   images: ProductImageItem[];
 };
 
@@ -184,6 +190,11 @@ export function ProductFormFields({
         )}
       </fieldset>
 
+      <CustomizationEditor
+        value={value.customization}
+        onChange={(customization) => patch({ customization })}
+      />
+
       <ProductImagesField
         items={value.images}
         onChange={(images) => patch({ images })}
@@ -203,6 +214,7 @@ export function emptyProductForm(): ProductFormValue {
     compare_at_price_aed: "",
     stock: "10",
     sizes: ["S", "M", "L"],
+    customization: defaultCustomizationConfig(),
     images: [],
   };
 }

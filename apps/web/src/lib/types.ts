@@ -75,6 +75,9 @@ export type Product = {
   sizes: string[];
   stock: number;
   is_available: boolean;
+  customization_enabled?: boolean;
+  customization_instructions?: string | null;
+  customization_fields?: import("@/lib/product-customization").ProductCustomizationField[];
 };
 
 export type ProductVariant = {
@@ -136,6 +139,7 @@ export type OrderItem = {
   unit_price_aed: number;
   quantity: number;
   line_total_aed: number;
+  customization?: import("@/lib/product-customization").ProductCustomizationValues | null;
 };
 
 export type ProductReview = {

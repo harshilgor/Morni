@@ -14,6 +14,13 @@ import { ProductReviewsSection } from "@/components/product-reviews-section";
 import { formatRatingLabel } from "@/lib/product-ratings";
 import { StarRating } from "@/components/star-rating";
 import { SizeGuide } from "@/components/size-guide";
+import { ProductCustomizationFields } from "@/components/product-customization-fields";
+import {
+  customizationConfigFromProduct,
+  sanitizeCustomizationValues,
+  validateCustomizationValues,
+  type ProductCustomizationValues,
+} from "@/lib/product-customization";
 import type { RelatedProduct, StoreCampaign } from "@/lib/types";
 
 function ArrowLeft() {
@@ -229,6 +236,9 @@ export function ProductDetail({
   const [reviewOrderId, setReviewOrderId] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(variants[0]?.id ?? null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [customizationSelected, setCustomizationSelected] = useState(false);
+  const [customizationValues, setCustomizationValues] = useState<ProductCustomizationValues>({});
+  const [customizationError, setCustomizationError] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [added, setAdded] = useState(false);
   const [celebrationKey, setCelebrationKey] = useState(0);
@@ -280,13 +290,20 @@ export function ProductDetail({
   }
 
   useEffect(() => {
-    setReviews(initialReviews);
-    setSelectedVariantId(variants[0]?.id ?? null);
-    setSelectedSize(null);
-    setActiveImage(0);
-    setAdded(false);
-    setBagSheet(null);
-    void loadReviewEligibility(product.id);
+    const resetProductState = () => {
+      setReviews(initialReviews);
+      setSelectedVariantId(variants[0]?.id ?? null);
+      setSelectedSize(null);
+      setCustomizationSelected(false);
+      setCustomizationValues({});
+      setCustomizationError(null);
+      setActiveImage(0);
+      setAdded(false);
+      setBagSheet(null);
+      void loadReviewEligibility(product.id);
+    };
+    if (typeof queueMicrotask === "function") queueMicrotask(resetProductState);
+    else window.setTimeout(resetProductState, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id, store.id]);
 
@@ -303,6 +320,7 @@ export function ProductDetail({
     [product, selectedVariant],
   );
   const availableStock = selectedVariant?.stock ?? product.stock ?? 0;
+  const customizationConfig = useMemo(() => customizationConfigFromProduct(product), [product]);
   const ratingSummary = useMemo(() => {
     if (!reviews.length) return null;
     return {
@@ -340,11 +358,26 @@ export function ProductDetail({
       setBagSheet("size");
       return;
     }
+    const customization = customizationSelected
+      ? sanitizeCustomizationValues(customizationValues)
+      : {};
+    if (customizationSelected && Object.keys(customization).length === 0) {
+      setCustomizationError("Add at least one measurement or turn customization off.");
+      return;
+    }
+    const customizationValidation = customizationSelected
+      ? validateCustomizationValues(customizationConfig, customization)
+      : null;
+    if (customizationValidation) {
+      setCustomizationError(customizationValidation);
+      return;
+    }
     addItem(product, store.name, 1, {
       size: size ?? undefined,
       variantId: selectedVariant?.id,
       colorName: selectedVariant?.color_name,
       imageUrl: gallery[0],
+      customization: Object.keys(customization).length ? customization : undefined,
     });
     setAdded(true);
     setCelebrationKey((key) => key + 1);
@@ -473,6 +506,21 @@ export function ProductDetail({
                 {!selectedSize ? <p className="mt-2 text-xs text-accent-deep">Select a size to add this piece to your bag.</p> : null}
               </div>
             ) : null}
+            <ProductCustomizationFields
+              config={customizationConfig}
+              enabled={customizationSelected}
+              values={customizationValues}
+              error={customizationError}
+              onToggle={(enabled) => {
+                setCustomizationSelected(enabled);
+                setCustomizationError(null);
+              }}
+              onChange={(id, value) => {
+                setCustomizationSelected(true);
+                setCustomizationError(null);
+                setCustomizationValues((current) => ({ ...current, [id]: value }));
+              }}
+            />
           </div>
 
           <p className={`mt-4 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>

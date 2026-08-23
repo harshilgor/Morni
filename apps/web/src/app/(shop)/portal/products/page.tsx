@@ -5,6 +5,8 @@
 
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import { ColorVariantEditor } from "@/components/color-variant-editor";
+import { CustomizationEditor } from "@/components/customization-editor";
+import type { CategoryOption } from "@/components/product-form-fields";
 import {
   ImagePreviewDialog,
   type PreviewImage,
@@ -23,15 +25,24 @@ import {
 } from "@/lib/product-variants";
 import { replaceProductVariants } from "@/lib/save-product-variants";
 import { revalidatePublicCatalog } from "@/lib/revalidate-catalog";
+import { ensureStoreCategory, loadBrowseCategoryOptions } from "@/lib/store-category";
 import type { Product, ProductVariant } from "@/lib/types";
+import {
+  customizationConfigFromProduct,
+  defaultCustomizationConfig,
+  type ProductCustomizationConfig,
+} from "@/lib/product-customization";
 
 type ProductWithVariants = Product & {
   product_variants?: ProductVariant[] | null;
+  categories?: { name: string; slug: string } | null;
 };
 
 type ProductDraft = {
   title: string;
   price_aed: string;
+  categorySlug: string;
+  customization: ProductCustomizationConfig;
 };
 
 type CreateStep = 1 | 2;
@@ -111,11 +122,14 @@ function SheetShell({
 export default function PortalProductsPage() {
   const { store, loading, error } = useOwnerStore();
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: "",
     description: "",
     price_aed: "",
+    categorySlug: "",
+    customization: defaultCustomizationConfig(),
   });
   const [createColors, setCreateColors] = useState<ColorDraft[]>([
     createColorDraft({ color_name: "Default" }),
@@ -145,11 +159,15 @@ export default function PortalProductsPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("products")
-      .select("*, product_variants(*)")
+      .select("*, product_variants(*), categories(name, slug)")
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
     setProducts((data as ProductWithVariants[]) ?? []);
   }
+
+  useEffect(() => {
+    void loadBrowseCategoryOptions().then(setCategories);
+  }, []);
 
   useEffect(() => {
     if (!store) return;
@@ -208,6 +226,13 @@ export default function PortalProductsPage() {
   function openCreate() {
     setCreateStep(1);
     setMessage(null);
+    setForm({
+      title: "",
+      description: "",
+      price_aed: "",
+      categorySlug: "",
+      customization: defaultCustomizationConfig(),
+    });
     setAddProductOpen(true);
   }
 
@@ -228,6 +253,8 @@ export default function PortalProductsPage() {
     setEditDraft({
       title: product.title,
       price_aed: String(product.price_aed),
+      categorySlug: product.categories?.slug ?? "",
+      customization: customizationConfigFromProduct(product),
     });
     setEditColors(draftsFromVariants(product));
     setEditMessage(null);
@@ -253,6 +280,16 @@ export default function PortalProductsPage() {
       setCreateStep(1);
       return;
     }
+    if (!form.categorySlug) {
+      setMessage("Choose a category for this product.");
+      setCreateStep(1);
+      return;
+    }
+    if (form.customization.enabled && form.customization.fields.length === 0) {
+      setMessage("Choose at least one measurement for custom sizing.");
+      setCreateStep(2);
+      return;
+    }
     const colorError = validateColorDrafts(createColors);
     if (colorError) {
       setMessage(colorError);
@@ -264,16 +301,38 @@ export default function PortalProductsPage() {
     setMessage(null);
     const supabase = createClient();
     const aggregate = aggregateFromColorDrafts(createColors);
+    const category = categories.find((item) => item.slug === form.categorySlug);
+
+    let categoryId: string;
+    try {
+      categoryId = await ensureStoreCategory({
+        storeId: store.id,
+        categorySlug: form.categorySlug,
+        categoryName: category?.name,
+      });
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Could not save the category.");
+      setSaving(false);
+      return;
+    }
 
     const { data: created, error: insertError } = await supabase
       .from("products")
       .insert({
         store_id: store.id,
+        category_id: categoryId,
         title: form.title,
         description: form.description || null,
         price_aed: Number(form.price_aed),
         stock: aggregate.stock,
         sizes: aggregate.sizes,
+        customization_enabled: form.customization.enabled,
+        customization_instructions: form.customization.enabled
+          ? form.customization.instructions.trim()
+          : null,
+        customization_fields: form.customization.enabled
+          ? form.customization.fields
+          : [],
         is_available: true,
         image_urls: [],
       })
@@ -298,7 +357,13 @@ export default function PortalProductsPage() {
       return;
     }
 
-    setForm({ title: "", description: "", price_aed: "" });
+    setForm({
+      title: "",
+      description: "",
+      price_aed: "",
+      categorySlug: "",
+      customization: defaultCustomizationConfig(),
+    });
     setCreateColors([createColorDraft({ color_name: "Default" })]);
     setSaving(false);
     setMessage("Product added with color options.");
@@ -318,6 +383,14 @@ export default function PortalProductsPage() {
       setEditMessage("Enter a valid price.");
       return;
     }
+    if (!editDraft.categorySlug) {
+      setEditMessage("Choose a category for this product.");
+      return;
+    }
+    if (editDraft.customization.enabled && editDraft.customization.fields.length === 0) {
+      setEditMessage("Choose at least one measurement for custom sizing.");
+      return;
+    }
     const colorError = validateColorDrafts(editColors);
     if (colorError) {
       setEditMessage(colorError);
@@ -327,11 +400,32 @@ export default function PortalProductsPage() {
     setSavingEdits(true);
     setEditMessage(null);
     const supabase = createClient();
+    const category = categories.find((item) => item.slug === editDraft.categorySlug);
+    let categoryId: string;
+    try {
+      categoryId = await ensureStoreCategory({
+        storeId: store.id,
+        categorySlug: editDraft.categorySlug,
+        categoryName: category?.name,
+      });
+    } catch (err) {
+      setEditMessage(err instanceof Error ? err.message : "Could not save the category.");
+      setSavingEdits(false);
+      return;
+    }
     const { error: updateError } = await supabase
       .from("products")
       .update({
+        category_id: categoryId,
         title: editDraft.title.trim(),
         price_aed: price,
+        customization_enabled: editDraft.customization.enabled,
+        customization_instructions: editDraft.customization.enabled
+          ? editDraft.customization.instructions.trim()
+          : null,
+        customization_fields: editDraft.customization.enabled
+          ? editDraft.customization.fields
+          : [],
       })
       .eq("id", editingProduct.id)
       .eq("store_id", store.id);
@@ -623,8 +717,8 @@ export default function PortalProductsPage() {
             onSubmit={(event) => {
               event.preventDefault();
               if (createStep === 1) {
-                if (!form.title.trim() || !form.price_aed.trim()) {
-                  setMessage("Add a title and price to continue.");
+                if (!form.title.trim() || !form.price_aed.trim() || !form.categorySlug) {
+                  setMessage("Add a title, price, and category to continue.");
                   return;
                 }
                 setMessage(null);
@@ -673,6 +767,26 @@ export default function PortalProductsPage() {
                   />
                 </label>
                 <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">
+                    Category <span className="text-accent-deep">*</span>
+                  </span>
+                  <select
+                    className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
+                    value={form.categorySlug}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, categorySlug: event.target.value }))
+                    }
+                    required
+                  >
+                    <option value="">Select a category</option>
+                    {categories.map((category) => (
+                      <option key={category.slug} value={category.slug}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block space-y-1.5 text-sm">
                   <span className="font-medium text-[#40534d]">Description</span>
                   <textarea
                     className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
@@ -684,11 +798,17 @@ export default function PortalProductsPage() {
                 </label>
               </div>
             ) : (
-              <ColorVariantEditor
-                value={createColors}
-                onChange={setCreateColors}
-                disabled={saving}
-              />
+              <div className="space-y-4">
+                <CustomizationEditor
+                  value={form.customization}
+                  onChange={(customization) => setForm((current) => ({ ...current, customization }))}
+                />
+                <ColorVariantEditor
+                  value={createColors}
+                  onChange={setCreateColors}
+                  disabled={saving}
+                />
+              </div>
             )}
 
             {message ? <p className="mt-3 text-sm text-accent-deep">{message}</p> : null}
@@ -762,6 +882,35 @@ export default function PortalProductsPage() {
                   className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm outline-none focus:border-accent"
                 />
               </label>
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-[#40534d]">
+                  Category <span className="text-accent-deep">*</span>
+                </span>
+                <select
+                  className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
+                  value={editDraft.categorySlug}
+                  onChange={(event) =>
+                    setEditDraft((current) =>
+                      current ? { ...current, categorySlug: event.target.value } : current,
+                    )
+                  }
+                  required
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((category) => (
+                    <option key={category.slug} value={category.slug}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <CustomizationEditor
+                compact
+                value={editDraft.customization}
+                onChange={(customization) =>
+                  setEditDraft((current) => (current ? { ...current, customization } : current))
+                }
+              />
               <ColorVariantEditor
                 compact
                 value={editColors}
@@ -884,6 +1033,9 @@ function CatalogCards({
                     <p className="mt-1 text-sm text-[#5b6a64]">
                       {formatAed(product.price_aed)} · {product.stock} in stock
                     </p>
+                    <p className="mt-1 text-xs text-[#7b8882]">
+                      {product.categories?.name ?? "Needs category"}
+                    </p>
                   </div>
                   {product.is_available ? <StatusBadge status="live" /> : <StatusBadge status="paused" />}
                 </div>
@@ -905,6 +1057,11 @@ function CatalogCards({
                       <span className="text-[11px] text-muted">+{variants.length - 4}</span>
                     ) : null}
                   </div>
+                ) : null}
+                {product.customization_enabled ? (
+                  <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#edf7f3] px-2 py-1 text-[11px] font-semibold text-[#2f6f66]">
+                    <PortalIcon name="sparkle" className="h-3 w-3" /> Custom sizing
+                  </span>
                 ) : null}
               </div>
             </div>
@@ -1035,6 +1192,9 @@ function CatalogTable({
                                 .map((variant) => `${variant.color_name} (${variant.stock})`)
                                 .join(" / ")
                             : "No colour variants"}
+                        </span>
+                        <span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">
+                          Category: {product.categories?.name ?? "Needs category"}
                         </span>
                       </span>
                     </div>
