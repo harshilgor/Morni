@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
       "form-action 'self' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com",
       // Inline $RS polyfill + Next/Vercel runtime; AFS payment widget from OPPWA.
       "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       `connect-src 'self' ${supabaseHost} https://*.supabase.co wss://*.supabase.co https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://vitals.vercel-insights.com https://va.vercel-scripts.com`,
