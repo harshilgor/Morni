@@ -1,0 +1,299 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BrandMark } from "@/components/brand-logo";
+import { PortalIcon } from "@/components/portal-icons";
+import { createClient } from "@/lib/supabase/client";
+import { useAuthUser } from "@/lib/use-auth-user";
+
+type DeliveryJobStatus = "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled";
+type DriverAvailability = "offline" | "available" | "assigned" | "paused";
+type DriverSection = "route" | "history" | "help";
+type JobAction = "accept" | "decline" | "at_pickup" | "collected" | "delivered" | "failed";
+
+type DriverJob = {
+  id: string;
+  status: DeliveryJobStatus;
+  assignment_expires_at: string | null;
+  order_number: string;
+  store_name: string;
+  store_address: string;
+  store_lat: number | null;
+  store_lng: number | null;
+  delivery_street: string;
+  delivery_building: string | null;
+  delivery_apartment: string | null;
+  delivery_area: string;
+  delivery_emirate: string | null;
+  delivery_notes: string | null;
+  delivery_phone: string | null;
+  delivery_eta_minutes: number | null;
+  item_count: number;
+  bag_summary: string | null;
+};
+
+type DriverHistoryJob = {
+  id: string;
+  status: Extract<DeliveryJobStatus, "delivered" | "failed" | "cancelled">;
+  order_number: string;
+  store_name: string;
+  delivery_area: string;
+  delivered_at: string | null;
+  failed_at: string | null;
+  failure_reason: string | null;
+  updated_at: string;
+};
+
+type DriverData = {
+  driver: {
+    id: string;
+    display_name: string;
+    availability: DriverAvailability;
+    is_active: boolean;
+    last_location_at: string | null;
+  };
+  partner?: { name?: string | null; support_email?: string | null };
+  jobs: DriverJob[];
+  history: DriverHistoryJob[];
+};
+
+const FAILURE_REASONS = ["Customer unavailable", "Wrong address", "Could not access building", "Order damaged", "Other delivery issue"] as const;
+const statusLabel: Record<DeliveryJobStatus, string> = {
+  unassigned: "Waiting for rider", assigned: "Awaiting acceptance", accepted: "Heading to pickup", at_pickup: "At the store",
+  collected: "Out for delivery", delivered: "Delivered", failed: "Needs attention", cancelled: "Cancelled",
+};
+const statusTone: Record<DeliveryJobStatus, string> = {
+  unassigned: "bg-amber-100 text-amber-800", assigned: "bg-sky-100 text-sky-800", accepted: "bg-violet-100 text-violet-800",
+  at_pickup: "bg-indigo-100 text-indigo-800", collected: "bg-teal-100 text-teal-800", delivered: "bg-emerald-100 text-emerald-800",
+  failed: "bg-rose-100 text-rose-800", cancelled: "bg-stone-200 text-stone-700",
+};
+
+function formatTime(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-AE", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
+}
+
+function relativeTime(value: string | null | undefined) {
+  if (!value) return "Location not shared yet";
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 15) return "Updated just now";
+  if (seconds < 60) return `Updated ${seconds}s ago`;
+  return `Updated ${Math.round(seconds / 60)}m ago`;
+}
+
+function friendlyError(message: string) {
+  if (/no rider profile|access is restricted/i.test(message)) return "Your account is not linked to an active rider profile yet.";
+  if (/expired|no longer available/i.test(message)) return "That assignment is no longer available. Your route has been refreshed.";
+  if (/finish the current delivery/i.test(message)) return "Finish the current delivery before changing availability.";
+  return "We could not complete that action. Check your connection and try again.";
+}
+
+function destinationFor(job: DriverJob) {
+  return [job.delivery_street, job.delivery_building, job.delivery_apartment, job.delivery_area, job.delivery_emirate].filter(Boolean).join(", ");
+}
+
+function useCountdown(expiresAt: string | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!expiresAt) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [expiresAt]);
+  if (!expiresAt) return null;
+  return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 1000));
+}
+
+function StatusPill({ status }: { status: DeliveryJobStatus }) {
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone[status]}`}>{statusLabel[status]}</span>;
+}
+
+function DriverLoading() {
+  return <main className="grid min-h-dvh place-items-center bg-[#f6f8f6] px-5"><div className="w-full max-w-md space-y-4"><div className="h-16 animate-pulse rounded-2xl bg-[#e6eee9]" /><div className="h-28 animate-pulse rounded-2xl bg-[#e6eee9]" /><div className="h-72 animate-pulse rounded-2xl bg-[#e6eee9]" /></div></main>;
+}
+
+function DriverAccess({ title, description, href = "/driver/sign-in?next=/driver" }: { title: string; description: string; href?: string }) {
+  return <main className="grid min-h-dvh place-items-center bg-[#f6f8f6] px-5 text-center"><section className="w-full max-w-md rounded-2xl border border-[#dbe4df] bg-white p-8 shadow-[0_24px_70px_-40px_rgba(25,42,35,0.45)]"><span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#e8f4ee] text-[#367762]"><PortalIcon name="package" className="h-5 w-5" /></span><p className="mt-5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4e8875]">Morni rider</p><h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#19342b]">{title}</h1><p className="mt-3 text-sm leading-6 text-[#63726c]">{description}</p><Link href={href} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#213d33] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f5d]">Sign in <PortalIcon name="arrow" className="h-4 w-4" /></Link></section></main>;
+}
+
+function AcceptCountdown({ expiresAt }: { expiresAt: string | null }) {
+  const seconds = useCountdown(expiresAt);
+  if (seconds === null) return null;
+  const urgent = seconds <= 20;
+  return <div className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold tabular-nums ${urgent ? "bg-rose-50 text-rose-700" : "bg-sky-50 text-sky-800"}`}><span className="flex items-center gap-2"><PortalIcon name="clock" className="h-4 w-4" /> Assignment window</span><span>{seconds > 0 ? `${seconds}s left` : "Refreshing…"}</span></div>;
+}
+
+function DriverJobCard({ job, updating, onAction }: { job: DriverJob; updating: boolean; onAction: (id: string, action: JobAction, note?: string) => void }) {
+  const [failureOpen, setFailureOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const destination = destinationFor(job);
+  const navigatePickup = ["assigned", "accepted", "at_pickup"].includes(job.status);
+  const mapsTarget = navigatePickup ? job.store_lat != null && job.store_lng != null ? `${job.store_lat},${job.store_lng}` : job.store_address : destination;
+  const mapsHref = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapsTarget)}`;
+  const action: JobAction | null = job.status === "assigned" ? "accept" : job.status === "accepted" ? "at_pickup" : job.status === "at_pickup" ? "collected" : job.status === "collected" ? "delivered" : null;
+  const actionLabel = job.status === "assigned" ? "Accept delivery" : job.status === "accepted" ? "I am at the store" : job.status === "at_pickup" ? "I collected the order" : "Mark delivered";
+
+  async function copyAddress() {
+    try { await navigator.clipboard.writeText(navigatePickup ? job.store_address : destination); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch { setCopied(false); }
+  }
+
+  function requestAction(nextAction: JobAction) {
+    if (nextAction === "delivered") { setConfirmed(false); setConfirmOpen(true); return; }
+    onAction(job.id, nextAction);
+  }
+
+  return <article className="overflow-hidden rounded-2xl border border-[#dce5e0] bg-white shadow-[0_14px_30px_-28px_rgba(30,55,43,0.7)]">
+    <div className="flex items-start justify-between gap-3 border-b border-[#e8efeb] px-4 py-4 sm:px-5"><div className="min-w-0"><p className="text-xs font-bold text-[#487767]">{job.order_number}</p><p className="mt-1 truncate text-base font-semibold text-[#19342b]">{job.store_name}</p></div><StatusPill status={job.status} /></div>
+    <div className="space-y-4 p-4 sm:p-5">
+      {job.status === "assigned" ? <AcceptCountdown expiresAt={job.assignment_expires_at} /> : null}
+      <div className="flex flex-wrap gap-2 text-xs font-semibold text-[#5b6e65]">{job.item_count > 0 ? <span className="rounded-full bg-[#edf6f1] px-2.5 py-1">{job.item_count} item{job.item_count === 1 ? "" : "s"}</span> : null}{job.bag_summary ? <span className="max-w-full rounded-full bg-[#edf6f1] px-2.5 py-1">{job.bag_summary}</span> : null}{job.delivery_eta_minutes ? <span className="rounded-full bg-[#edf6f1] px-2.5 py-1">ETA {job.delivery_eta_minutes} min</span> : null}</div>
+      <div className="grid gap-4 sm:grid-cols-2"><div className="rounded-xl bg-[#f7faf8] p-3"><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#708078]">Pickup</p><p className="mt-1 text-sm leading-5 text-[#33473e]">{job.store_address}</p></div><div className="rounded-xl bg-[#f7faf8] p-3"><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#708078]">Drop-off</p><p className="mt-1 text-sm leading-5 text-[#33473e]">{destination}</p></div></div>
+      {job.delivery_notes ? <div className="flex gap-2 rounded-xl bg-[#fff8ed] px-3 py-2.5 text-xs leading-5 text-[#7b5c2d]"><PortalIcon name="warning" className="mt-0.5 h-4 w-4 shrink-0" /><span><strong>Delivery note:</strong> {job.delivery_notes}</span></div> : null}
+      <div className="flex flex-wrap gap-2"><a href={mapsHref} target="_blank" rel="noreferrer" className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#213d33] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2f6f5d]"><PortalIcon name="location" className="h-4 w-4" />{navigatePickup ? "Navigate to store" : "Navigate to customer"}</a><button type="button" onClick={() => void copyAddress()} className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-[#cfdcd5] px-3 text-xs font-semibold text-[#3f6155] transition hover:bg-[#f5f8f6]" aria-label="Copy current address">{copied ? "Copied" : "Copy"}</button>{job.delivery_phone ? <a href={`tel:${job.delivery_phone}`} className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-[#cfdcd5] text-[#3f6155] transition hover:bg-[#f5f8f6]" aria-label="Call customer"><PortalIcon name="phone" className="h-4 w-4" /></a> : null}</div>
+      {job.status === "assigned" ? <div className="grid grid-cols-2 gap-2"><button type="button" disabled={updating} onClick={() => onAction(job.id, "decline")} className="min-h-12 rounded-xl border border-[#ead4d0] px-3 py-2.5 text-sm font-semibold text-[#a24a40] transition hover:bg-[#fff8f7] disabled:opacity-50">Decline</button><button type="button" disabled={updating} onClick={() => onAction(job.id, "accept")} className="min-h-12 rounded-xl bg-[#2f6f5d] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#235446] disabled:opacity-50">{updating ? "Accepting…" : "Accept delivery"}</button></div> : null}
+      {action && job.status !== "assigned" ? <button type="button" disabled={updating} onClick={() => requestAction(action)} className="min-h-12 w-full rounded-xl bg-[#2f6f5d] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#235446] disabled:opacity-50">{updating ? "Updating…" : actionLabel}</button> : null}
+      {confirmOpen ? <div className="space-y-3 rounded-xl border border-[#cbded3] bg-[#f2f8f4] p-3"><div><p className="text-sm font-semibold text-[#21493b]">Confirm this delivery step</p><p className="mt-1 text-xs leading-5 text-[#5b7168]">Only confirm after you have handed the order to the customer.</p></div><label className="flex items-start gap-2 text-xs leading-5 text-[#39594d]"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-1 h-4 w-4 accent-[#2f6f5d]" />I confirm the customer received the order.</label><div className="flex gap-2"><button type="button" onClick={() => setConfirmOpen(false)} className="min-h-10 flex-1 rounded-lg border border-[#cbded3] px-3 text-xs font-semibold text-[#47665a]">Cancel</button><button type="button" disabled={!confirmed || updating} onClick={() => { setConfirmOpen(false); onAction(job.id, "delivered", "Customer confirmed receipt."); }} className="min-h-10 flex-1 rounded-lg bg-[#2f6f5d] px-3 text-xs font-semibold text-white disabled:opacity-50">Confirm delivered</button></div></div> : null}
+      {job.status === "collected" ? failureOpen ? <div className="space-y-2 rounded-xl border border-[#ead4d0] bg-[#fff8f7] p-3"><p className="text-xs font-semibold text-[#9e5348]">Why couldn’t delivery be completed?</p>{FAILURE_REASONS.map((reason) => <button key={reason} type="button" disabled={updating} onClick={() => onAction(job.id, "failed", reason)} className="block min-h-10 w-full rounded-lg border border-[#ead4d0] bg-white px-3 py-2 text-left text-xs font-semibold text-[#9e5348] disabled:opacity-50">{reason}</button>)}<button type="button" onClick={() => setFailureOpen(false)} className="w-full py-1 text-xs font-semibold text-[#5b6e65]">Cancel</button></div> : <button type="button" disabled={updating} onClick={() => setFailureOpen(true)} className="w-full py-1 text-xs font-semibold text-[#9e5348] disabled:opacity-50">Report delivery issue</button> : null}
+    </div>
+  </article>;
+}
+
+function AvailabilityCard({ driver, activeJobs, updating, online, onAvailability }: { driver: DriverData["driver"]; activeJobs: number; updating: boolean; online: boolean; onAvailability: (availability: DriverAvailability) => void }) {
+  const isAvailable = driver.availability === "available";
+  const isBusy = ["assigned", "accepted", "at_pickup", "collected"].includes(driver.availability) || activeJobs > 0;
+  return <section className="rounded-2xl border border-[#d4e3db] bg-[#eaf4ee] p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${isAvailable ? "bg-[#2f8a64]" : "bg-[#9aa9a2]"}`} /><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4f7666]">Your availability</p></div><p className="mt-2 text-2xl font-semibold capitalize tracking-[-0.04em] text-[#19342b]">{driver.availability}</p></div>{isAvailable ? <button type="button" onClick={() => onAvailability("offline")} disabled={updating || isBusy} className="min-h-11 rounded-xl border border-[#c5d8cd] bg-white px-4 py-2.5 text-sm font-semibold text-[#48645b] transition hover:bg-[#f5faf7] disabled:opacity-50">Go offline</button> : <button type="button" onClick={() => onAvailability("available")} disabled={updating || !online} className="min-h-11 rounded-xl bg-[#2f6f5d] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#235446] disabled:opacity-50">{updating ? "Going available…" : "Go available"}</button>}</div><div className="mt-4 grid gap-2 text-xs text-[#567268] sm:grid-cols-2"><span className="flex items-center gap-2 rounded-lg bg-white/70 px-3 py-2"><PortalIcon name="location" className="h-4 w-4" />{relativeTime(driver.last_location_at)}</span><span className="flex items-center gap-2 rounded-lg bg-white/70 px-3 py-2"><span className={`h-2 w-2 rounded-full ${online ? "bg-[#2f8a64]" : "bg-[#bd6057]"}`} />{online ? "Connection is healthy" : "You are offline"}</span></div><p className="mt-3 text-xs leading-5 text-[#63786e]">When you are available, Morni uses your location to prioritize nearby pickup requests.</p></section>;
+}
+
+function AssignmentNotice({ job, alertsEnabled, onEnableAlerts, onDismiss }: { job: DriverJob; alertsEnabled: boolean; onEnableAlerts: () => void; onDismiss: () => void }) {
+  return <section className="mx-auto mt-4 w-[min(100%-2rem,72rem)] rounded-2xl border border-[#b9d9ca] bg-[#eaf7ef] p-4 shadow-[0_16px_40px_-28px_rgba(33,78,58,0.5)] sm:flex sm:items-center sm:justify-between sm:gap-5"><div className="flex gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#2f6f5d] text-white"><PortalIcon name="bell" className="h-5 w-5" /></span><div><p className="text-sm font-bold text-[#214d3b]">New delivery assigned</p><p className="mt-1 text-xs leading-5 text-[#527466]">{job.order_number} from {job.store_name}. Accept it before the assignment window closes.</p></div></div><div className="mt-3 flex gap-2 sm:mt-0">{!alertsEnabled ? <button type="button" onClick={onEnableAlerts} className="min-h-10 rounded-lg border border-[#b7d7c6] bg-white px-3 text-xs font-semibold text-[#356b55]">Enable alerts</button> : null}<button type="button" onClick={onDismiss} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-[#527466]">Dismiss</button></div></section>;
+}
+
+function HistoryList({ history }: { history: DriverHistoryJob[] }) {
+  return <section className="rounded-2xl border border-[#dce5e0] bg-white p-4 sm:p-5"><div className="flex items-end justify-between gap-3 border-b border-[#edf1ee] pb-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Recent work</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#19342b]">Delivery history</h2></div><span className="rounded-full bg-[#edf6f1] px-2.5 py-1 text-xs font-semibold text-[#376f5c]">Last 30 days</span></div><div className="divide-y divide-[#edf1ee]">{history.map((job) => <div key={job.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div className="min-w-0"><p className="text-sm font-semibold text-[#33473e]">{job.order_number} · {job.store_name}</p><p className="mt-1 text-xs text-[#7a8982]">{job.delivery_area} · {job.status === "delivered" ? `Delivered ${formatTime(job.delivered_at)}` : job.failure_reason ?? statusLabel[job.status]}</p></div><StatusPill status={job.status} /></div>)}{history.length === 0 ? <div className="py-12 text-center"><span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-[#e8f4ee] text-[#3c7d68]"><PortalIcon name="orders" className="h-5 w-5" /></span><p className="mt-3 text-sm font-semibold text-[#33473e]">No completed deliveries yet</p><p className="mt-1 text-xs leading-5 text-[#718079]">Your completed route will appear here.</p></div> : null}</div></section>;
+}
+
+function ShiftSummary({ activeJobs, completedJobs }: { activeJobs: number; completedJobs: number }) {
+  return <section className="rounded-2xl border border-[#dce5e0] bg-white p-5"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Today at a glance</p><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl bg-[#f5f8f6] p-3"><p className="text-2xl font-semibold tracking-[-0.04em] text-[#19342b]">{activeJobs}</p><p className="mt-1 text-xs text-[#718079]">Active jobs</p></div><div className="rounded-xl bg-[#f5f8f6] p-3"><p className="text-2xl font-semibold tracking-[-0.04em] text-[#19342b]">{completedJobs}</p><p className="mt-1 text-xs text-[#718079]">Completed today</p></div></div><p className="mt-4 text-xs leading-5 text-[#718079]">Keep availability accurate so dispatch can send you the closest next pickup.</p></section>;
+}
+
+function HelpPanel({ supportEmail, partnerName }: { supportEmail?: string | null; partnerName?: string | null }) {
+  return <section className="rounded-2xl border border-[#dce5e0] bg-white p-5"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Need help?</p><h2 className="mt-1 text-lg font-semibold text-[#19342b]">Contact dispatch</h2><p className="mt-2 text-xs leading-5 text-[#718079]">{partnerName ?? "Your delivery partner"} can help with address, store, or customer issues.</p>{supportEmail ? <a href={`mailto:${supportEmail}`} className="mt-4 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#213d33] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2f6f5d]"><PortalIcon name="phone" className="h-4 w-4" /> Email dispatch</a> : <p className="mt-4 rounded-lg bg-[#f5f8f6] px-3 py-2 text-xs text-[#718079]">Ask your dispatcher for a support contact.</p>}</section>;
+}
+
+function BottomNav({ section, onChange }: { section: DriverSection; onChange: (section: DriverSection) => void }) {
+  const items: Array<{ id: DriverSection; label: string; icon: "location" | "orders" | "phone" }> = [{ id: "route", label: "Route", icon: "location" }, { id: "history", label: "History", icon: "orders" }, { id: "help", label: "Help", icon: "phone" }];
+  return <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#dce5e0] bg-white/95 px-4 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden" aria-label="Rider sections"><div className="mx-auto grid max-w-md grid-cols-3 gap-2">{items.map((item) => <button key={item.id} type="button" onClick={() => onChange(item.id)} className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold ${section === item.id ? "bg-[#eaf4ee] text-[#2f6f5d]" : "text-[#718079]"}`} aria-current={section === item.id ? "page" : undefined}><PortalIcon name={item.icon} className="h-4 w-4" />{item.label}</button>)}</div></nav>;
+}
+
+export function DriverWorkspace() {
+  const { auth, loading: authLoading } = useAuthUser();
+  const [data, setData] = useState<DriverData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [section, setSection] = useState<DriverSection>("route");
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [assignmentNotice, setAssignmentNotice] = useState<DriverJob | null>(null);
+  const [alertsEnabled, setAlertsEnabled] = useState(false);
+  const previousAssignedIds = useRef<Set<string> | null>(null);
+
+  const load = useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true); else setLoading(true);
+    const { data: response, error: rpcError } = await createClient().rpc("driver_delivery_workspace_data");
+    if (rpcError) { setError(friendlyError(rpcError.message)); if (!silent) setData(null); }
+    else { const nextData = response as unknown as Partial<DriverData>; setData({ ...(nextData as DriverData), jobs: nextData.jobs ?? [], history: nextData.history ?? [] }); setError(null); setLastUpdatedAt(new Date().toISOString()); }
+    setLoading(false); setRefreshing(false);
+  }, []);
+
+  useEffect(() => {
+    if (!auth) return;
+    const requestLoad = () => void load();
+    if (typeof queueMicrotask === "function") queueMicrotask(requestLoad); else window.setTimeout(requestLoad, 0);
+  }, [auth, load]);
+
+  useEffect(() => {
+    const onlineHandler = () => setOnline(true); const offlineHandler = () => setOnline(false);
+    window.addEventListener("online", onlineHandler); window.addEventListener("offline", offlineHandler);
+    return () => { window.removeEventListener("online", onlineHandler); window.removeEventListener("offline", offlineHandler); };
+  }, []);
+
+  useEffect(() => {
+    if (!auth || !data?.driver.id) return;
+    const supabase = createClient();
+    const channel = supabase.channel(`driver-jobs-${data.driver.id}`).on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs", filter: `driver_id=eq.${data.driver.id}` }, () => void load(true)).subscribe();
+    const poll = window.setInterval(() => void load(true), 15_000);
+    return () => { window.clearInterval(poll); void supabase.removeChannel(channel); };
+  }, [auth, data?.driver.id, load]);
+
+  useEffect(() => {
+    const assigned = data?.jobs.filter((job) => job.status === "assigned") ?? [];
+    const ids = new Set(assigned.map((job) => job.id));
+    if (previousAssignedIds.current) {
+      const newJob = assigned.find((job) => !previousAssignedIds.current?.has(job.id));
+      if (newJob) {
+        setAssignmentNotice(newJob);
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate([160, 80, 160]);
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification("New Morni delivery", { body: `${newJob.order_number} from ${newJob.store_name}` });
+      }
+    }
+    previousAssignedIds.current = ids;
+  }, [data?.jobs]);
+
+  const hasExpiredAssignment = useMemo(() => data?.jobs.some((job) => job.status === "assigned" && job.assignment_expires_at && new Date(job.assignment_expires_at).getTime() <= Date.now()) ?? false, [data?.jobs]);
+  useEffect(() => { if (!hasExpiredAssignment) return; const id = window.setTimeout(() => void load(true), 1200); return () => window.clearTimeout(id); }, [hasExpiredAssignment, load]);
+
+  async function setAvailability(availability: DriverAvailability) {
+    if (!data || !online) return;
+    setUpdating("availability"); setError(null);
+    let lat: number | null = null; let lng: number | null = null;
+    if (availability === "available" && "geolocation" in navigator) {
+      try { const position = await new Promise<GeolocationPosition>((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 7000, maximumAge: 60_000 })); lat = position.coords.latitude; lng = position.coords.longitude; } catch { /* The backend still permits availability without location. */ }
+    }
+    const { error: rpcError } = await createClient().rpc("set_delivery_driver_availability", { p_availability: availability, p_lat: lat, p_lng: lng });
+    if (rpcError) setError(friendlyError(rpcError.message)); else await load(true);
+    setUpdating(null);
+  }
+
+  async function jobAction(jobId: string, action: JobAction, note?: string) {
+    if (!online) { setError("You are offline. Reconnect before updating a delivery."); return; }
+    setUpdating(jobId); setError(null);
+    const supabase = createClient(); let rpcError: { message: string } | null = null;
+    if (action === "accept") ({ error: rpcError } = await supabase.rpc("accept_delivery_job", { p_delivery_job_id: jobId }));
+    else if (action === "decline") ({ error: rpcError } = await supabase.rpc("decline_delivery_job", { p_delivery_job_id: jobId, p_reason: "Rider unavailable" }));
+    else ({ error: rpcError } = await supabase.rpc("advance_delivery_job", { p_delivery_job_id: jobId, p_status: action, p_note: note ?? null }));
+    if (rpcError) setError(friendlyError(rpcError.message)); else await load(true);
+    setUpdating(null);
+  }
+
+  async function enableAlerts() {
+    if (typeof Notification === "undefined") return;
+    setAlertsEnabled((await Notification.requestPermission()) === "granted");
+  }
+
+  if (authLoading || (auth && loading)) return <DriverLoading />;
+  if (!auth) return <DriverAccess title="Rider sign in" description="Sign in with the account invited by your delivery company." />;
+  if (error && !data) return <DriverAccess title="Rider access is restricted" description={error} />;
+
+  const driver = data!.driver;
+  const activeJobs = data!.jobs;
+  const currentJob = activeJobs.find((job) => ["accepted", "at_pickup", "collected"].includes(job.status)) ?? activeJobs[0] ?? null;
+  const otherJobs = currentJob ? activeJobs.filter((job) => job.id !== currentJob.id) : [];
+  const completedToday = data!.history.filter((job) => job.status === "delivered" && job.delivered_at?.slice(0, 10) === new Date().toISOString().slice(0, 10)).length;
+
+  return <main className="min-h-dvh bg-[#f6f8f6] pb-24 text-[#19342b] sm:pb-10">
+    <header className="sticky top-0 z-20 border-b border-[#dce5e0] bg-white/95 backdrop-blur"><div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6"><div className="flex min-w-0 items-center gap-3"><BrandMark className="h-10 w-10 object-contain" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#6b8077]">Morni rider</p><p className="truncate text-lg font-semibold">Hello, {driver.display_name.split(" ")[0]}</p></div></div><div className="flex items-center gap-2"><span className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex ${driver.availability === "available" ? "bg-[#e8f4ee] text-[#2f6f5d]" : "bg-[#f1f4f2] text-[#6f7e77]"}`}><span className={`h-1.5 w-1.5 rounded-full ${driver.availability === "available" ? "bg-[#2f8a64]" : "bg-[#9aa9a2]"}`} />{driver.availability}</span><span className="hidden text-[11px] text-[#819089] lg:inline">{lastUpdatedAt ? `Updated ${formatTime(lastUpdatedAt)}` : "Connecting"}</span><button type="button" onClick={() => void load(true)} disabled={refreshing || !online} className="grid h-10 w-10 place-items-center rounded-xl border border-[#d7e1dc] bg-white text-[#4d6c60] transition hover:bg-[#f5f8f6] disabled:opacity-50" aria-label="Refresh deliveries"><PortalIcon name="refresh" className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /></button></div></div></header>
+    {!online ? <div className="border-b border-[#e8c7a2] bg-[#fff5e6] px-4 py-2.5 text-center text-xs font-semibold text-[#8a602d]">You are offline. Current jobs are visible, but actions are paused until you reconnect.</div> : null}
+    {assignmentNotice ? <AssignmentNotice job={assignmentNotice} alertsEnabled={alertsEnabled} onEnableAlerts={() => void enableAlerts()} onDismiss={() => setAssignmentNotice(null)} /> : null}
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8"><div className="mb-5 flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#4e8875]">Driver cockpit</p><h1 className="mt-1 text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">{section === "route" ? "Today’s route" : section === "history" ? "Delivery history" : "Rider support"}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#64736c]">{section === "route" ? "Keep your availability accurate and take the next delivery one clear step at a time." : section === "history" ? "Review completed and exception deliveries from the last 30 days." : "Get help from your delivery partner when a route or customer needs attention."}</p></div><Link href="/" className="hidden text-xs font-semibold text-[#487368] transition hover:text-[#19342b] sm:inline-flex">Open Morni</Link></div>
+      {section === "route" ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]"><div className="space-y-5"><AvailabilityCard driver={driver} activeJobs={activeJobs.length} updating={updating === "availability"} online={online} onAvailability={(next) => void setAvailability(next)} />{error ? <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</p> : null}<section><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Next up</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em]">{currentJob ? "Active delivery" : "No active delivery"}</h2></div><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#5b6e65]">{activeJobs.length} active</span></div><div className="mt-4 space-y-4">{currentJob ? <DriverJobCard job={currentJob} updating={updating === currentJob.id} onAction={jobAction} /> : <div className="rounded-2xl border border-dashed border-[#cad8d1] bg-white p-8 text-center"><span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-[#e8f4ee] text-[#3c7d68]"><PortalIcon name="package" className="h-5 w-5" /></span><h2 className="mt-4 font-semibold">No active delivery jobs</h2><p className="mt-2 text-sm leading-6 text-[#6d7d75]">Go available and Morni will send nearby pickup requests here.</p></div>}{otherJobs.length > 0 ? <div><p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#708078]">Other active jobs</p><div className="space-y-4">{otherJobs.map((job) => <DriverJobCard key={job.id} job={job} updating={updating === job.id} onAction={jobAction} />)}</div></div> : null}</div></section></div><aside className="hidden space-y-5 xl:block"><ShiftSummary activeJobs={activeJobs.length} completedJobs={completedToday} /><HelpPanel supportEmail={data!.partner?.support_email} partnerName={data!.partner?.name} /></aside></div> : null}
+      {section === "history" ? <HistoryList history={data!.history} /> : null}
+      {section === "help" ? <div className="max-w-xl"><HelpPanel supportEmail={data!.partner?.support_email} partnerName={data!.partner?.name} /></div> : null}
+    </div>
+    <div className="mx-auto hidden max-w-6xl px-4 sm:block sm:px-6"><div className="mt-5 grid max-w-xl grid-cols-3 gap-2 rounded-2xl border border-[#dce5e0] bg-white p-1"><button type="button" onClick={() => setSection("route")} className={`rounded-xl px-3 py-2 text-xs font-semibold ${section === "route" ? "bg-[#eaf4ee] text-[#2f6f5d]" : "text-[#718079]"}`}>Route</button><button type="button" onClick={() => setSection("history")} className={`rounded-xl px-3 py-2 text-xs font-semibold ${section === "history" ? "bg-[#eaf4ee] text-[#2f6f5d]" : "text-[#718079]"}`}>History</button><button type="button" onClick={() => setSection("help")} className={`rounded-xl px-3 py-2 text-xs font-semibold ${section === "help" ? "bg-[#eaf4ee] text-[#2f6f5d]" : "text-[#718079]"}`}>Help</button></div></div>
+    <BottomNav section={section} onChange={setSection} />
+  </main>;
+}

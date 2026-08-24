@@ -142,7 +142,7 @@ function DailyBriefing({ data, ownerName, onViewChange }: { data: FounderData; o
       : "The marketplace is clear for now.";
 
   return (
-    <section className="overflow-hidden rounded-xl bg-[#21342e] text-[#f4faf7] shadow-[0_18px_40px_-28px_rgba(33,52,46,0.75)]">
+    <section className="founder-briefing overflow-hidden rounded-xl bg-[#21342e] text-[#f4faf7] shadow-[0_18px_40px_-28px_rgba(33,52,46,0.75)]">
       <div className="relative px-5 py-6 sm:px-7 sm:py-7">
         <div
           aria-hidden
@@ -334,7 +334,7 @@ function NavButton({ item, active, alertCount, onViewChange }: { item: { id: Fou
 
 function FounderSidebar({ activeView, onViewChange, alertCount }: { activeView: FounderView; onViewChange: (view: FounderView) => void; alertCount: number }) {
   return (
-    <aside className="z-40 border-b border-[#c6d0cb] bg-[#f8faf9] lg:sticky lg:top-0 lg:h-screen lg:w-[15.5rem] lg:shrink-0 lg:border-b-0 lg:border-r">
+    <aside className="founder-sidebar z-40 border-b border-[#c6d0cb] bg-[#f8faf9] lg:sticky lg:top-0 lg:h-screen lg:w-[15.5rem] lg:shrink-0 lg:border-b-0 lg:border-r">
       <div className="flex h-full flex-col">
         <div className="hidden border-b border-[#d5ddd9] px-5 py-5 lg:block">
           <div className="flex items-center gap-2.5">
@@ -943,11 +943,11 @@ function FinanceView({ data }: { data: FounderData }) {
   ];
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-      <Panel className="p-5 sm:p-6">
+      <Panel className="founder-finance-panel p-5 sm:p-6">
         <SectionTitle title="Sales composition" detail={`Non-cancelled orders · last ${data.range_days} days`} />
         <div className="mt-6 space-y-2">
           {financeRows.map((row) => (
-            <div key={row.label} className="flex items-center justify-between gap-4 rounded-lg border border-[#d5ddd9] bg-[#f7faf8] p-3.5">
+            <div key={row.label} className="founder-finance-row flex items-center justify-between gap-4 rounded-lg border border-[#d5ddd9] bg-[#f7faf8] p-3.5">
               <div>
                 <p className="text-sm font-semibold text-[#17231f]">{row.label}</p>
                 <p className="mt-1 text-xs text-[#687770]">{row.detail}</p>
@@ -961,7 +961,7 @@ function FinanceView({ data }: { data: FounderData }) {
           <span className="text-2xl font-semibold tracking-[-0.04em] text-[#17231f]">{formatAed(data.finance.gross_sales)}</span>
         </div>
       </Panel>
-      <Panel className="p-5 sm:p-6">
+      <Panel className="founder-finance-panel p-5 sm:p-6">
         <SectionTitle title="Payment readiness" detail="Confirmed vs pending payment state." />
         <div className="mt-6 grid grid-cols-2 gap-3">
           <MetricCard label="Paid" value={number(data.finance.paid_orders)} detail="Verified" icon="check" />
@@ -1052,10 +1052,10 @@ export function FounderWorkspace() {
   if (!isAdmin) return <FounderAccess title="Founder access is restricted" description="This workspace is available only to Morni administrator accounts. Seller accounts continue to use the Seller Portal." action="Open Seller Portal" href="/portal" />;
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="founder-workspace flex min-h-screen flex-col lg:flex-row">
       <FounderSidebar activeView={activeView} onViewChange={setActiveView} alertCount={data?.alerts.length ?? 0} />
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 border-b border-[#c6d0cb] bg-white/90 backdrop-blur-xl">
+        <header className="founder-header sticky top-0 z-30 border-b border-[#c6d0cb] bg-white/90 backdrop-blur-xl">
           <div className="flex min-h-14 flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-9">
             <div className="mr-auto lg:hidden">
               <p className="text-sm font-bold tracking-[-0.02em] text-[#17231f]">Morni Founder</p>
@@ -1087,7 +1087,7 @@ export function FounderWorkspace() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
+        <main className="founder-main mx-auto w-full max-w-[1500px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="portal-eyebrow">Founder workspace</p>

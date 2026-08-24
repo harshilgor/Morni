@@ -33,7 +33,7 @@ export function StorefrontPreview({
 
   return (
     <div className="overflow-hidden rounded-[1.5rem] border border-line bg-white shadow-sm">
-      <div className="border-b border-line bg-[#fff7f9] px-4 py-2.5">
+      <div className="border-b border-line bg-[#eef5f1] px-4 py-2.5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-deep">
           Live shopper preview
         </p>

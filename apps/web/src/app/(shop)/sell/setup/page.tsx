@@ -33,6 +33,7 @@ import {
 } from "@/lib/store-category";
 import type { Product, Store } from "@/lib/types";
 import { customizationConfigFromProduct } from "@/lib/product-customization";
+import { SellerSetupHeader } from "@/components/seller-setup-header";
 import {
   getResumeOnboardingStep,
   isOnboardingComplete,
@@ -57,6 +58,7 @@ export default function SellSetupPage() {
   const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [launched, setLaunched] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -563,52 +565,67 @@ export default function SellSetupPage() {
 
   if (error === "unauthenticated") {
     return (
-      <div className="mx-auto max-w-lg px-4 py-16 text-center sm:px-6">
-        <h1 className="font-display text-3xl text-ink">Sign in to sell on Morni</h1>
-        <p className="mt-2 text-sm text-muted">
-          Create an account, then finish your store setup. Progress is saved as
-          you go.
-        </p>
-        <Link
-          href="/auth?next=/sell/setup"
-          className="mt-6 inline-flex rounded-full bg-ink px-6 py-3 text-sm text-white"
-        >
-          Sign in / Sign up
-        </Link>
+      <div className="seller-setup-page">
+        <SellerSetupHeader saved={savedFlash} />
+        <div className="mx-auto max-w-lg px-4 py-16 text-center sm:px-6">
+          <span className="seller-setup-kicker">Morni seller workspace</span>
+          <h1 className="mt-3 font-display text-3xl text-ink">Sign in to sell on Morni</h1>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Create an account, then finish your store setup. Progress is saved as
+            you go.
+          </p>
+          <Link
+            href="/auth?next=/sell/setup"
+            className="mt-6 inline-flex min-h-12 items-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-mint"
+          >
+            Sign in / Sign up
+          </Link>
+        </div>
       </div>
     );
   }
 
   if (loading || !modeReady || !hydrated) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-16 text-muted">Loading setup…</div>
+      <div className="seller-setup-page">
+        <SellerSetupHeader saved={savedFlash} />
+        <div className="seller-setup-loading mx-auto max-w-lg px-4 py-16 sm:px-6">
+          <div className="h-2 w-28 rounded-full bg-line" />
+          <div className="mt-4 h-10 w-3/4 rounded-xl bg-line/80" />
+          <div className="mt-3 h-4 w-full rounded-full bg-line/70" />
+          <div className="mt-8 h-64 rounded-[1.25rem] border border-line bg-surface/80" />
+        </div>
+      </div>
     );
   }
 
   if (launched && store) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">
-        <p className="text-xs uppercase tracking-[0.18em] text-mint">Live</p>
-        <h1 className="mt-2 font-display text-4xl text-ink">
-          {store.name} is live
-        </h1>
-        <p className="mt-3 text-sm text-muted">
-          Shoppers can now find your boutique on Morni. Keep adding products and
-          fine-tune settings anytime.
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link
-            href={`/stores/${store.slug}`}
-            className="rounded-full bg-ink px-6 py-3 text-sm text-white"
-          >
-            View my store
-          </Link>
-          <Link
-            href="/portal/products"
-            className="rounded-full border border-line bg-surface px-6 py-3 text-sm text-ink"
-          >
-            Add another product
-          </Link>
+      <div className="seller-setup-page">
+        <SellerSetupHeader saved={savedFlash} />
+        <div className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">
+          <p className="seller-setup-kicker text-mint">Your storefront is live</p>
+          <h1 className="mt-3 font-display text-4xl text-ink">
+            {store.name} is live
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-muted">
+            Shoppers can now find your boutique on Morni. Keep adding products and
+            fine-tune settings anytime.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link
+              href={`/stores/${store.slug}`}
+              className="inline-flex min-h-12 items-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-mint"
+            >
+              View my store
+            </Link>
+            <Link
+              href="/portal/products"
+              className="inline-flex min-h-12 items-center rounded-full border border-line bg-surface px-6 py-3 text-sm font-semibold text-ink transition hover:border-mint"
+            >
+              Add another product
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -619,68 +636,94 @@ export default function SellSetupPage() {
     step >= 4 ? "launch" : step >= 3 ? "product" : ("store" as const);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-accent-deep">
-            Store setup · Step {step} of 4 · about 6 minutes
-          </p>
-          <h1 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
-            {current.title}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted">
-            {step === 1 && "Name, story, and exact location for your boutique."}
-            {step === 2 &&
-              "Add a logo and banner so your storefront looks complete."}
-            {step === 3 &&
-              "Create one sellable product with photos, sizes, and category."}
-            {step === 4 &&
-              "Check everything looks right, then launch when you are ready."}
-          </p>
-        </div>
-        {savedFlash ? (
-          <span className="rounded-full bg-[#e8f5ef] px-3 py-1.5 text-xs font-medium text-mint">
-            Saved
-          </span>
-        ) : null}
-      </div>
-
-      <div className="mt-6 grid gap-2 sm:grid-cols-4">
-        {STEPS.map((item) => (
-          <button
-            key={item.n}
-            type="button"
-            disabled={!store && item.n > 1}
-            onClick={() => {
-              if (!store && item.n > 1) return;
-              if (store && item.n > Math.max(store.onboarding_step, step)) return;
-              setStep(item.n);
-              setMessage(null);
-            }}
-            className="text-left"
-          >
-            <div
-              className={`h-1.5 rounded-full ${
-                item.n <= step ? "bg-accent" : "bg-line"
-              }`}
-            />
-            <p
-              className={`mt-2 text-xs ${
-                item.n === step ? "font-semibold text-ink" : "text-muted"
-              }`}
-            >
-              {item.label}
+    <div className="seller-setup-page">
+      <SellerSetupHeader saved={savedFlash} />
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="seller-setup-kicker">
+              Store setup · about 6 minutes
             </p>
-          </button>
-        ))}
-      </div>
+            <h1 className="mt-3 font-display text-3xl text-ink sm:text-4xl">
+              {current.title}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
+              {step === 1 && "Name, story, and exact location for your boutique."}
+              {step === 2 &&
+                "Add a logo and banner so your storefront looks complete."}
+              {step === 3 &&
+                "Create one sellable product with photos, sizes, and category."}
+              {step === 4 &&
+                "Check everything looks right, then launch when you are ready."}
+            </p>
+          </div>
+          <div className="seller-setup-time-note">
+            <span className="seller-setup-time-icon" aria-hidden>⌁</span>
+            You can come back and finish later
+          </div>
+        </div>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div>
+        <div className="seller-setup-stepper mt-7" aria-label="Store setup progress">
+          <div className="seller-setup-stepper-mobile">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-ink">Step {step} of 4</span>
+              <span className="text-muted">{current.label}</span>
+            </div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line">
+              <div
+                className="h-full rounded-full bg-accent transition-[width] duration-300"
+                style={{ width: `${(step / STEPS.length) * 100}%` }}
+              />
+            </div>
+          </div>
+          <div className="seller-setup-stepper-desktop grid gap-2 sm:grid-cols-4">
+            {STEPS.map((item) => (
+              <button
+                key={item.n}
+                type="button"
+                disabled={!store && item.n > 1}
+                onClick={() => {
+                  if (!store && item.n > 1) return;
+                  if (store && item.n > Math.max(store.onboarding_step, step)) return;
+                  setStep(item.n);
+                  setMessage(null);
+                }}
+                className="text-left"
+                aria-current={item.n === step ? "step" : undefined}
+              >
+                <div
+                  className={`h-1.5 rounded-full transition-colors ${
+                    item.n <= step ? "bg-accent" : "bg-line"
+                  }`}
+                />
+                <p
+                  className={`mt-2 text-xs ${
+                    item.n === step ? "font-semibold text-ink" : "text-muted"
+                  }`}
+                >
+                  {item.n}. {item.label}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setPreviewOpen((open) => !open)}
+          className="seller-setup-preview-toggle mt-6 lg:hidden"
+          aria-expanded={previewOpen}
+        >
+          <span>{previewOpen ? "Hide storefront preview" : "Preview storefront"}</span>
+          <span aria-hidden>{previewOpen ? "↑" : "↓"}</span>
+        </button>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10">
+          <div className="min-w-0">
           {step === 1 ? (
             <form
               onSubmit={saveBasics}
-              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6"
+              className="seller-setup-form space-y-4 rounded-[1.25rem] border border-line bg-surface p-4 sm:p-7"
             >
               <label className="block space-y-1.5 text-sm">
                 <span className="text-muted">
@@ -719,7 +762,7 @@ export default function SellSetupPage() {
           {step === 2 ? (
             <form
               onSubmit={saveBrand}
-              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6"
+              className="seller-setup-form space-y-4 rounded-[1.25rem] border border-line bg-surface p-4 sm:p-7"
             >
               <StoreBrandingFields
                 value={branding}
@@ -740,7 +783,7 @@ export default function SellSetupPage() {
           {step === 3 ? (
             <form
               onSubmit={saveFirstProduct}
-              className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6"
+              className="seller-setup-form space-y-4 rounded-[1.25rem] border border-line bg-surface p-4 sm:p-7"
             >
               <ProductFormFields
                 value={productForm}
@@ -761,7 +804,7 @@ export default function SellSetupPage() {
           ) : null}
 
           {step === 4 ? (
-            <div className="space-y-4 rounded-[1.5rem] border border-line bg-surface p-4 sm:p-6">
+            <div className="seller-setup-form space-y-4 rounded-[1.25rem] border border-line bg-surface p-4 sm:p-7">
               <h2 className="font-display text-2xl text-ink">Launch checklist</h2>
               <ul className="space-y-2">
                 {checklist.map((item) => (
@@ -796,11 +839,11 @@ export default function SellSetupPage() {
 
               {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
 
-              <div className="flex flex-wrap gap-2 pt-2">
+              <div className="seller-setup-actions flex flex-wrap gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  className="rounded-full border border-line px-5 py-2.5 text-sm text-ink"
+                  className="inline-flex min-h-12 items-center rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-mint"
                 >
                   Back
                 </button>
@@ -808,7 +851,7 @@ export default function SellSetupPage() {
                   type="button"
                   disabled={busy || !isStoreLaunchReady(store, products)}
                   onClick={launchStore}
-                  className="rounded-full bg-ink px-6 py-2.5 text-sm text-white disabled:opacity-50"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-mint disabled:opacity-50 sm:flex-none"
                 >
                   {busy ? "Launching…" : "Launch my store"}
                 </button>
@@ -817,9 +860,13 @@ export default function SellSetupPage() {
           ) : null}
         </div>
 
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <StorefrontPreview data={previewData} mode={previewMode} />
-        </aside>
+          <aside className={`seller-setup-preview lg:sticky lg:top-6 lg:block lg:self-start ${previewOpen ? "block" : "hidden"}`}>
+            <StorefrontPreview data={previewData} mode={previewMode} />
+            <p className="mt-3 px-1 text-xs leading-5 text-muted">
+              This preview updates as you add your boutique details. Your page stays hidden until you launch.
+            </p>
+          </aside>
+        </div>
       </div>
     </div>
   );
@@ -841,12 +888,12 @@ function WizardNav({
   onSecondaryAction?: () => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2 pt-2">
+    <div className="seller-setup-actions flex flex-wrap gap-2 pt-2">
       {canBack ? (
         <button
           type="button"
           onClick={onBack}
-          className="rounded-full border border-line px-5 py-2.5 text-sm text-ink"
+          className="inline-flex min-h-12 items-center rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-mint"
         >
           Back
         </button>
@@ -856,7 +903,7 @@ function WizardNav({
           type="button"
           onClick={onSecondaryAction}
           disabled={busy}
-          className="rounded-full border border-line px-5 py-2.5 text-sm text-ink disabled:opacity-50"
+          className="inline-flex min-h-12 items-center rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-mint disabled:opacity-50"
         >
           {secondaryLabel}
         </button>
@@ -864,7 +911,7 @@ function WizardNav({
       <button
         type="submit"
         disabled={busy}
-        className="rounded-full bg-ink px-6 py-2.5 text-sm text-white disabled:opacity-50"
+        className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-mint disabled:opacity-50 sm:flex-none"
       >
         {busy ? "Saving…" : continueLabel}
       </button>
