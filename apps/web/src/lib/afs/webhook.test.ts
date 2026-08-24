@@ -55,9 +55,10 @@ describe("decryptAfsWebhookPayload", () => {
 
   it("rejects tampered ciphertext", () => {
     const encrypted = encryptPayload(secret, { type: "PAYMENT" });
+    const tamperedBody = `${encrypted.body[0] === "0" ? "1" : "0"}${encrypted.body.slice(1)}`;
     expect(() =>
       decryptAfsWebhookPayload({
-        bodyText: encrypted.body.replace(/0/g, "1"),
+        bodyText: tamperedBody,
         ivHex: encrypted.ivHex,
         authTagHex: encrypted.authTagHex,
         secretHex: secret,

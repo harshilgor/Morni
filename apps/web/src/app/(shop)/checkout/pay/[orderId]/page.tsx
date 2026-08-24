@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import Script from "next/script";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
@@ -14,6 +15,7 @@ type CheckoutSession = {
   amountAed: number;
   currency: string;
   orderId: string;
+  shopperResultUrl: string;
 };
 
 export default function CheckoutPayPage() {
@@ -25,7 +27,6 @@ export default function CheckoutPayPage() {
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const widgetHostRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -100,7 +101,10 @@ export default function CheckoutPayPage() {
         return;
       }
 
-      setSession(checkoutPayload);
+      setSession({
+        ...checkoutPayload,
+        shopperResultUrl: `${window.location.origin}/api/payments/afs/result?orderId=${encodeURIComponent(orderId)}`,
+      });
       setLoading(false);
     }
 
@@ -109,37 +113,6 @@ export default function CheckoutPayPage() {
       active = false;
     };
   }, [orderId, router]);
-
-  useEffect(() => {
-    if (!session || !widgetHostRef.current) return;
-
-    const host = widgetHostRef.current;
-    host.innerHTML = "";
-
-    const form = document.createElement("form");
-    const shopperResultUrl = `${window.location.origin}/api/payments/afs/result?orderId=${encodeURIComponent(orderId)}`;
-    form.action = shopperResultUrl;
-    form.className = "paymentWidgets";
-    form.setAttribute("data-brands", brands);
-    host.appendChild(form);
-
-    const script = document.createElement("script");
-    script.src = session.scriptUrl;
-    script.async = true;
-    if (session.integrity) {
-      script.integrity = session.integrity;
-      script.crossOrigin = "anonymous";
-    }
-    script.onerror = () => {
-      setError("Unable to load the secure payment form. Please try again.");
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      script.remove();
-      host.innerHTML = "";
-    };
-  }, [session, brands, orderId]);
 
   return (
     <div className="mx-auto max-w-lg px-4 py-10 sm:px-6">
@@ -185,7 +158,23 @@ export default function CheckoutPayPage() {
         </div>
       ) : null}
 
-      <div ref={widgetHostRef} className="mt-8 min-h-[12rem]" />
+      {session ? (
+        <div className="mt-8 min-h-[12rem]">
+          <form
+            action={session.shopperResultUrl}
+            className="paymentWidgets"
+            data-brands={brands}
+          />
+          <Script
+            id={`afs-payment-widget-${session.checkoutId}`}
+            src={session.scriptUrl}
+            integrity={session.integrity ?? undefined}
+            crossOrigin={session.integrity ? "anonymous" : undefined}
+            strategy="afterInteractive"
+            onError={() => setError("Unable to load the secure payment form. Please try again.")}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
