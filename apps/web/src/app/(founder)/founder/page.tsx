@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { FounderWorkspace } from "@morni/founder/components/founder-workspace";
 import { PortalWorkspace } from "@/components/portal-workspace";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function FounderPage() {
+  await connection();
   const supabase = await createClient();
   const {
     data: { user },
