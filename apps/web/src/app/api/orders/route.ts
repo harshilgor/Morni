@@ -42,6 +42,14 @@ type CheckoutBody = {
   paymentMethod?: "cod" | "card";
 };
 
+type VerifiedProduct = {
+  id: string;
+  store_id: string;
+  customization_enabled?: boolean | null;
+  customization_instructions?: string | null;
+  customization_fields?: unknown;
+};
+
 // Postgres accepts any 8-4-4-4-12 hex uuid; seed ids like
 // c1000000-0000-0000-0000-000000000001 are valid but not RFC version/variant.
 const UUID_PATTERN =
@@ -113,12 +121,32 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const { data: productRows, error: productError } = await admin
+  const { data: baseProductRows, error: productError } = await admin
     .from("products")
-    .select("id, store_id, customization_enabled, customization_instructions, customization_fields")
+    // Keep this verification query on the stable product columns. Optional
+    // customization fields may not exist until their migration is applied;
+    // checkout should still work for standard products in that interim.
+    .select("id, store_id")
     .in("id", rpcItems.map((item) => item.product_id));
   if (productError) {
     return NextResponse.json({ error: "Unable to verify your bag." }, { status: 500 });
+  }
+
+  let productRows = (baseProductRows ?? []) as VerifiedProduct[];
+  const { data: customizationRows, error: customizationQueryError } = await admin
+    .from("products")
+    .select("id, customization_enabled, customization_instructions, customization_fields")
+    .in("id", rpcItems.map((item) => item.product_id));
+  if (!customizationQueryError && customizationRows) {
+    const customizationById = new Map(
+      customizationRows.map((product) => [product.id, product]),
+    );
+    productRows = productRows.map((product) => ({
+      ...product,
+      ...(customizationById.get(product.id) ?? {}),
+    }));
+  } else if (customizationQueryError) {
+    console.warn("Optional product customization fields unavailable during checkout", customizationQueryError.message);
   }
 
   const productsById = new Map((productRows ?? []).map((product) => [product.id, product]));

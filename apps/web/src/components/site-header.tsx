@@ -122,7 +122,7 @@ function LaunchAnnouncement() {
       role="region"
     >
       <div className="morni-announcement-track" aria-hidden="true">
-        {[0, 1].map((group) => (
+        {[0, 1, 2, 3].map((group) => (
           <div className="morni-announcement-group" key={group}>
             <span>{LAUNCH_MESSAGE}</span>
             <span className="morni-announcement-dot">✦</span>
