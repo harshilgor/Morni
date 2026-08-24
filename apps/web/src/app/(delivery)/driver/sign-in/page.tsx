@@ -30,7 +30,7 @@ function DriverSignInForm() {
     setGoogleLoading(true);
     setMessage(null);
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    const redirectTo = `${window.location.origin}/auth/callback?flow=driver&next=${encodeURIComponent(next)}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -53,7 +53,7 @@ function DriverSignInForm() {
     setLinkLoading(true);
     setMessage(null);
     const supabase = createClient();
-    const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    const emailRedirectTo = `${window.location.origin}/auth/callback?flow=driver&next=${encodeURIComponent(next)}`;
     const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
       options: { emailRedirectTo },
@@ -73,7 +73,7 @@ function DriverSignInForm() {
       setLoading(false);
       return;
     }
-    router.push(next);
+    router.replace(next);
     router.refresh();
   }
 

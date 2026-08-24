@@ -6,6 +6,7 @@ import { BrandMark } from "@/components/brand-logo";
 import { PortalIcon } from "@/components/portal-icons";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUser } from "@/lib/use-auth-user";
+import { DriverMap } from "./driver-map";
 
 type DeliveryJobStatus = "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled";
 type DriverAvailability = "offline" | "available" | "assigned" | "paused";
@@ -51,6 +52,8 @@ type DriverData = {
     display_name: string;
     availability: DriverAvailability;
     is_active: boolean;
+    last_lat: number | null;
+    last_lng: number | null;
     last_location_at: string | null;
   };
   partner?: { name?: string | null; support_email?: string | null };
@@ -258,6 +261,24 @@ export function DriverWorkspace() {
     setUpdating(null);
   }
 
+  async function refreshLocation() {
+    if (!data || !online) return;
+    if (!("geolocation" in navigator)) {
+      setError("Location access is not available on this device.");
+      return;
+    }
+    setUpdating("location");
+    setError(null);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }));
+      const { error: locationError } = await createClient().rpc("set_delivery_driver_availability", { p_availability: data.driver.availability, p_lat: position.coords.latitude, p_lng: position.coords.longitude });
+      if (locationError) setError(friendlyError(locationError.message)); else await load(true);
+    } catch {
+      setError("Location access was blocked. Allow it in your browser settings and try again.");
+    }
+    setUpdating(null);
+  }
+
   async function jobAction(jobId: string, action: JobAction, note?: string) {
     if (!online) { setError("You are offline. Reconnect before updating a delivery."); return; }
     setUpdating(jobId); setError(null);
@@ -289,7 +310,7 @@ export function DriverWorkspace() {
     {!online ? <div className="border-b border-[#e8c7a2] bg-[#fff5e6] px-4 py-2.5 text-center text-xs font-semibold text-[#8a602d]">You are offline. Current jobs are visible, but actions are paused until you reconnect.</div> : null}
     {assignmentNotice ? <AssignmentNotice job={assignmentNotice} alertsEnabled={alertsEnabled} onEnableAlerts={() => void enableAlerts()} onDismiss={() => setAssignmentNotice(null)} /> : null}
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8"><div className="mb-5 flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#4e8875]">Driver cockpit</p><h1 className="mt-1 text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">{section === "route" ? "Today’s route" : section === "history" ? "Delivery history" : "Rider support"}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#64736c]">{section === "route" ? "Keep your availability accurate and take the next delivery one clear step at a time." : section === "history" ? "Review completed and exception deliveries from the last 30 days." : "Get help from your delivery partner when a route or customer needs attention."}</p></div><Link href="/" className="hidden text-xs font-semibold text-[#487368] transition hover:text-[#19342b] sm:inline-flex">Open Morni</Link></div>
-      {section === "route" ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]"><div className="space-y-5"><AvailabilityCard driver={driver} activeJobs={activeJobs.length} updating={updating === "availability"} online={online} onAvailability={(next) => void setAvailability(next)} />{error ? <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</p> : null}<section><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Next up</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em]">{currentJob ? "Active delivery" : "No active delivery"}</h2></div><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#5b6e65]">{activeJobs.length} active</span></div><div className="mt-4 space-y-4">{currentJob ? <DriverJobCard job={currentJob} updating={updating === currentJob.id} onAction={jobAction} /> : <div className="rounded-2xl border border-dashed border-[#cad8d1] bg-white p-8 text-center"><span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-[#e8f4ee] text-[#3c7d68]"><PortalIcon name="package" className="h-5 w-5" /></span><h2 className="mt-4 font-semibold">No active delivery jobs</h2><p className="mt-2 text-sm leading-6 text-[#6d7d75]">Go available and Morni will send nearby pickup requests here.</p></div>}{otherJobs.length > 0 ? <div><p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#708078]">Other active jobs</p><div className="space-y-4">{otherJobs.map((job) => <DriverJobCard key={job.id} job={job} updating={updating === job.id} onAction={jobAction} />)}</div></div> : null}</div></section></div><aside className="hidden space-y-5 xl:block"><ShiftSummary activeJobs={activeJobs.length} completedJobs={completedToday} /><HelpPanel supportEmail={data!.partner?.support_email} partnerName={data!.partner?.name} /></aside></div> : null}
+      {section === "route" ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]"><div className="space-y-5"><AvailabilityCard driver={driver} activeJobs={activeJobs.length} updating={updating === "availability"} online={online} onAvailability={(next) => void setAvailability(next)} /><DriverMap job={currentJob} driverLat={driver.last_lat} driverLng={driver.last_lng} locationUpdatedAt={driver.last_location_at} online={online} updating={updating === "location"} onRefreshLocation={() => void refreshLocation()} />{error ? <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</p> : null}<section><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Next up</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em]">{currentJob ? "Active delivery" : "No active delivery"}</h2></div><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#5b6e65]">{activeJobs.length} active</span></div><div className="mt-4 space-y-4">{currentJob ? <DriverJobCard job={currentJob} updating={updating === currentJob.id} onAction={jobAction} /> : <div className="rounded-2xl border border-dashed border-[#cad8d1] bg-white p-8 text-center"><span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-[#e8f4ee] text-[#3c7d68]"><PortalIcon name="package" className="h-5 w-5" /></span><h2 className="mt-4 font-semibold">No active delivery jobs</h2><p className="mt-2 text-sm leading-6 text-[#6d7d75]">Go available and Morni will send nearby pickup requests here.</p></div>}{otherJobs.length > 0 ? <div><p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#708078]">Other active jobs</p><div className="space-y-4">{otherJobs.map((job) => <DriverJobCard key={job.id} job={job} updating={updating === job.id} onAction={jobAction} />)}</div></div> : null}</div></section></div><aside className="hidden space-y-5 xl:block"><ShiftSummary activeJobs={activeJobs.length} completedJobs={completedToday} /><HelpPanel supportEmail={data!.partner?.support_email} partnerName={data!.partner?.name} /></aside></div> : null}
       {section === "history" ? <HistoryList history={data!.history} /> : null}
       {section === "help" ? <div className="max-w-xl"><HelpPanel supportEmail={data!.partner?.support_email} partnerName={data!.partner?.name} /></div> : null}
     </div>

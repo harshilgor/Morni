@@ -4,6 +4,10 @@ import { updateSession } from "@/lib/supabase/middleware";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isFounderRoute = pathname === "/founder" || pathname.startsWith("/founder/");
+  const isDriverRoot = pathname === "/driver";
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
   const needsSessionRefresh = [
     "/account",
     "/addresses",
@@ -20,11 +24,16 @@ export async function proxy(request: NextRequest) {
 
   // Redirect direct visits to Founder into the auth flow before the route can
   // be served from the static cache. The original destination survives login.
+  if (isDriverRoot && !hasAuthCookie) {
+    const signInUrl = request.nextUrl.clone();
+    signInUrl.pathname = "/driver/sign-in";
+    signInUrl.search = `?next=${encodeURIComponent(`${pathname}${request.nextUrl.search}`)}`;
+    return NextResponse.redirect(signInUrl);
+  }
+
   if (
     isFounderRoute &&
-    !request.cookies
-      .getAll()
-      .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"))
+    !hasAuthCookie
   ) {
     const authUrl = request.nextUrl.clone();
     authUrl.pathname = "/auth";

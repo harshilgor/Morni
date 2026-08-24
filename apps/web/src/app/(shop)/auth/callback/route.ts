@@ -3,8 +3,8 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { sendWelcomeEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 
-function safeNextPath(value: string | null) {
-  return value && /^\/(?!\/)/.test(value) ? value : "/";
+function safeNextPath(value: string | null, fallback = "/") {
+  return value && /^\/(?!\/)/.test(value) ? value : fallback;
 }
 
 export async function GET(request: Request) {
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = safeNextPath(searchParams.get("next"));
+  const next = safeNextPath(searchParams.get("next"), searchParams.get("flow") === "driver" ? "/driver" : "/");
 
   if (code || (tokenHash && type)) {
     const supabase = await createClient();

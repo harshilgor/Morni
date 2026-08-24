@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       `connect-src 'self' ${supabaseHost} https://*.supabase.co wss://*.supabase.co https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://vitals.vercel-insights.com https://va.vercel-scripts.com`,
-      "frame-src 'self' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com",
+      "frame-src 'self' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://www.openstreetmap.org",
       "worker-src 'self' blob:",
       "upgrade-insecure-requests",
     ].join("; ");
