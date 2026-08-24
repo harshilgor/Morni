@@ -37,10 +37,15 @@ const nextConfig: NextConfig = {
         hostname: "xobagxgagarnzxujxfag.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      {
+        protocol: "https",
+        hostname: "api.morniuae.com",
+        pathname: "/storage/v1/object/public/**",
+      },
     ],
   },
   async headers() {
-    const supabaseHost = "https://xobagxgagarnzxujxfag.supabase.co";
+    const supabaseHost = "https://api.morniuae.com";
     const csp = [
       "default-src 'self'",
       "base-uri 'self'",
