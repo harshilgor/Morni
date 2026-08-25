@@ -91,6 +91,36 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Auth providers can create the auth row before a database trigger has
+  // finished (or when an older project was missing the trigger entirely).
+  // Ensure the FK target exists before the order RPC runs. The database
+  // trigger remains the primary path; this is a server-side last line of
+  // defense and never trusts profile data from the browser.
+  const admin = createAdminClient();
+  const profileName =
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    user.email?.split("@")[0] ||
+    "Morni shopper";
+  const { error: profileError } = await admin
+    .from("profiles")
+    .upsert(
+      {
+        id: user.id,
+        full_name: profileName,
+        phone: user.phone ?? null,
+        role: "shopper",
+      },
+      { onConflict: "id", ignoreDuplicates: true },
+    );
+  if (profileError) {
+    console.error("Unable to ensure shopper profile before checkout", profileError.message);
+    return NextResponse.json(
+      { error: "We could not prepare your account for checkout. Please try again." },
+      { status: 500 },
+    );
+  }
+
   const rpcItems: Array<{
     product_id: string;
     variant_id: string | null;
@@ -116,7 +146,6 @@ export async function POST(request: Request) {
     });
   }
 
-  const admin = createAdminClient();
   const { data: baseProductRows, error: productError } = await admin
     .from("products")
     // Keep this verification query on the stable product columns. Optional

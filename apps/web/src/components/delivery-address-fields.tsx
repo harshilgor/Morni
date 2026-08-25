@@ -71,7 +71,7 @@ export function DeliveryAddressFields({
           value={value.phone}
           onChange={(event) => patch({ phone: event.target.value })}
           placeholder="+971 50 123 4567"
-          pattern="[+0-9() -]{7,}"
+          pattern="[-+0-9() ]{7,}"
           title="Enter a valid phone number"
           required
         />
