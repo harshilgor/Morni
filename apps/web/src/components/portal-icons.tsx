@@ -13,6 +13,7 @@ export type PortalIconName =
   | "bell"
   | "plus"
   | "arrow"
+  | "chevronDown"
   | "external"
   | "package"
   | "warning"
@@ -49,6 +50,7 @@ export function PortalIcon({
     bell: <><path d="M18 10a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 22h4" /></>,
     plus: <path d="M12 5v14M5 12h14" />,
     arrow: <path d="M5 12h13M13 6l6 6-6 6" />,
+    chevronDown: <path d="m6 9 6 6 6-6" />,
     external: <><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 13v6H4V6h6" /></>,
     package: <><path d="m12 3 8 4.4v9.2L12 21l-8-4.4V7.4L12 3Z" /><path d="m4.5 7.8 7.5 4.1 7.5-4.1M12 12v8.5" /></>,
     warning: <><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v4.5M12 17h.01" /></>,

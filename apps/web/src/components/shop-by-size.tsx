@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 const SIZE_OPTIONS = [
-  { label: "XS", detail: "Petite fits", tone: "bg-[#f3dfe6]", accent: "text-[#9d5369]" },
-  { label: "S", detail: "Easy everyday fits", tone: "bg-[#e4e9f5]", accent: "text-[#52688f]" },
-  { label: "M", detail: "Most-loved fits", tone: "bg-[#f2e6c9]", accent: "text-[#9a7431]" },
-  { label: "L", detail: "Room to move", tone: "bg-[#dbeae5]", accent: "text-[#2f6f66]" },
-  { label: "XL", detail: "Relaxed fits", tone: "bg-[#f4ddd1]", accent: "text-[#a6583d]" },
-  { label: "Free size", detail: "Made to flex", tone: "bg-[#e7e1ee]", accent: "text-[#705b82]" },
+  { label: "XS", tone: "bg-[#f3dfe6]", accent: "text-[#9d5369]" },
+  { label: "S", tone: "bg-[#e4e9f5]", accent: "text-[#52688f]" },
+  { label: "M", tone: "bg-[#f2e6c9]", accent: "text-[#9a7431]" },
+  { label: "L", tone: "bg-[#dbeae5]", accent: "text-[#2f6f66]" },
+  { label: "XL", tone: "bg-[#f4ddd1]", accent: "text-[#a6583d]" },
+  { label: "Free size", tone: "bg-[#e7e1ee]", accent: "text-[#705b82]" },
 ] as const;
 
 export function ShopBySize() {
@@ -15,13 +15,7 @@ export function ShopBySize() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-accent-deep">
-              Find your fit
-            </p>
-            <h2 className="mt-2 shop-section-title">Shop by size</h2>
-            <p className="shop-section-copy">
-              Start with your size, then discover pieces from local boutiques.
-            </p>
+            <h2 className="shop-section-title">Shop by size</h2>
           </div>
           <Link
             href="/search"
@@ -46,20 +40,9 @@ export function ShopBySize() {
                 aria-hidden
                 className="absolute -bottom-10 -left-8 h-20 w-20 rounded-full bg-white/35"
               />
-              <span className="relative flex min-h-[7.8rem] flex-col justify-between">
-                <span className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${size.accent}`}>
-                  Size
-                </span>
-                <span>
-                  <span className={`block font-display text-4xl font-bold leading-none tracking-[-0.06em] ${size.accent}`}>
-                    {size.label}
-                  </span>
-                  <span className="mt-2 block max-w-[8rem] text-[11px] leading-tight text-ink/70">
-                    {size.detail}
-                  </span>
-                </span>
-                <span className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink/65 transition group-hover:text-ink">
-                  Explore <span aria-hidden>→</span>
+              <span className="relative flex min-h-[7.8rem] items-center justify-center">
+                <span className={`block font-display text-4xl font-bold leading-none tracking-[-0.06em] ${size.accent}`}>
+                  {size.label}
                 </span>
               </span>
             </Link>

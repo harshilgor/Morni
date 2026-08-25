@@ -6,6 +6,7 @@
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import { ColorVariantEditor } from "@/components/color-variant-editor";
 import { CustomizationEditor } from "@/components/customization-editor";
+import { QuickProductFields } from "@/components/quick-product-fields";
 import type { CategoryOption } from "@/components/product-form-fields";
 import {
   ImagePreviewDialog,
@@ -46,6 +47,34 @@ type ProductDraft = {
 };
 
 type CreateStep = 1 | 2;
+
+type ProductListingSuggestion = {
+  title: string;
+  description: string;
+  categorySlug: string | null;
+  colorName: string | null;
+};
+
+async function compressImageForListing(file: File) {
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = sourceUrl;
+    await image.decode();
+
+    const maxDimension = 1400;
+    const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not prepare the product photo.");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.8);
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
 
 function draftsFromVariants(product: ProductWithVariants): ColorDraft[] {
   const variants = [...(product.product_variants ?? [])].sort(
@@ -136,6 +165,8 @@ export default function PortalProductsPage() {
   ]);
   const [createStep, setCreateStep] = useState<CreateStep>(1);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [aiGenerated, setAiGenerated] = useState(false);
   const [query, setQuery] = useState("");
   const [showLowStock, setShowLowStock] = useState(false);
   const [showHiddenOnly, setShowHiddenOnly] = useState(false);
@@ -233,6 +264,8 @@ export default function PortalProductsPage() {
       categorySlug: "",
       customization: defaultCustomizationConfig(),
     });
+    setCreateColors([createColorDraft({ color_name: "Default" })]);
+    setAiGenerated(false);
     setAddProductOpen(true);
   }
 
@@ -245,6 +278,92 @@ export default function PortalProductsPage() {
         url.searchParams.delete("new");
         window.history.replaceState({}, "", `${url.pathname}${url.search}`);
       }
+    }
+  }
+
+  function updatePrimaryColorDraft(next: ColorDraft) {
+    setCreateColors((current) =>
+      current.length > 0 ? [next, ...current.slice(1)] : [next],
+    );
+  }
+
+  async function generateListing() {
+    if (!store) return;
+    const primary = createColors[0];
+    if (!primary || primary.images.length === 0) {
+      setMessage("Add at least one product photo to generate a listing.");
+      return;
+    }
+    if (!form.price_aed.trim() || Number(form.price_aed) < 0) {
+      setMessage("Enter a valid price before generating the listing.");
+      return;
+    }
+    if (primary.sizes.length === 0) {
+      setMessage("Choose at least one available size.");
+      return;
+    }
+    const stock = Number(primary.stock);
+    if (!Number.isFinite(stock) || stock < 0) {
+      setMessage("Enter a valid stock count.");
+      return;
+    }
+
+    setGenerating(true);
+    setMessage("Creating a draft from your product photos…");
+
+    try {
+      const files = primary.images
+        .map((image) => image.file)
+        .filter((file): file is File => Boolean(file))
+        .slice(0, 3);
+      const images = await Promise.all(files.map(compressImageForListing));
+      if (images.length === 0) {
+        throw new Error("Please choose a new product photo to generate a listing.");
+      }
+
+      const response = await fetch("/api/portal/products/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId: store.id,
+          priceAed: Number(form.price_aed),
+          stock,
+          sizes: primary.sizes,
+          images,
+        }),
+      });
+      const payload = (await response.json()) as {
+        suggestion?: ProductListingSuggestion;
+        error?: string;
+      };
+      if (!response.ok || !payload.suggestion) {
+        throw new Error(payload.error ?? "Could not generate a product draft.");
+      }
+
+      const suggestion = payload.suggestion;
+      setForm((current) => ({
+        ...current,
+        title: suggestion.title,
+        description: suggestion.description,
+        categorySlug: suggestion.categorySlug ?? "",
+      }));
+      updatePrimaryColorDraft({
+        ...primary,
+        color_name: suggestion.colorName || "Default",
+      });
+      setAiGenerated(true);
+      setMessage("Review the suggested listing, then publish when it looks right.");
+      setCreateStep(2);
+    } catch (error) {
+      setAiGenerated(false);
+      setMessage(
+        error instanceof Error
+          ? `${error.message} You can fill in the listing manually below.`
+          : "AI listing generation is unavailable. You can fill in the listing manually below.",
+      );
+      setCreateStep(2);
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -710,19 +829,14 @@ export default function PortalProductsPage() {
       {addProductOpen ? (
         <SheetShell
           title="Add product"
-          subtitle={createStep === 1 ? "Step 1 of 2 · Details" : "Step 2 of 2 · Photos & options"}
+          subtitle={createStep === 1 ? "Step 1 of 2 · Photos & stock" : "Step 2 of 2 · Review listing"}
           onClose={closeCreate}
         >
           <form
             onSubmit={(event) => {
               event.preventDefault();
               if (createStep === 1) {
-                if (!form.title.trim() || !form.price_aed.trim() || !form.categorySlug) {
-                  setMessage("Add a title, price, and category to continue.");
-                  return;
-                }
-                setMessage(null);
-                setCreateStep(2);
+                void generateListing();
                 return;
               }
               void onCreate();
@@ -741,35 +855,40 @@ export default function PortalProductsPage() {
             </div>
 
             {createStep === 1 ? (
-              <div className="space-y-3">
+              <QuickProductFields
+                draft={createColors[0] ?? createColorDraft({ color_name: "Default" })}
+                priceAed={form.price_aed}
+                onPriceChange={(price_aed) => setForm((current) => ({ ...current, price_aed }))}
+                onChange={updatePrimaryColorDraft}
+                disabled={generating || saving}
+              />
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-[#c9ddd4] bg-[#f4faf7] p-4">
+                  <p className="text-sm font-semibold text-[#21463b]">
+                    {aiGenerated ? "AI draft ready for review" : "Finish your product listing"}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[#54756b]">
+                    {aiGenerated
+                      ? "Check every suggestion before publishing. You can edit anything below."
+                      : "AI suggestions are unavailable, so enter the listing details manually."
+                    }
+                  </p>
+                </div>
+
                 <label className="block space-y-1.5 text-sm">
-                  <span className="font-medium text-[#40534d]">Title</span>
+                  <span className="font-medium text-[#40534d]">Title *</span>
                   <input
                     className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
                     placeholder="Product name"
                     value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))}
                     required
                     autoFocus
                   />
                 </label>
                 <label className="block space-y-1.5 text-sm">
-                  <span className="font-medium text-[#40534d]">Price (AED)</span>
-                  <input
-                    className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
-                    placeholder="0.00"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.price_aed}
-                    onChange={(e) => setForm((f) => ({ ...f, price_aed: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="block space-y-1.5 text-sm">
-                  <span className="font-medium text-[#40534d]">
-                    Category <span className="text-accent-deep">*</span>
-                  </span>
+                  <span className="font-medium text-[#40534d]">Category *</span>
                   <select
                     className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
                     value={form.categorySlug}
@@ -787,27 +906,45 @@ export default function PortalProductsPage() {
                   </select>
                 </label>
                 <label className="block space-y-1.5 text-sm">
-                  <span className="font-medium text-[#40534d]">Description</span>
+                  <span className="font-medium text-[#40534d]">Description *</span>
                   <textarea
                     className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
-                    placeholder="Optional details for shoppers"
-                    rows={4}
+                    placeholder="Describe what shoppers should know"
+                    rows={5}
                     value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                    onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
+                    required
                   />
                 </label>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <CustomizationEditor
-                  value={form.customization}
-                  onChange={(customization) => setForm((current) => ({ ...current, customization }))}
-                />
-                <ColorVariantEditor
-                  value={createColors}
-                  onChange={setCreateColors}
-                  disabled={saving}
-                />
+
+                <div className="rounded-2xl border border-line bg-white p-4 text-sm text-[#40534d]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">Essentials saved</span>
+                    <span className="text-xs text-muted">
+                      {createColors[0]?.stock ?? 0} in stock · {createColors[0]?.sizes.length ?? 0} sizes · {createColors[0]?.images.length ?? 0} photos
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    Need colors, custom sizing, or other advanced options? Expand below.
+                  </p>
+                </div>
+
+                <details className="rounded-2xl border border-line bg-white p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-[#40534d]">
+                    Advanced options
+                  </summary>
+                  <div className="mt-4 space-y-4">
+                    <CustomizationEditor
+                      value={form.customization}
+                      onChange={(customization) => setForm((current) => ({ ...current, customization }))}
+                    />
+                    <ColorVariantEditor
+                      value={createColors}
+                      onChange={setCreateColors}
+                      disabled={saving}
+                    />
+                  </div>
+                </details>
               </div>
             )}
 
@@ -835,10 +972,16 @@ export default function PortalProductsPage() {
                 )}
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || generating}
                   className="portal-button-primary flex-[1.4] disabled:opacity-50"
                 >
-                  {createStep === 1 ? "Continue" : saving ? "Saving…" : "Save product"}
+                  {createStep === 1
+                    ? generating
+                      ? "Creating draft…"
+                      : "Generate listing"
+                    : saving
+                      ? "Publishing…"
+                      : "Publish product"}
                 </button>
               </div>
             </StickyActionBar>

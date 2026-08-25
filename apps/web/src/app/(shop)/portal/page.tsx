@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import { getOnboardingChecklist } from "@/lib/onboarding";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
-import type { Order, OrderItem, Product, ProductReview } from "@/lib/types";
+import type { Order, OrderItem, Product, ProductReview, Store } from "@/lib/types";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] | null };
 type WishRow = { product_id: string; count: number; title: string };
@@ -135,48 +135,203 @@ export default function PortalOverviewPage() {
 
   return (
     <div className="space-y-7">
-      <PortalPageHeader
-        eyebrow="Store overview"
-        title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${store.name}`}
-        description="Start with the work that keeps your shoppers happy and your store growing."
-      >
-        <button type="button" onClick={handleRefresh} disabled={refreshing} className="portal-button-secondary disabled:opacity-55"><PortalIcon name="refresh" className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />{refreshing ? "Refreshing" : "Refresh"}</button>
-        <Link href={setupComplete && store.is_active ? `/stores/${store.slug}` : "/portal/settings"} className="portal-button-primary">{setupComplete && store.is_active ? "View storefront" : "Finish setup"}<PortalIcon name="external" className="h-3.5 w-3.5" /></Link>
-      </PortalPageHeader>
-
-      {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
-
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <div><p className="portal-eyebrow">Priority queue</p><h2 className="mt-1 text-lg font-semibold text-[#1d2925]">What needs your attention</h2></div>
-          <Link href="/portal/orders" className="portal-text-link">Open orders<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link>
+      <div className="lg:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="portal-eyebrow">Store overview</p>
+            <h1 className="mt-1 truncate text-2xl font-semibold tracking-[-0.04em] text-[#1d2925]">Overview</h1>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={handleRefresh} disabled={refreshing} aria-label="Refresh dashboard" className="portal-button-secondary h-10 w-10 justify-center p-0 disabled:opacity-55">
+              <PortalIcon name="refresh" className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+            <Link href={setupComplete && store.is_active ? `/stores/${store.slug}` : "/portal/settings"} className="portal-button-primary h-10 px-3 text-xs">
+              {setupComplete && store.is_active ? "Store" : "Setup"}<PortalIcon name="external" className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <AttentionCard icon="orders" title={`${insights.newOrders.length} new order${insights.newOrders.length === 1 ? "" : "s"}`} description={insights.newOrders.length ? "Ready to accept and prepare" : "No new orders right now"} href="/portal/orders" urgent={Boolean(insights.newOrders.length)} />
-          <AttentionCard icon="package" title={`${insights.activeOrders.length} in fulfilment`} description={insights.activeOrders.length ? "Keep these orders moving" : "Nothing is being prepared"} href="/portal/orders" />
-          <AttentionCard icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} description={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
-          <AttentionCard icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} description={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
-        </div>
-      </section>
+        <MobileOverview
+          store={store}
+          setupComplete={setupComplete}
+          checklist={checklist}
+          insights={insights}
+          products={products}
+          reviews={reviews}
+          orders={orders}
+          wishlistRows={wishlistRows}
+        />
+      </div>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="Excludes cancelled orders" icon="analytics" />
-        <PortalMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} detail={`${insights.activeOrders.length} active order${insights.activeOrders.length === 1 ? "" : "s"}`} icon="orders" />
-        <PortalMetric label="Average order" value={formatAed(insights.averageOrder)} detail="Across non-cancelled orders" icon="sparkle" />
-        <PortalMetric label="Catalog health" value={`${products.length} products`} detail={`${insights.lowStock.length} low stock and ${products.filter((product) => !product.is_available).length} hidden`} icon="products" tone={insights.lowStock.length ? "urgent" : "default"} />
-      </section>
+      <div className="hidden space-y-7 lg:block">
+        <PortalPageHeader
+          eyebrow="Store overview"
+          title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${store.name}`}
+          description="Start with the work that keeps your shoppers happy and your store growing."
+        >
+          <button type="button" onClick={handleRefresh} disabled={refreshing} className="portal-button-secondary disabled:opacity-55"><PortalIcon name="refresh" className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />{refreshing ? "Refreshing" : "Refresh"}</button>
+          <Link href={setupComplete && store.is_active ? `/stores/${store.slug}` : "/portal/settings"} className="portal-button-primary">{setupComplete && store.is_active ? "View storefront" : "Finish setup"}<PortalIcon name="external" className="h-3.5 w-3.5" /></Link>
+        </PortalPageHeader>
 
-      <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
-        <SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} />
-        <StoreHealth store={store} complete={setupComplete} checklistComplete={checklist.filter((item) => item.done).length} reviews={reviews.length} />
-      </section>
+        {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
 
-      <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
-        <OrdersToFulfil orders={orders} />
-        <ProductDemand products={insights.topProducts} wishlistRows={wishlistRows} />
-      </section>
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <div><p className="portal-eyebrow">Priority queue</p><h2 className="mt-1 text-lg font-semibold text-[#1d2925]">What needs your attention</h2></div>
+            <Link href="/portal/orders" className="portal-text-link">Open orders<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <AttentionCard icon="orders" title={`${insights.newOrders.length} new order${insights.newOrders.length === 1 ? "" : "s"}`} description={insights.newOrders.length ? "Ready to accept and prepare" : "No new orders right now"} href="/portal/orders" urgent={Boolean(insights.newOrders.length)} />
+            <AttentionCard icon="package" title={`${insights.activeOrders.length} in fulfilment`} description={insights.activeOrders.length ? "Keep these orders moving" : "Nothing is being prepared"} href="/portal/orders" />
+            <AttentionCard icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} description={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
+            <AttentionCard icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} description={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
+          </div>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="Excludes cancelled orders" icon="analytics" />
+          <PortalMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} detail={`${insights.activeOrders.length} active order${insights.activeOrders.length === 1 ? "" : "s"}`} icon="orders" />
+          <PortalMetric label="Average order" value={formatAed(insights.averageOrder)} detail="Across non-cancelled orders" icon="sparkle" />
+          <PortalMetric label="Catalog health" value={`${products.length} products`} detail={`${insights.lowStock.length} low stock and ${products.filter((product) => !product.is_available).length} hidden`} icon="products" tone={insights.lowStock.length ? "urgent" : "default"} />
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
+          <SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} />
+          <StoreHealth store={store} complete={setupComplete} checklistComplete={checklist.filter((item) => item.done).length} reviews={reviews.length} />
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
+          <OrdersToFulfil orders={orders} />
+          <ProductDemand products={insights.topProducts} wishlistRows={wishlistRows} />
+        </section>
+      </div>
     </div>
   );
+}
+
+function MobileOverview({
+  store,
+  setupComplete,
+  checklist,
+  insights,
+  products,
+  reviews,
+  orders,
+  wishlistRows,
+}: {
+  store: Store;
+  setupComplete: boolean;
+  checklist: ReturnType<typeof getOnboardingChecklist>;
+  insights: {
+    activeOrders: OrderWithItems[];
+    newOrders: OrderWithItems[];
+    lowStock: Product[];
+    unreplied: ProductReview[];
+    todayRevenue: number;
+    weekRevenue: number;
+    averageOrder: number;
+    topProducts: { title: string; units: number; revenue: number }[];
+    salesDays: { label: string; revenue: number }[];
+    maxRevenue: number;
+  };
+  products: Product[];
+  reviews: ProductReview[];
+  orders: OrderWithItems[];
+  wishlistRows: WishRow[];
+}) {
+  const attentionCount = insights.newOrders.length + insights.lowStock.length + insights.unreplied.length;
+  const checklistComplete = checklist.filter((item) => item.done).length;
+
+  return (
+    <div className="space-y-4">
+      {!setupComplete || !store.is_active ? <MobileLaunchCard storeActive={store.is_active} complete={setupComplete} /> : null}
+
+      <section className="overflow-hidden rounded-2xl bg-[#21342e] text-white shadow-[0_18px_40px_-28px_rgba(33,52,46,0.75)]">
+        <div className="flex items-start justify-between gap-3 px-4 py-5">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9fc4b8]">Today at a glance</p>
+            <h2 className="mt-1 truncate text-xl font-bold tracking-[-0.03em]">{store.name}</h2>
+            <p className="mt-1 text-xs text-[#c5d8d1]">{insights.activeOrders.length ? `${insights.activeOrders.length} order${insights.activeOrders.length === 1 ? "" : "s"} moving through fulfilment` : "Your order queue is clear"}</p>
+          </div>
+          <StatusBadge status={store.is_active ? "live" : "paused"} />
+        </div>
+        <div className="grid grid-cols-2 border-t border-white/10">
+          <div className="px-4 py-3.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9fc4b8]">Sales today</p>
+            <p className="mt-1 text-xl font-bold tabular-nums">{formatAed(insights.todayRevenue)}</p>
+          </div>
+          <div className="border-l border-white/10 px-4 py-3.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9fc4b8]">Active orders</p>
+            <p className="mt-1 text-xl font-bold tabular-nums">{insights.activeOrders.length}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="portal-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="portal-eyebrow">Priority queue</p>
+            <h2 className="mt-1 text-base font-semibold text-[#1d2925]">What needs attention</h2>
+          </div>
+          {attentionCount ? <span className="rounded-full bg-[#fff1dc] px-2 py-1 text-[10px] font-bold text-[#9c5b05]">{attentionCount} to review</span> : null}
+        </div>
+        <div className="mt-3 divide-y divide-[#edf1ef]">
+          <MobilePriorityRow icon="orders" title={`${insights.newOrders.length} new order${insights.newOrders.length === 1 ? "" : "s"}`} detail={insights.newOrders.length ? "Ready to accept and prepare" : "No new orders right now"} href="/portal/orders" urgent={Boolean(insights.newOrders.length)} />
+          <MobilePriorityRow icon="package" title={`${insights.activeOrders.length} in fulfilment`} detail={insights.activeOrders.length ? "Keep these orders moving" : "Nothing is being prepared"} href="/portal/orders" />
+          <MobilePriorityRow icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} detail={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
+          <MobilePriorityRow icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} detail={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
+        </div>
+      </section>
+
+      <OrdersToFulfil orders={orders} limit={3} />
+
+      <details className="portal-mobile-disclosure">
+        <summary className="portal-card flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+          <span><span className="portal-eyebrow block">Performance</span><span className="mt-1 block text-base font-semibold text-[#1d2925]">Sales and catalogue health</span></span>
+          <PortalIcon name="chevronDown" className="h-4 w-4 shrink-0 text-[#687770]" />
+        </summary>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <MobileMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} />
+          <MobileMetric label="Average order" value={formatAed(insights.averageOrder)} />
+          <MobileMetric label="Products" value={String(products.length)} />
+          <MobileMetric label="Hidden items" value={String(products.filter((product) => !product.is_available).length)} />
+        </div>
+        <div className="mt-3"><SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} /></div>
+      </details>
+
+      <details className="portal-mobile-disclosure">
+        <summary className="portal-card flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+          <span><span className="portal-eyebrow block">Store health</span><span className="mt-1 block text-base font-semibold text-[#1d2925]">Storefront essentials</span></span>
+          <PortalIcon name="chevronDown" className="h-4 w-4 shrink-0 text-[#687770]" />
+        </summary>
+        <div className="portal-card mt-3 space-y-3 p-4">
+          <HealthRow label="Storefront" value={store.is_active ? "Live" : "Paused"} status={store.is_active ? "live" : "paused"} />
+          <HealthRow label="Setup" value={setupComplete ? "Complete" : `${checklistComplete}/4 complete`} status={setupComplete ? "live" : "draft"} />
+          <HealthRow label="Store hours" value={store.opens_at && store.closes_at ? `${store.opens_at.slice(0, 5)} - ${store.closes_at.slice(0, 5)}` : "Not set"} status={store.opens_at && store.closes_at ? "live" : "draft"} />
+          <HealthRow label="Customer reviews" value={reviews.length ? `${reviews.length} received` : "No reviews yet"} status={reviews.length ? "live" : "draft"} />
+        </div>
+      </details>
+
+      <details className="portal-mobile-disclosure">
+        <summary className="portal-card flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+          <span><span className="portal-eyebrow block">Product demand</span><span className="mt-1 block text-base font-semibold text-[#1d2925]">What shoppers want</span></span>
+          <PortalIcon name="chevronDown" className="h-4 w-4 shrink-0 text-[#687770]" />
+        </summary>
+        <div className="mt-3"><ProductDemand products={insights.topProducts} wishlistRows={wishlistRows} /></div>
+      </details>
+    </div>
+  );
+}
+
+function MobileMetric({ label, value }: { label: string; value: string }) {
+  return <div className="portal-card p-3"><p className="portal-eyebrow">{label}</p><p className="mt-1 text-lg font-bold tabular-nums text-[#17231f]">{value}</p></div>;
+}
+
+function MobilePriorityRow({ icon, title, detail, href, urgent = false }: { icon: "orders" | "package" | "warning" | "reviews"; title: string; detail: string; href: string; urgent?: boolean }) {
+  return <Link href={href} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${urgent ? "bg-[#ffead7] text-[#a6542e]" : "bg-[#e8efec] text-[#315f54]"}`}><PortalIcon name={icon} className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#263530]">{title}</span><span className="mt-0.5 block truncate text-xs text-[#7b8882]">{detail}</span></span><PortalIcon name="arrow" className="h-4 w-4 shrink-0 text-[#9aa8a2]" /></Link>;
+}
+
+function MobileLaunchCard({ storeActive, complete }: { storeActive: boolean; complete: boolean }) {
+  return <Link href="/portal/settings" className="flex items-center justify-between gap-3 rounded-2xl border border-[#bad7cd] bg-[#edf7f3] px-4 py-3.5"><span className="min-w-0"><span className="portal-eyebrow block text-[#438276]">Store launch</span><span className="mt-1 block truncate text-sm font-semibold text-[#1d2925]">{complete ? "Your store is paused" : "Finish your store setup"}</span></span><span className="flex shrink-0 items-center gap-1.5 text-xs font-bold text-[#2f6f66]">{complete && !storeActive ? "Turn on" : "Continue"}<PortalIcon name="arrow" className="h-3.5 w-3.5" /></span></Link>;
 }
 
 function LaunchCard({ storeActive, complete, checklist }: { storeActive: boolean; complete: boolean; checklist: ReturnType<typeof getOnboardingChecklist> }) {
@@ -199,8 +354,8 @@ function HealthRow({ label, value, status }: { label: string; value: string; sta
   return <div className="flex items-center justify-between gap-3 border-b border-[#edf1ef] pb-3 last:border-0 last:pb-0"><span><span className="block text-sm font-medium text-[#34423d]">{label}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{value}</span></span><StatusBadge status={status} /></div>;
 }
 
-function OrdersToFulfil({ orders }: { orders: OrderWithItems[] }) {
-  return <div className="portal-card overflow-hidden"><div className="p-5"><PortalSectionHeading title="Orders to fulfil" description="Your latest orders, sorted by when they arrived." action={{ label: "View all orders", href: "/portal/orders" }} /></div>{orders.length ? <div className="divide-y divide-[#edf1ef]">{orders.slice(0, 5).map((order) => <Link key={order.id} href="/portal/orders" className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-[#f8faf9]"><div className="flex min-w-0 items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#f0f5f2] text-[#4d766b]"><PortalIcon name="package" className="h-4 w-4" /></span><span><span className="block text-sm font-semibold text-[#263530]">{order.order_number}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{order.delivery_area} - {relativeTime(order.placed_at)}</span></span></div><div className="flex items-center gap-3"><StatusBadge status={order.status} /><span className="text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</span></div></Link>)}</div> : <div className="px-5 pb-5"><PortalEmpty icon="orders" title="Your order queue is clear" description="New shopper orders will appear here the moment they are placed." /></div>}</div>;
+function OrdersToFulfil({ orders, limit = 5 }: { orders: OrderWithItems[]; limit?: number }) {
+  return <div className="portal-card overflow-hidden"><div className="p-5"><PortalSectionHeading title="Orders to fulfil" description="Your latest orders, sorted by when they arrived." action={{ label: "View all orders", href: "/portal/orders" }} /></div>{orders.length ? <div className="divide-y divide-[#edf1ef]">{orders.slice(0, limit).map((order) => <Link key={order.id} href="/portal/orders" className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-[#f8faf9]"><div className="flex min-w-0 items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#f0f5f2] text-[#4d766b]"><PortalIcon name="package" className="h-4 w-4" /></span><span><span className="block text-sm font-semibold text-[#263530]">{order.order_number}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{order.delivery_area} - {relativeTime(order.placed_at)}</span></span></div><div className="flex items-center gap-3"><StatusBadge status={order.status} /><span className="text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</span></div></Link>)}</div> : <div className="px-5 pb-5"><PortalEmpty icon="orders" title="Your order queue is clear" description="New shopper orders will appear here the moment they are placed." /></div>}</div>;
 }
 
 function ProductDemand({ products, wishlistRows }: { products: { title: string; units: number; revenue: number }[]; wishlistRows: WishRow[] }) {

@@ -44,6 +44,7 @@ export function SiteFooter() {
       links: [
         { href: "/sell", label: "Sell on Morni" },
         { href: "/portal", label: "Store portal" },
+        { href: "/driver/sign-in", label: "Driver login" },
       ],
     },
   ];

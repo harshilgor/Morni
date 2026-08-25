@@ -167,6 +167,10 @@ body.portal-mode {
   text-transform: uppercase;
 }
 
+.portal-mobile-disclosure[open] > summary svg {
+  transform: rotate(180deg);
+}
+
 .portal-button-primary,
 .portal-button-secondary,
 .portal-text-link {

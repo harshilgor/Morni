@@ -24,11 +24,13 @@ export function ProductImagesField({
   onChange,
   required = false,
   error,
+  disabled = false,
 }: {
   items: ProductImageItem[];
   onChange: (items: ProductImageItem[]) => void;
   required?: boolean;
   error?: string | null;
+  disabled?: boolean;
 }) {
   const inputId = useId();
   const [dragging, setDragging] = useState(false);
@@ -47,7 +49,7 @@ export function ProductImagesField({
   }, []);
 
   function addFiles(fileList: FileList | File[] | null) {
-    if (!fileList) return;
+    if (!fileList || disabled) return;
     setLocalError(null);
     const next = [...items];
     const files = Array.from(fileList);
@@ -72,6 +74,7 @@ export function ProductImagesField({
   }
 
   function removeAt(index: number) {
+    if (disabled) return;
     const target = items[index];
     if (target?.previewUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(target.previewUrl);
@@ -80,7 +83,7 @@ export function ProductImagesField({
   }
 
   function setPrimary(index: number) {
-    if (index === 0) return;
+    if (disabled || index === 0) return;
     const next = [...items];
     const [picked] = next.splice(index, 1);
     next.unshift(picked);
@@ -88,6 +91,7 @@ export function ProductImagesField({
   }
 
   function move(index: number, direction: -1 | 1) {
+    if (disabled) return;
     const target = index + direction;
     if (target < 0 || target >= items.length) return;
     const next = [...items];
@@ -140,30 +144,32 @@ export function ProductImagesField({
                   <button
                     type="button"
                     onClick={() => setPrimary(index)}
+                    disabled={disabled}
                     className="rounded-full border border-line px-2 py-1 text-[10px] text-muted"
                   >
                     Make primary
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => move(index, -1)}
-                  disabled={index === 0}
+                  <button
+                    type="button"
+                    onClick={() => move(index, -1)}
+                    disabled={disabled || index === 0}
                   className="rounded-full border border-line px-2 py-1 text-[10px] text-muted disabled:opacity-40"
                 >
                   ←
                 </button>
-                <button
-                  type="button"
-                  onClick={() => move(index, 1)}
-                  disabled={index === items.length - 1}
+                  <button
+                    type="button"
+                    onClick={() => move(index, 1)}
+                    disabled={disabled || index === items.length - 1}
                   className="rounded-full border border-line px-2 py-1 text-[10px] text-muted disabled:opacity-40"
                 >
                   →
                 </button>
-                <button
-                  type="button"
-                  onClick={() => removeAt(index)}
+                  <button
+                    type="button"
+                    onClick={() => removeAt(index)}
+                    disabled={disabled}
                   className="rounded-full border border-line px-2 py-1 text-[10px] text-accent-deep"
                 >
                   Remove
@@ -176,6 +182,7 @@ export function ProductImagesField({
         {canAdd ? (
           <label
             htmlFor={inputId}
+            aria-disabled={disabled}
             onDragEnter={(e) => {
               e.preventDefault();
               setDragging(true);
@@ -193,7 +200,9 @@ export function ProductImagesField({
               setDragging(false);
               addFiles(e.dataTransfer.files);
             }}
-            className={`flex aspect-[3/4] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-3 text-center transition ${
+            className={`flex aspect-[3/4] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-3 text-center transition ${
+              disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+            } ${
               dragging
                 ? "border-accent bg-[#fff0f4]"
                 : "border-line bg-background hover:border-accent/60"
@@ -216,6 +225,7 @@ export function ProductImagesField({
         accept={MEDIA_ACCEPT}
         multiple
         className="sr-only"
+        disabled={disabled}
         onChange={(e) => {
           addFiles(e.target.files);
           e.currentTarget.value = "";

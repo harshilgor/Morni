@@ -86,6 +86,8 @@ export default function AccountPage() {
   const [form, setForm] = useState<ProfileForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -151,6 +153,22 @@ export default function AccountPage() {
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError(null);
+
+    const { error } = await createClient().auth.signOut();
+    if (error) {
+      setSigningOut(false);
+      setSignOutError("We couldn't sign you out. Please try again.");
+      return;
+    }
+
+    router.push("/");
+    router.refresh();
   }
 
   if (authLoading || !auth) {
@@ -248,6 +266,25 @@ export default function AccountPage() {
           >
             {saving ? "Saving…" : saved ? "Saved!" : "Update profile"}
           </button>
+          <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-ink">Account access</p>
+              <p className="mt-1 text-xs text-muted">Sign out of Morni on this device.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              disabled={signingOut}
+              className="rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-ink hover:bg-background disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {signingOut ? "Signing out…" : "Sign out"}
+            </button>
+          </div>
+          {signOutError && (
+            <p className="text-sm text-red-700" role="alert">
+              {signOutError}
+            </p>
+          )}
         </div>
       </div>
 

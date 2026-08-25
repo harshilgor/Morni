@@ -40,15 +40,58 @@ export async function uploadStoreMedia(options: {
   if (error) throw new Error(error);
 
   const supabase = createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) {
+    throw new Error(`Could not verify your session: ${userError.message}`);
+  }
+  if (!user) {
+    throw new Error("Sign in before uploading store images.");
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("store_members")
+    .select("store_id")
+    .eq("store_id", options.storeId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (membershipError) {
+    throw new Error(`Could not verify store access: ${membershipError.message}`);
+  }
+
+  let canUpload = Boolean(membership);
+  if (!canUpload) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profileError) {
+      throw new Error(`Could not verify store access: ${profileError.message}`);
+    }
+    canUpload = profile?.role === "admin";
+  }
+
+  if (!canUpload) {
+    throw new Error("You do not have permission to upload images for this store.");
+  }
+
   const safeName = sanitizeFileName(options.file.name);
   const folder = options.productId
     ? `${options.storeId}/${options.productId}`
     : options.storeId;
-  const path = `${folder}/${options.prefix}-${Date.now()}-${safeName}`;
+  const uploadId =
+    typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const path = `${folder}/${options.prefix}-${uploadId}-${safeName}`;
 
   const { error: uploadError } = await supabase.storage
     .from(options.bucket)
-    .upload(path, options.file, { upsert: true, contentType: options.file.type });
+    .upload(path, options.file, { upsert: false, contentType: options.file.type });
 
   if (uploadError) {
     throw new Error(uploadError.message);
