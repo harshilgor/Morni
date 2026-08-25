@@ -121,9 +121,9 @@ export function DriverMap({
 
   const points = useMemo<Point[]>(() => {
     const next: Point[] = [];
-    if (driverLat != null && driverLng != null) next.push({ id: "driver", lat: driverLat, lng: driverLng, label: "You", tone: "bg-[#213d33]" });
-    if (job?.store_lat != null && job.store_lng != null) next.push({ id: "pickup", lat: job.store_lat, lng: job.store_lng, label: "Pickup", tone: "bg-[#2f6f5d]" });
-    if (dropoff) next.push({ id: "dropoff", lat: dropoff.lat, lng: dropoff.lng, label: "Drop-off", tone: "bg-[#b35b45]" });
+    if (driverLat != null && driverLng != null) next.push({ id: "driver", lat: driverLat, lng: driverLng, label: "You", tone: "bg-[#155C4B]" });
+    if (job?.store_lat != null && job.store_lng != null) next.push({ id: "pickup", lat: job.store_lat, lng: job.store_lng, label: "Pickup", tone: "bg-[#F97316]" });
+    if (dropoff) next.push({ id: "dropoff", lat: dropoff.lat, lng: dropoff.lng, label: "Drop-off", tone: "bg-[#2B6CB0]" });
     return next;
   }, [driverLat, driverLng, dropoff, job]);
 
@@ -142,11 +142,11 @@ export function DriverMap({
       </div>
       <button type="button" onClick={onRefreshLocation} disabled={!online || updating} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#cfdcd5] px-3 py-2 text-xs font-semibold text-[#3f6155] transition hover:bg-[#f5f8f6] disabled:opacity-50"><PortalIcon name="refresh" className={`h-3.5 w-3.5 ${updating ? "animate-spin" : ""}`} />{updating ? "Updating…" : "Update location"}</button>
     </div>
-    <div className="relative h-[18rem] overflow-hidden bg-[#e7eee9] sm:h-[22rem]">
+    <div className="relative h-[18rem] overflow-hidden bg-[#FFF4D6] sm:h-[22rem]">
       {mapUrl ? <iframe title="Driver route map" src={mapUrl} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" /> : <div className="grid h-full place-items-center px-8 text-center"><div><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-[#4e8875] shadow-sm"><PortalIcon name="location" className="h-5 w-5" /></span><p className="mt-3 text-sm font-semibold text-[#33473e]">Waiting for a location pin</p><p className="mt-1 max-w-xs text-xs leading-5 text-[#718079]">Allow location access and tap “Update location” to place yourself on the map.</p></div></div>}
       {bounds ? <div className="pointer-events-none absolute inset-0">{points.map((point) => <span key={point.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={markerStyle(point, bounds)}><span className={`flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold text-white shadow-lg ${point.tone}`}><span className="h-1.5 w-1.5 rounded-full bg-white" />{point.label}</span></span>)}</div> : null}
       <div className="absolute bottom-2 left-2 rounded-md bg-white/90 px-2 py-1 text-[10px] text-[#61756b] shadow-sm backdrop-blur"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="hover:underline">© OpenStreetMap contributors</a></div>
     </div>
-    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5"><div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[#5b6e65]"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#213d33]" />You</span>{job ? <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#2f6f5d]" />Pickup</span> : null}{job && dropoff ? <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#b35b45]" />Drop-off</span> : null}</div><span className="text-[11px] text-[#7b8982]">{geocoding ? "Finding drop-off pin…" : relativeLocationTime(locationUpdatedAt)}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5"><div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[#4E6D61]"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#155C4B]" />You</span>{job ? <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#F97316]" />Pickup</span> : null}{job && dropoff ? <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#2B6CB0]" />Drop-off</span> : null}</div><span className="text-[11px] text-[#6D7D75]">{geocoding ? "Finding drop-off pin…" : relativeLocationTime(locationUpdatedAt)}</span></div>
   </section>;
 }

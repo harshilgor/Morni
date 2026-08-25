@@ -104,7 +104,6 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
     "/categories/party-wear.png",
     ["party", "evening", "sequin", "cocktail", "occasion"],
     11,
-    "Party",
   ),
   featuredCategory(
     "Casual Wear",

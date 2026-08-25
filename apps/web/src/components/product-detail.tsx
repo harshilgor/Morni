@@ -247,6 +247,10 @@ export function ProductDetail({
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [returnsOpen, setReturnsOpen] = useState(false);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [product.id]);
+
   async function loadReviewEligibility(productId: string) {
     const supabase = createClient();
     const { data: reviewRows } = await supabase

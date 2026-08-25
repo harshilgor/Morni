@@ -98,7 +98,6 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-white/45 sm:px-5">
           <span>© {new Date().getFullYear()} Morni · Real Magic Trading LLC</span>
-          <span>Pay later available while online payments connect</span>
         </div>
       </div>
     </footer>

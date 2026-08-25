@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
 import { isAfsPaymentsEnabled } from "@/lib/afs/client";
-import {
-  sendOrderConfirmationEmail,
-  sendStoreNewOrderEmails,
-} from "@/lib/email";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -39,7 +35,7 @@ type CheckoutBody = {
   address?: CheckoutAddress;
   saveAddress?: boolean;
   makeDefault?: boolean;
-  paymentMethod?: "cod" | "card";
+  paymentMethod?: "card";
 };
 
 type VerifiedProduct = {
@@ -178,10 +174,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A product in your bag is no longer available." }, { status: 400 });
   }
 
-  const requestedMethod = body?.paymentMethod === "card" ? "card" : "cod";
-  if (requestedMethod === "card" && !isAfsPaymentsEnabled()) {
+  const requestedMethod = body?.paymentMethod === "card" ? "card" : null;
+  if (!requestedMethod) {
     return NextResponse.json(
-      { error: "Card payments are not available right now. Choose pay later or try again later." },
+      { error: "Card payment is required to place an order." },
+      { status: 400 },
+    );
+  }
+  if (!isAfsPaymentsEnabled()) {
+    return NextResponse.json(
+      { error: "Card payments are not available right now. Please try again later." },
       { status: 503 },
     );
   }
@@ -268,25 +270,10 @@ export async function POST(request: Request) {
     }
   }
 
-  // Card orders email only after AFS confirms payment (see /api/payments/afs/result).
-  if (paymentMethod === "cod") {
-    try {
-      await sendOrderConfirmationEmail(order.id);
-    } catch (sendError) {
-      console.error("Order placed but confirmation email failed", sendError);
-    }
-
-    try {
-      await sendStoreNewOrderEmails(order.id);
-    } catch (sendError) {
-      console.error("Order placed but store notification email failed", sendError);
-    }
-  }
-
   return NextResponse.json(
     {
       order: { id: order.id, order_number: order.order_number ?? null },
-      next: paymentMethod === "card" ? "pay" : "confirmation",
+      next: "pay",
     },
     { status: 201 },
   );

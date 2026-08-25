@@ -55,7 +55,7 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "cod">("cod");
+  const paymentMethod = "card" as const;
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
   const fees = calculateCheckoutFees(orderSubtotal);
@@ -109,6 +109,10 @@ export default function CheckoutPage() {
       router.push("/auth?next=/checkout");
       return;
     }
+    if (!cardPaymentsEnabled) {
+      setPlaceError("Online card payments are temporarily unavailable. Please try again later.");
+      return;
+    }
 
     const address = resolveAddress();
     if (!address) {
@@ -123,7 +127,7 @@ export default function CheckoutPage() {
     setPlacing(true);
     setPlaceError(null);
     try {
-      const method = cardPaymentsEnabled ? paymentMethod : "cod";
+      const method = paymentMethod;
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -176,7 +180,6 @@ export default function CheckoutPage() {
         if (!active) return;
         const enabled = Boolean(payload?.enabled);
         setCardPaymentsEnabled(enabled);
-        if (enabled) setPaymentMethod("card");
       } catch {
         if (active) setCardPaymentsEnabled(false);
       }
@@ -421,17 +424,15 @@ export default function CheckoutPage() {
               <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
             </button>
             {placeError ? <p className="text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
-            <button type="button" onClick={() => void placeOrder()} disabled={placing} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void placeOrder()} disabled={placing || !cardPaymentsEnabled} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
               {placing
-                ? paymentMethod === "card" && cardPaymentsEnabled
-                  ? "Starting payment..."
-                  : "Placing order..."
+                ? "Starting payment..."
+                : !cardPaymentsEnabled
+                  ? "Card payments unavailable"
                 : authed === false
                   ? "Sign in to place order"
                   : mobileAddressReady
-                    ? paymentMethod === "card" && cardPaymentsEnabled
-                      ? "Continue to payment"
-                      : "Place order"
+                    ? "Continue to payment"
                     : "Select address to continue"}
             </button>
           </div>
@@ -703,53 +704,17 @@ export default function CheckoutPage() {
 
         <section aria-labelledby="payment-heading" className="border-t border-line pt-6">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Payment</p>
-          <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">
-            {cardPaymentsEnabled ? "How will you pay?" : "Pay later"}
-          </h2>
+          <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Pay securely online</h2>
           {cardPaymentsEnabled ? (
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              <label
-                className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
-                  paymentMethod === "card"
-                    ? "border-ink bg-background"
-                    : "border-line bg-surface hover:border-ink/30"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment-method"
-                  className="sr-only"
-                  checked={paymentMethod === "card"}
-                  onChange={() => setPaymentMethod("card")}
-                />
-                <span className="block text-sm font-semibold text-ink">Card</span>
-                <span className="mt-1 block text-xs text-muted">
-                  Pay now with Visa or Mastercard via AFS.
-                </span>
-              </label>
-              <label
-                className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
-                  paymentMethod === "cod"
-                    ? "border-ink bg-background"
-                    : "border-line bg-surface hover:border-ink/30"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment-method"
-                  className="sr-only"
-                  checked={paymentMethod === "cod"}
-                  onChange={() => setPaymentMethod("cod")}
-                />
-                <span className="block text-sm font-semibold text-ink">Pay later</span>
-                <span className="mt-1 block text-xs text-muted">
-                  Place the order now and settle payment later.
-                </span>
-              </label>
+            <div className="mt-4 rounded-xl border border-ink bg-background px-4 py-3">
+              <span className="block text-sm font-semibold text-ink">Card payment</span>
+              <span className="mt-1 block text-xs text-muted">
+                Pay now with Visa or Mastercard via AFS secure checkout.
+              </span>
             </div>
           ) : (
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-              Online payments are not connected yet. Place the order now and the boutique will receive it immediately.
+            <p className="mt-2 max-w-xl rounded-xl bg-surface px-4 py-3 text-sm leading-relaxed text-muted">
+              Online card payments are temporarily unavailable. Please try again later to complete checkout.
             </p>
           )}
         </section>
@@ -770,26 +735,24 @@ export default function CheckoutPage() {
         {placeError ? <p className="mt-4 text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
         <button
           type="button"
-          disabled={placing || (!mobileAddressReady && authed !== false)}
+          disabled={placing || !cardPaymentsEnabled || (!mobileAddressReady && authed !== false)}
           onClick={() => void placeOrder()}
           className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
           {placing
-            ? paymentMethod === "card" && cardPaymentsEnabled
-              ? "Starting payment..."
-              : "Placing order..."
+            ? "Starting payment..."
+            : !cardPaymentsEnabled
+              ? "Card payments unavailable"
             : authed === false
               ? "Sign in to place order"
               : mobileAddressReady
-                ? paymentMethod === "card" && cardPaymentsEnabled
-                  ? "Continue to payment"
-                  : "Place order"
+                ? "Continue to payment"
                 : "Select address to continue"}
         </button>
         <p className="mt-3 text-center text-xs leading-relaxed text-muted">
-          {paymentMethod === "card" && cardPaymentsEnabled
+          {cardPaymentsEnabled
             ? "You will enter card details on AFS’s secure form next."
-            : "Payment will be collected later. Delivery and service fees are included above."}
+            : "Checkout is temporarily unavailable while online card payments are offline."}
         </p>
       </aside>
       </div>

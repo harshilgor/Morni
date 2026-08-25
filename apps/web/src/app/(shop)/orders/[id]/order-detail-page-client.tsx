@@ -179,7 +179,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
             <span className="text-muted">Payment</span>
             <span>
               {order.payment_method === "cod"
-                ? "Pay later"
+                ? "Cash on delivery"
                 : order.payment_status === "paid"
                   ? "Card · Paid"
                   : order.payment_status === "failed"
