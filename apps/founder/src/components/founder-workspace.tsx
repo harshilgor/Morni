@@ -469,8 +469,8 @@ function DeliveryView({ data, onRefresh }: { data: FounderDeliveryData; onRefres
   const [supportEmail, setSupportEmail] = useState("");
   const [partnerId, setPartnerId] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"dispatcher" | "driver">("dispatcher");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [createMessage, setCreateMessage] = useState<string | null>(null);
   const [manageMessage, setManageMessage] = useState<string | null>(null);
@@ -507,16 +507,22 @@ function DeliveryView({ data, onRefresh }: { data: FounderDeliveryData; onRefres
     setSubmitting("invite");
     setFormError(null);
     setInviteUrl(null);
+    setInviteMessage(null);
     const response = await fetch(`/api/delivery/partners/${targetPartnerId}/invites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      body: JSON.stringify({ email: inviteEmail, role: "driver" }),
     });
-    const payload = (await response.json().catch(() => null)) as { error?: string; inviteUrl?: string } | null;
-    if (!response.ok || !payload?.inviteUrl) setFormError(payload?.error ?? "Unable to create invite.");
+    const payload = (await response.json().catch(() => null)) as { error?: string; inviteUrl?: string; emailSent?: boolean } | null;
+    if (!payload?.inviteUrl) setFormError(payload?.error ?? "Unable to add rider.");
     else {
       setInviteEmail("");
       setInviteUrl(payload.inviteUrl);
+      setInviteMessage(
+        payload.emailSent === false
+          ? payload.error ?? "Rider added, but the welcome email could not be sent."
+          : "Welcome email sent. The rider can use the secure link to join Morni.",
+      );
     }
     setSubmitting(null);
   }
@@ -725,25 +731,23 @@ function DeliveryView({ data, onRefresh }: { data: FounderDeliveryData; onRefres
           ) : null}
         </Panel>
         <Panel className="p-5 sm:p-6">
-          <SectionTitle title="Invite dispatchers and riders" detail="One-time invite linked to the selected company." />
+          <SectionTitle title="Add a rider" detail="Enter their email and Morni sends the welcome invite automatically." />
           <form onSubmit={createInvite} className="mt-5 grid gap-3 sm:grid-cols-2">
-            <select required value={selectedPartner} onChange={(event) => setPartnerId(event.target.value)} className="portal-select">
-              <option value="" disabled>
-                Select partner
-              </option>
-              {data.partners.map((partner) => (
-                <option key={partner.id} value={partner.id}>
-                  {partner.name}
+            {data.partners.length > 1 ? (
+              <select required value={selectedPartner} onChange={(event) => setPartnerId(event.target.value)} className="portal-select">
+                <option value="" disabled>
+                  Select delivery company
                 </option>
-              ))}
-            </select>
-            <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "dispatcher" | "driver")} className="portal-select">
-              <option value="dispatcher">Dispatcher</option>
-              <option value="driver">Rider</option>
-            </select>
-            <input required type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="name@company.com" className="portal-input" />
-            <button type="submit" disabled={!selectedPartner || submitting === "invite"} className="portal-button-secondary disabled:opacity-50">
-              {submitting === "invite" ? "Creating" : "Create invite"}
+                {data.partners.map((partner) => (
+                  <option key={partner.id} value={partner.id}>
+                    {partner.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <input required type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="rider@email.com" className="portal-input" />
+            <button type="submit" disabled={!selectedPartner || submitting === "invite"} className="portal-button-primary disabled:opacity-50">
+              {submitting === "invite" ? "Adding rider" : "Add rider & send email"}
             </button>
           </form>
           {formError ? (
@@ -753,9 +757,9 @@ function DeliveryView({ data, onRefresh }: { data: FounderDeliveryData; onRefres
           ) : null}
           {inviteUrl ? (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#edf3f0] p-3">
-              <span className="text-xs leading-5 text-[#3a4a44]">Invite ready to share once.</span>
+              <span className="text-xs leading-5 text-[#3a4a44]">{inviteMessage ?? "Invite ready to share once."}</span>
               <button type="button" onClick={() => void copyInvite()} className="rounded-md bg-white px-3 py-2 text-xs font-semibold text-[#21342e] shadow-sm">
-                Copy invite link
+                Copy join link
               </button>
             </div>
           ) : null}

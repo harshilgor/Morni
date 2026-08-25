@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendDeliveryInviteEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 
 type InviteRole = "dispatcher" | "driver";
@@ -35,5 +36,31 @@ export async function POST(
   const joinPath = role === "driver" ? "/driver/join" : "/partner/join";
   const inviteUrl = new URL(joinPath, request.url);
   inviteUrl.searchParams.set("token", invite.token);
-  return NextResponse.json({ inviteUrl: inviteUrl.toString(), partnerName: invite.partner_name });
+
+  try {
+    await sendDeliveryInviteEmail({
+      email,
+      partnerName: invite.partner_name,
+      role,
+      inviteUrl: inviteUrl.toString(),
+      inviteToken: invite.token,
+    });
+    return NextResponse.json({
+      inviteUrl: inviteUrl.toString(),
+      partnerName: invite.partner_name,
+      emailSent: true,
+    });
+  } catch (error) {
+    console.error("Unable to send delivery invite email", {
+      partnerId,
+      email,
+      error,
+    });
+    return NextResponse.json({
+      inviteUrl: inviteUrl.toString(),
+      partnerName: invite.partner_name,
+      emailSent: false,
+      error: "Invite created, but the welcome email could not be sent. Copy the join link and share it manually.",
+    });
+  }
 }

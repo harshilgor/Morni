@@ -7,6 +7,7 @@ import {
 } from "@/emails/order-confirmation-email";
 import { OrderStatusEmail } from "@/emails/order-status-email";
 import { StoreNewOrderEmail } from "@/emails/store-new-order-email";
+import { DeliveryInviteEmail } from "@/emails/delivery-invite-email";
 import { deliveryPromise, formatAed, orderStatusLabel } from "@/lib/format";
 import type { OrderStatus } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -17,7 +18,8 @@ type NotificationEvent =
   | "welcome"
   | "order_confirmation"
   | "order_status"
-  | "store_new_order";
+  | "store_new_order"
+  | "delivery_invite";
 
 type OrderEmailRecord = {
   id: string;
@@ -210,6 +212,30 @@ export async function sendWelcomeEmail(userId: string) {
     );
     throw error;
   }
+}
+
+export async function sendDeliveryInviteEmail({
+  email,
+  partnerName,
+  role,
+  inviteUrl,
+  inviteToken,
+}: {
+  email: string;
+  partnerName: string;
+  role: "dispatcher" | "driver";
+  inviteUrl: string;
+  inviteToken: string;
+}) {
+  const { from } = getMailer();
+  const resendId = await sendWithRetry("delivery_invite", inviteToken, {
+    from,
+    to: [email],
+    subject: `Welcome to Morni delivery with ${partnerName}`,
+    react: DeliveryInviteEmail({ partnerName, role, joinUrl: inviteUrl }),
+  });
+
+  return { sent: true, resendId };
 }
 
 export async function sendOrderConfirmationEmail(orderId: string) {
