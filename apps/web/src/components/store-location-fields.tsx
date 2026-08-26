@@ -135,11 +135,6 @@ export function StoreLocationFields({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-line bg-background/60 px-3 py-2.5 text-xs text-muted">
-        Enter your exact store location — any neighborhood and full street address in the UAE.
-        Pin it on the map so shoppers know where you’re based.
-      </div>
-
       <label className="block space-y-1.5 text-sm">
         <span className="text-muted">Emirate</span>
         <select
@@ -177,9 +172,6 @@ export function StoreLocationFields({
             <option key={item} value={item} />
           ))}
         </datalist>
-        <span className="block text-xs text-muted">
-          Type any area — suggestions appear for common neighborhoods.
-        </span>
       </label>
 
       <label className="block space-y-1.5 text-sm">
@@ -253,11 +245,7 @@ export function StoreLocationFields({
             Pinned at {value.lat!.toFixed(5)}, {value.lng!.toFixed(5)}
           </p>
         </div>
-      ) : (
-        <p className="text-xs text-muted">
-          No map pin yet — use “Find on map” or “Use my current location” after entering your address.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

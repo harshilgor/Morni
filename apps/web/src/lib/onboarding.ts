@@ -13,11 +13,10 @@ export function getOnboardingChecklist(
 ): OnboardingChecklistItem[] {
   const hasBasics = Boolean(
     store?.name?.trim() &&
-      store?.description?.trim() &&
       store?.area?.trim() &&
       store?.address?.trim(),
   );
-  const hasBrand = Boolean(store?.logo_url && store?.cover_url);
+  const hasBrand = Boolean(store?.logo_url);
   const completeProduct = products.find(
     (product) =>
       product.title?.trim() &&
@@ -30,13 +29,13 @@ export function getOnboardingChecklist(
   return [
     {
       id: "basics",
-      label: "Boutique name, description, and location",
+      label: "Boutique name and location",
       done: hasBasics,
       step: 1,
     },
     {
       id: "brand",
-      label: "Logo and store banner",
+      label: "Store logo",
       done: hasBrand,
       step: 2,
     },

@@ -93,8 +93,9 @@ function AuthForm() {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
       password,
       options: {
         data: { full_name: fullName },
@@ -103,6 +104,16 @@ function AuthForm() {
 
     if (error) {
       setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    // With email confirmations enabled, Supabase intentionally returns a
+    // successful-looking response for an existing account. An empty identity
+    // list is its documented signal that no new user was created.
+    if (data.user?.identities?.length === 0) {
+      setMessage("An account has already been created with this email. Please sign in instead.");
+      setMode("signin");
       setLoading(false);
       return;
     }
@@ -171,11 +182,12 @@ function AuthForm() {
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted">Email</span>
           <input
-            type="email"
-            className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
+              type="email"
+              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
           />
         </label>
         <label className="block space-y-1.5 text-sm">

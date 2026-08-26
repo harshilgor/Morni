@@ -37,9 +37,9 @@ const sellerBenefits = [
 ] as const;
 
 const gettingStarted = [
-  "Your boutique name and a short story",
+  "Your boutique name and location",
   "Your Dubai location and street address",
-  "A logo or banner image",
+  "A store logo",
   "One product photo, price, and size list",
 ] as const;
 

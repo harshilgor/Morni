@@ -40,9 +40,7 @@ export default function PortalSettingsPage() {
   });
   const [branding, setBranding] = useState<StoreBrandingValue>({
     logoFile: null,
-    coverFile: null,
     logoUrl: null,
-    coverUrl: null,
   });
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -74,9 +72,7 @@ export default function PortalSettingsPage() {
       });
       setBranding({
         logoFile: null,
-        coverFile: null,
         logoUrl: store.logo_url,
-        coverUrl: store.cover_url,
       });
     };
     if (typeof queueMicrotask === "function") queueMicrotask(syncFromStore);
@@ -95,7 +91,6 @@ export default function PortalSettingsPage() {
 
     try {
       let logo_url = branding.logoUrl ?? store.logo_url;
-      let cover_url = branding.coverUrl ?? store.cover_url;
 
       if (branding.logoFile) {
         logo_url = await uploadStoreMedia({
@@ -105,15 +100,6 @@ export default function PortalSettingsPage() {
           prefix: "logo",
         });
       }
-      if (branding.coverFile) {
-        cover_url = await uploadStoreMedia({
-          bucket: "store-logos",
-          storeId: store.id,
-          file: branding.coverFile,
-          prefix: "cover",
-        });
-      }
-
       const supabase = createClient();
       const { error: updateError } = await supabase
         .from("stores")
@@ -129,7 +115,6 @@ export default function PortalSettingsPage() {
           closes_at: storeHours.closes_at,
           pause_note: form.pause_note || null,
           logo_url,
-          cover_url,
         })
         .eq("id", store.id);
 
@@ -137,9 +122,7 @@ export default function PortalSettingsPage() {
 
       setBranding({
         logoFile: null,
-        coverFile: null,
         logoUrl: logo_url,
-        coverUrl: cover_url,
       });
       setMessage("Store updated.");
       await refresh();

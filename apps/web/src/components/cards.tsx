@@ -13,17 +13,12 @@ export function StoreCard({ store, compact = false }: { store: Store; compact?: 
       href={`/stores/${store.slug}`}
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-[#dedbd4] bg-white transition duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_18px_42px_-30px_rgba(28,20,24,0.38)]"
     >
-      <div className="relative h-28 overflow-hidden bg-sand sm:h-40">
-        {store.cover_url ? (
-          <Image
-            src={store.cover_url}
-            alt=""
-            fill
-            sizes="(max-width: 640px) 50vw, 25vw"
-            className="object-cover transition duration-500 group-hover:scale-[1.03]"
-          />
+      <div className="relative flex h-28 items-center justify-center overflow-hidden bg-sand sm:h-40">
+        {store.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={store.logo_url} alt={`${store.name} logo`} className="h-16 w-16 rounded-2xl border border-line bg-white object-cover sm:h-20 sm:w-20" />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-[#e8e4dc] to-[#c9c3b8]" />
+          <span className="font-display text-3xl text-ink">{store.name.slice(0, 1).toUpperCase()}</span>
         )}
         <NewStoreBadge createdAt={store.created_at} />
       </div>

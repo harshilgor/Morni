@@ -69,28 +69,8 @@ export function StoreProfileHeader({
   const showRating = rating != null && reviewCount > 0;
 
   return (
-    <section className="relative">
-      <div className="relative h-48 overflow-hidden bg-sand sm:h-64 lg:h-72">
-        {store.cover_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={store.cover_url}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div
-            className="h-full w-full"
-            style={{
-              backgroundImage:
-                "linear-gradient(135deg, #1c1418 0%, #4a3038 45%, #c45b7a 100%)",
-            }}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/15" />
-      </div>
-
-      <div className="relative z-10 mx-auto -mt-14 max-w-7xl px-4 sm:-mt-16 sm:px-6">
+    <section className="border-b border-line bg-sand/45 py-5 sm:py-7">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <motion.div
           initial={false}
           animate={{ opacity: 1, y: 0 }}

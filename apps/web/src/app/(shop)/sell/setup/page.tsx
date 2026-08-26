@@ -17,7 +17,6 @@ import {
   StoreLocationFields,
   type StoreLocationValue,
 } from "@/components/store-location-fields";
-import { StorefrontPreview } from "@/components/storefront-preview";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/format";
 import {
@@ -58,7 +57,6 @@ export default function SellSetupPage() {
   const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [launched, setLaunched] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -67,7 +65,6 @@ export default function SellSetupPage() {
     Partial<Record<keyof ProductFormValue, string>>
   >({});
   const [logoError, setLogoError] = useState<string | null>(null);
-  const [coverError, setCoverError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -80,32 +77,9 @@ export default function SellSetupPage() {
   });
   const [branding, setBranding] = useState<StoreBrandingValue>({
     logoFile: null,
-    coverFile: null,
     logoUrl: null,
-    coverUrl: null,
   });
   const [productForm, setProductForm] = useState<ProductFormValue>(emptyProductForm());
-
-  const logoPreview = useMemo(
-    () => (branding.logoFile ? URL.createObjectURL(branding.logoFile) : null),
-    [branding.logoFile],
-  );
-  const coverPreview = useMemo(
-    () => (branding.coverFile ? URL.createObjectURL(branding.coverFile) : null),
-    [branding.coverFile],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (logoPreview) URL.revokeObjectURL(logoPreview);
-    };
-  }, [logoPreview]);
-
-  useEffect(() => {
-    return () => {
-      if (coverPreview) URL.revokeObjectURL(coverPreview);
-    };
-  }, [coverPreview]);
 
   useEffect(() => {
     void loadBrowseCategoryOptions().then(setCategories);
@@ -147,9 +121,7 @@ export default function SellSetupPage() {
         });
         setBranding({
           logoFile: null,
-          coverFile: null,
           logoUrl: store.logo_url,
-          coverUrl: store.cover_url,
         });
         setStep(getResumeOnboardingStep(store) as Step);
         void loadProducts(store.id).then((loaded) => {
@@ -212,11 +184,6 @@ export default function SellSetupPage() {
       setMessage("Add your area and exact street address.");
       return;
     }
-    if (!description.trim()) {
-      setMessage("Add a short description shoppers will see.");
-      return;
-    }
-
     setBusy(true);
     setMessage(null);
     const supabase = createClient();
@@ -288,30 +255,19 @@ export default function SellSetupPage() {
     }
 
     setLogoError(null);
-    setCoverError(null);
-
     const nextLogo = branding.logoFile
       ? null
       : branding.logoUrl ?? store.logo_url;
-    const nextCover = branding.coverFile
-      ? null
-      : branding.coverUrl ?? store.cover_url;
 
     if (!branding.logoFile && !nextLogo) {
       setLogoError("Upload a store logo.");
       return;
     }
-    if (!branding.coverFile && !nextCover) {
-      setCoverError("Upload a store banner.");
-      return;
-    }
-
     setBusy(true);
     setMessage(null);
 
     try {
       let logo_url = nextLogo;
-      let cover_url = nextCover;
 
       if (branding.logoFile) {
         logo_url = await uploadStoreMedia({
@@ -321,21 +277,11 @@ export default function SellSetupPage() {
           prefix: "logo",
         });
       }
-      if (branding.coverFile) {
-        cover_url = await uploadStoreMedia({
-          bucket: "store-logos",
-          storeId: store.id,
-          file: branding.coverFile,
-          prefix: "cover",
-        });
-      }
-
       const supabase = createClient();
       const { error: updateError } = await supabase
         .from("stores")
         .update({
           logo_url,
-          cover_url,
           onboarding_step: Math.max(store.onboarding_step ?? 2, 3),
         })
         .eq("id", store.id);
@@ -344,9 +290,7 @@ export default function SellSetupPage() {
 
       setBranding({
         logoFile: null,
-        coverFile: null,
         logoUrl: logo_url,
-        coverUrl: cover_url,
       });
       await refresh();
       flashSaved();
@@ -532,37 +476,6 @@ export default function SellSetupPage() {
     [store, products],
   );
 
-  const primaryProduct = products[0];
-  const productImagePreview =
-    productForm.images[0]?.previewUrl ??
-    productForm.images[0]?.url ??
-    primaryProduct?.image_urls?.[0] ??
-    null;
-
-  // A new-store flow must never borrow display data from the currently selected store.
-  const previewStore = creatingNew ? null : store;
-  const previewData = {
-    name: name || previewStore?.name || "Your boutique",
-    description: description || previewStore?.description || "",
-    emirate: location.emirate,
-    area: location.area || previewStore?.area || "",
-    address: location.address || previewStore?.address || "",
-    logoUrl: logoPreview || branding.logoUrl || previewStore?.logo_url,
-    coverUrl: coverPreview || branding.coverUrl || previewStore?.cover_url,
-    deliveryEtaMinutes: previewStore?.delivery_eta_minutes || 60,
-    opensAt: previewStore?.opens_at?.slice(0, 5) || "10:00",
-    closesAt: previewStore?.closes_at?.slice(0, 5) || "22:00",
-    product: {
-      title: productForm.title || primaryProduct?.title || "First product",
-      priceAed:
-        Number(productForm.price_aed) || Number(primaryProduct?.price_aed) || 0,
-      compareAtPriceAed: productForm.compare_at_price_aed
-        ? Number(productForm.compare_at_price_aed)
-        : primaryProduct?.compare_at_price_aed,
-      imageUrl: productImagePreview,
-    },
-  };
-
   if (error === "unauthenticated") {
     return (
       <div className="seller-setup-page">
@@ -632,9 +545,6 @@ export default function SellSetupPage() {
   }
 
   const current = STEPS.find((item) => item.n === step) ?? STEPS[0];
-  const previewMode =
-    step >= 4 ? "launch" : step >= 3 ? "product" : ("store" as const);
-
   return (
     <div className="seller-setup-page">
       <SellerSetupHeader saved={savedFlash} />
@@ -648,9 +558,9 @@ export default function SellSetupPage() {
               {current.title}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
-              {step === 1 && "Name, story, and exact location for your boutique."}
+              {step === 1 && "Add your name and exact location. A short description is optional."}
               {step === 2 &&
-                "Add a logo and banner so your storefront looks complete."}
+                "Add a logo so shoppers can recognise your storefront."}
               {step === 3 &&
                 "Create one sellable product with photos, sizes, and category."}
               {step === 4 &&
@@ -708,18 +618,7 @@ export default function SellSetupPage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setPreviewOpen((open) => !open)}
-          className="seller-setup-preview-toggle mt-6 lg:hidden"
-          aria-expanded={previewOpen}
-        >
-          <span>{previewOpen ? "Hide storefront preview" : "Preview storefront"}</span>
-          <span aria-hidden>{previewOpen ? "↑" : "↓"}</span>
-        </button>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10">
-          <div className="min-w-0">
+        <div className="mt-6 max-w-3xl">
           {step === 1 ? (
             <form
               onSubmit={saveBasics}
@@ -738,7 +637,7 @@ export default function SellSetupPage() {
               </label>
               <label className="block space-y-1.5 text-sm">
                 <span className="text-muted">
-                  Short description <span className="text-accent-deep">*</span>
+                  Short description <span className="text-muted">(optional)</span>
                 </span>
                 <textarea
                   className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
@@ -746,7 +645,6 @@ export default function SellSetupPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="What makes your boutique special?"
-                  required
                 />
               </label>
               <StoreLocationFields value={location} onChange={setLocation} />
@@ -769,7 +667,6 @@ export default function SellSetupPage() {
                 onChange={setBranding}
                 required
                 logoError={logoError}
-                coverError={coverError}
               />
               {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
               <WizardNav
@@ -858,14 +755,6 @@ export default function SellSetupPage() {
               </div>
             </div>
           ) : null}
-        </div>
-
-          <aside className={`seller-setup-preview lg:sticky lg:top-6 lg:block lg:self-start ${previewOpen ? "block" : "hidden"}`}>
-            <StorefrontPreview data={previewData} mode={previewMode} />
-            <p className="mt-3 px-1 text-xs leading-5 text-muted">
-              This preview updates as you add your boutique details. Your page stays hidden until you launch.
-            </p>
-          </aside>
         </div>
       </div>
     </div>
