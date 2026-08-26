@@ -140,6 +140,7 @@ export type OrderItem = {
   unit_price_aed: number;
   quantity: number;
   line_total_aed: number;
+  image_url?: string | null;
   customization?: import("@/lib/product-customization").ProductCustomizationValues | null;
 };
 

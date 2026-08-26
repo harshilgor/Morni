@@ -145,6 +145,8 @@ export const useCart = create<CartState>()(
         get().items.reduce((sum, i) => sum + i.priceAed * i.quantity, 0),
       count: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
     }),
-    { name: "morni-cart" },
+    // Keep the server render and the first browser render identical. Persisted
+    // carts are restored by CartHydrator after React finishes hydrating.
+    { name: "morni-cart", skipHydration: true },
   ),
 );

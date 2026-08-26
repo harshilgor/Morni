@@ -950,6 +950,31 @@ h3,
     animation: none;
   }
 }
+
+.order-invoice {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .order-invoice,
+  .order-invoice * {
+    visibility: visible !important;
+  }
+
+  .order-invoice {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 2.5rem;
+    background: #fff;
+    color: #17231f;
+  }
+}
 @media (max-width: 639px) {
   html {
     scroll-padding-top: 8.5rem;

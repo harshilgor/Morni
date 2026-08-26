@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { PortalIcon, type PortalIconName } from "@/components/portal-icons";
 import { createClient } from "@/lib/supabase/client";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
+import { useNewOrderCount } from "@/lib/use-new-order-count";
 
 const primaryLinks: { href: string; label: string; icon: PortalIconName }[] = [
   { href: "/portal", label: "Overview", icon: "overview" },
@@ -23,10 +24,12 @@ function NavGroup({
   title,
   links,
   pathname,
+  newOrderCount = 0,
 }: {
   title?: string;
   links: { href: string; label: string; icon: PortalIconName }[];
   pathname: string;
+  newOrderCount?: number;
 }) {
   return (
     <div className="space-y-1">
@@ -51,6 +54,14 @@ function NavGroup({
           >
             <PortalIcon name={link.icon} className="h-[18px] w-[18px]" />
             <span>{link.label}</span>
+            {link.href === "/portal/orders" && newOrderCount > 0 ? (
+              <span
+                className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-[#d66b4a] px-1 text-[10px] font-bold text-white"
+                aria-label={`${newOrderCount} new order${newOrderCount === 1 ? "" : "s"}`}
+              >
+                {newOrderCount > 99 ? "99+" : newOrderCount}
+              </span>
+            ) : null}
           </Link>
         );
       })}
@@ -62,6 +73,7 @@ export function PortalNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { store } = useOwnerStore();
+  const newOrderCount = useNewOrderCount(store?.id);
 
   async function signOut() {
     await createClient().auth.signOut();
@@ -89,7 +101,7 @@ export function PortalNav() {
         </Link>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <NavGroup links={primaryLinks} pathname={pathname} />
+        <NavGroup links={primaryLinks} pathname={pathname} newOrderCount={newOrderCount} />
         <NavGroup title="Manage" links={manageLinks} pathname={pathname} />
       </nav>
       <div className="border-t border-[#d5ddd9] p-3">

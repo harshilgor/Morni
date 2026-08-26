@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { PortalIcon, type PortalIconName } from "@/components/portal-icons";
 import { createClient } from "@/lib/supabase/client";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
+import { useNewOrderCount } from "@/lib/use-new-order-count";
 
 const primaryTabs: { href: string; label: string; icon: PortalIconName }[] = [
   { href: "/portal", label: "Overview", icon: "overview" },
@@ -28,10 +29,11 @@ export function PortalBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { store } = useOwnerStore();
+  const newOrderCount = useNewOrderCount(store?.id);
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
-    setMoreOpen(false);
+    window.queueMicrotask(() => setMoreOpen(false));
   }, [pathname]);
 
   async function signOut() {
@@ -128,11 +130,16 @@ export function PortalBottomNav() {
                 }`}
               >
                 <span
-                  className={`grid h-9 w-9 place-items-center rounded-xl ${
+                  className={`relative grid h-9 w-9 place-items-center rounded-xl ${
                     active ? "bg-[#e3eee9]" : "bg-transparent"
                   }`}
                 >
                   <PortalIcon name={tab.icon} className="h-5 w-5" />
+                  {tab.href === "/portal/orders" && newOrderCount > 0 ? (
+                    <span className="absolute ml-7 mt-[-1.35rem] grid h-4 min-w-4 place-items-center rounded-full bg-[#d66b4a] px-1 text-[9px] font-bold text-white">
+                      {newOrderCount > 99 ? "99+" : newOrderCount}
+                    </span>
+                  ) : null}
                 </span>
                 {tab.label}
               </Link>
