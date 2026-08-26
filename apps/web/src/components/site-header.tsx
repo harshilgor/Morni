@@ -154,6 +154,13 @@ export function SiteHeader() {
   const menuCloseTimer = useRef<number | null>(null);
   const headerRef = useRef<HTMLElement>(null);
 
+  // SiteHeader is lazy-loaded. Rehydrate its browser-only data after this
+  // component itself has finished hydrating, not earlier in the shop layout.
+  useEffect(() => {
+    void useCart.persist.rehydrate();
+    void useLocation.persist.rehydrate();
+  }, []);
+
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (!accountRef.current?.contains(e.target as Node)) {
@@ -224,9 +231,11 @@ export function SiteHeader() {
   }, [categoriesOpen]);
 
   useEffect(() => {
-    setLocationOpen(false);
-    setCategoriesOpen(false);
-    setAccountOpen(false);
+    window.queueMicrotask(() => {
+      setLocationOpen(false);
+      setCategoriesOpen(false);
+      setAccountOpen(false);
+    });
   }, [pathname]);
 
   const isProductDetailPage = Boolean(

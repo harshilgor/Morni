@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { ProductCard } from "@/components/cards";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
 
 export function RecentlyViewedRail() {
   const items = useRecentlyViewed((s) => s.items);
+
+  useEffect(() => {
+    void useRecentlyViewed.persist.rehydrate();
+  }, []);
 
   if (items.length === 0) return null;
 
