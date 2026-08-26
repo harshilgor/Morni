@@ -13,12 +13,18 @@ export function StoreCard({ store, compact = false }: { store: Store; compact?: 
       href={`/stores/${store.slug}`}
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-[#dedbd4] bg-white transition duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_18px_42px_-30px_rgba(28,20,24,0.38)]"
     >
-      <div className="relative flex h-28 items-center justify-center overflow-hidden bg-sand sm:h-40">
+      <div className="relative flex h-36 items-center justify-center overflow-hidden bg-sand sm:h-48">
         {store.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={store.logo_url} alt={`${store.name} logo`} className="h-16 w-16 rounded-2xl border border-line bg-white object-cover sm:h-20 sm:w-20" />
+          <img
+            src={store.logo_url}
+            alt={`${store.name} logo`}
+            className="h-28 w-28 rounded-[1.35rem] border border-line bg-white object-contain shadow-[0_8px_22px_-16px_rgba(28,20,24,0.5)] sm:h-36 sm:w-36"
+          />
         ) : (
-          <span className="font-display text-3xl text-ink">{store.name.slice(0, 1).toUpperCase()}</span>
+          <span className="flex h-28 w-28 items-center justify-center rounded-[1.35rem] border border-ink/10 bg-white font-display text-5xl text-ink shadow-[0_8px_22px_-16px_rgba(28,20,24,0.5)] sm:h-36 sm:w-36 sm:text-6xl">
+            {store.name.slice(0, 1).toUpperCase()}
+          </span>
         )}
         <NewStoreBadge createdAt={store.created_at} />
       </div>

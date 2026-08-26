@@ -12,6 +12,7 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
+  const flow = searchParams.get("flow");
   const next = safeNextPath(searchParams.get("next"), searchParams.get("flow") === "driver" ? "/driver" : "/");
 
   if (code || (tokenHash && type)) {
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (user) {
+      if (user && flow !== "password-reset") {
         try {
           await sendWelcomeEmail(user.id);
         } catch (emailError) {

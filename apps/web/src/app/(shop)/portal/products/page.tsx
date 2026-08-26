@@ -345,15 +345,18 @@ export default function PortalProductsPage() {
       }
 
       const suggestion = payload.suggestion;
+      const gifting = suggestion.categorySlug === "gifting";
       setForm((current) => ({
         ...current,
         title: suggestion.title,
         description: suggestion.description,
         categorySlug: suggestion.categorySlug ?? "",
+        ...(gifting ? { customization: defaultCustomizationConfig() } : {}),
       }));
       updatePrimaryColorDraft({
         ...primary,
         color_name: suggestion.colorName || "Default",
+        ...(gifting ? { sizes: [] } : {}),
       });
       setAiGenerated(true);
       setMessage("Review the suggested listing, then publish when it looks right.");
@@ -377,7 +380,10 @@ export default function PortalProductsPage() {
       title: product.title,
       price_aed: String(product.price_aed),
       categorySlug: product.categories?.slug ?? "",
-      customization: customizationConfigFromProduct(product),
+      customization:
+        product.categories?.slug === "gifting"
+          ? defaultCustomizationConfig()
+          : customizationConfigFromProduct(product),
     });
     setEditColors(draftsFromVariants(product));
     setEditMessage(null);
@@ -408,7 +414,7 @@ export default function PortalProductsPage() {
       setCreateStep(1);
       return;
     }
-    if (form.customization.enabled && form.customization.fields.length === 0) {
+    if (categoryHasSizes(form.categorySlug) && form.customization.enabled && form.customization.fields.length === 0) {
       setMessage("Choose at least one measurement for custom sizing.");
       setCreateStep(2);
       return;
@@ -453,11 +459,11 @@ export default function PortalProductsPage() {
         price_aed: Number(form.price_aed),
         stock: aggregate.stock,
         sizes: aggregate.sizes,
-        customization_enabled: form.customization.enabled,
-        customization_instructions: form.customization.enabled
+        customization_enabled: categoryHasSizes(form.categorySlug) && form.customization.enabled,
+        customization_instructions: categoryHasSizes(form.categorySlug) && form.customization.enabled
           ? form.customization.instructions.trim()
           : null,
-        customization_fields: form.customization.enabled
+        customization_fields: categoryHasSizes(form.categorySlug) && form.customization.enabled
           ? form.customization.fields
           : [],
         is_available: true,
@@ -514,7 +520,7 @@ export default function PortalProductsPage() {
       setEditMessage("Choose a category for this product.");
       return;
     }
-    if (editDraft.customization.enabled && editDraft.customization.fields.length === 0) {
+    if (categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled && editDraft.customization.fields.length === 0) {
       setEditMessage("Choose at least one measurement for custom sizing.");
       return;
     }
@@ -547,11 +553,11 @@ export default function PortalProductsPage() {
         category_id: categoryId,
         title: editDraft.title.trim(),
         price_aed: price,
-        customization_enabled: editDraft.customization.enabled,
-        customization_instructions: editDraft.customization.enabled
+        customization_enabled: categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled,
+        customization_instructions: categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled
           ? editDraft.customization.instructions.trim()
           : null,
-        customization_fields: editDraft.customization.enabled
+        customization_fields: categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled
           ? editDraft.customization.fields
           : [],
       })
@@ -945,7 +951,13 @@ export default function PortalProductsPage() {
                     value={form.categorySlug}
                     onChange={(event) => {
                       const categorySlug = event.target.value;
-                      setForm((current) => ({ ...current, categorySlug }));
+                      setForm((current) => ({
+                        ...current,
+                        categorySlug,
+                        ...(categorySlug === "gifting"
+                          ? { customization: defaultCustomizationConfig() }
+                          : {}),
+                      }));
                       if (!categoryHasSizes(categorySlug)) {
                         setCreateColors((current) =>
                           current.map((draft) => ({ ...draft, sizes: [] })),
@@ -991,10 +1003,12 @@ export default function PortalProductsPage() {
                     Advanced options
                   </summary>
                   <div className="mt-4 space-y-4">
-                    <CustomizationEditor
-                      value={form.customization}
-                      onChange={(customization) => setForm((current) => ({ ...current, customization }))}
-                    />
+                    {categoryHasSizes(form.categorySlug) ? (
+                      <CustomizationEditor
+                        value={form.customization}
+                        onChange={(customization) => setForm((current) => ({ ...current, customization }))}
+                      />
+                    ) : null}
                     <ColorVariantEditor
                       value={createColors}
                       onChange={setCreateColors}
@@ -1093,7 +1107,15 @@ export default function PortalProductsPage() {
                     onChange={(event) => {
                       const categorySlug = event.target.value;
                       setEditDraft((current) =>
-                        current ? { ...current, categorySlug } : current,
+                        current
+                          ? {
+                              ...current,
+                              categorySlug,
+                              ...(categorySlug === "gifting"
+                                ? { customization: defaultCustomizationConfig() }
+                                : {}),
+                            }
+                          : current,
                       );
                       if (!categoryHasSizes(categorySlug)) {
                         setEditColors((current) =>
@@ -1111,13 +1133,15 @@ export default function PortalProductsPage() {
                   ))}
                 </select>
               </label>
-              <CustomizationEditor
-                compact
-                value={editDraft.customization}
-                onChange={(customization) =>
-                  setEditDraft((current) => (current ? { ...current, customization } : current))
-                }
-              />
+              {categoryHasSizes(editDraft.categorySlug) ? (
+                <CustomizationEditor
+                  compact
+                  value={editDraft.customization}
+                  onChange={(customization) =>
+                    setEditDraft((current) => (current ? { ...current, customization } : current))
+                  }
+                />
+              ) : null}
               <ColorVariantEditor
                 compact
                 value={editColors}

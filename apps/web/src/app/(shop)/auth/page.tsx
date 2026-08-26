@@ -15,12 +15,17 @@ function AuthForm() {
   const next = safeNextPath(searchParams.get("next"));
   const authError = searchParams.get("error");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [resetMode, setResetMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [message, setMessage] = useState<string | null>(
-    authError ? "This sign-in link is invalid or has expired. Please request a new one." : null,
+    authError
+      ? "This sign-in link is invalid or has expired. Please request a new one."
+      : searchParams.get("reset") === "success"
+        ? "Your password has been updated. You can sign in now."
+        : null,
   );
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -71,6 +76,23 @@ function AuthForm() {
     });
 
     setMessage(error ? error.message : "Check your email for a secure sign-in link.");
+    setLinkLoading(false);
+  }
+
+  async function sendPasswordReset() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setMessage("Enter a valid email address first.");
+      return;
+    }
+
+    setLinkLoading(true);
+    setMessage(null);
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback?flow=password-reset&next=${encodeURIComponent("/auth/reset-password")}`;
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, { redirectTo });
+
+    setMessage(error ? error.message : "If an account exists for that email, you’ll receive a password reset link.");
     setLinkLoading(false);
   }
 
@@ -126,10 +148,39 @@ function AuthForm() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-14 sm:px-6">
-      <h1 className="font-display text-4xl text-ink">{title}</h1>
+      <h1 className="font-display text-4xl text-ink">{resetMode ? "Reset your password" : title}</h1>
       <p className="mt-2 text-sm text-muted">
-        Sign in with Google, or use email and password.
+        {resetMode ? "Enter your email and we’ll send you a secure reset link." : "Sign in with Google, or use email and password."}
       </p>
+
+      {resetMode ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void sendPasswordReset();
+          }}
+          className="mt-6 space-y-4 rounded-[1.5rem] border border-line bg-surface p-6"
+        >
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-muted">Email</span>
+            <input
+              type="email"
+              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </label>
+          {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
+          <button type="submit" disabled={linkLoading} className="w-full rounded-full bg-ink py-3 text-sm text-white disabled:opacity-50">
+            {linkLoading ? "Sending link…" : "Send reset link"}
+          </button>
+          <button type="button" onClick={() => { setResetMode(false); setMessage(null); }} className="w-full rounded-full border border-line bg-surface py-3 text-sm text-ink">
+            Back to sign in
+          </button>
+        </form>
+      ) : <>
 
       <button
         type="button"
@@ -224,16 +275,17 @@ function AuthForm() {
           {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
         </button>
         {mode === "signin" ? (
-          <button
-            type="button"
-            onClick={() => void sendSignInLink()}
-            disabled={loading || linkLoading}
-            className="w-full rounded-full border border-line bg-surface py-3 text-sm text-ink disabled:opacity-50"
-          >
-            {linkLoading ? "Sending link…" : "Email me a sign-in link"}
-          </button>
+          <>
+            <button type="button" onClick={() => void sendSignInLink()} disabled={loading || linkLoading} className="w-full rounded-full border border-line bg-surface py-3 text-sm text-ink disabled:opacity-50">
+              {linkLoading ? "Sending link…" : "Email me a sign-in link"}
+            </button>
+            <button type="button" onClick={() => { setResetMode(true); setMessage(null); }} disabled={loading || linkLoading} className="w-full text-sm text-muted underline underline-offset-4 hover:text-ink">
+              Forgot password?
+            </button>
+          </>
         ) : null}
       </form>
+      </>}
     </div>
   );
 }

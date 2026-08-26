@@ -330,7 +330,7 @@ export default function SellSetupPage() {
     if (!Number.isFinite(stock) || stock < 0) {
       errors.stock = "Enter a valid stock count.";
     }
-    if (productForm.sizes.length === 0) {
+    if (productForm.categorySlug !== "gifting" && productForm.sizes.length === 0) {
       errors.sizes = "Select at least one size.";
     }
     if (productForm.images.length === 0) {

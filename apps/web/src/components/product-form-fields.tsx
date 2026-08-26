@@ -87,7 +87,15 @@ export function ProductFormFields({
         <select
           className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
           value={value.categorySlug}
-          onChange={(e) => patch({ categorySlug: e.target.value })}
+          onChange={(e) => {
+            const categorySlug = e.target.value;
+            patch({
+              categorySlug,
+              ...(categorySlug === "gifting"
+                ? { sizes: [], customization: defaultCustomizationConfig() }
+                : {}),
+            });
+          }}
           required
         >
           <option value="">Select a category</option>
@@ -190,10 +198,12 @@ export function ProductFormFields({
         )}
       </fieldset> : null}
 
-      <CustomizationEditor
-        value={value.customization}
-        onChange={(customization) => patch({ customization })}
-      />
+      {value.categorySlug !== "gifting" ? (
+        <CustomizationEditor
+          value={value.customization}
+          onChange={(customization) => patch({ customization })}
+        />
+      ) : null}
 
       <ProductImagesField
         items={value.images}

@@ -934,6 +934,13 @@ h3,
   }
 }
 
+/* Keep featured product rails compact enough to show five cards on laptops. */
+@media (min-width: 1024px) {
+  .shop-rail-item-lg {
+    width: calc((100% - 4rem) / 5);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-rise-delay,
