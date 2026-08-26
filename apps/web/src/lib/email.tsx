@@ -8,6 +8,7 @@ import {
 import { OrderStatusEmail } from "@/emails/order-status-email";
 import { StoreNewOrderEmail } from "@/emails/store-new-order-email";
 import { DeliveryInviteEmail } from "@/emails/delivery-invite-email";
+import { LifecycleEmail } from "@/emails/lifecycle-email";
 import { deliveryPromise, formatAed, orderStatusLabel } from "@/lib/format";
 import type { OrderStatus } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,7 +20,17 @@ type NotificationEvent =
   | "order_confirmation"
   | "order_status"
   | "store_new_order"
-  | "delivery_invite";
+  | "delivery_invite"
+  | LifecycleEmailKind
+  | "store_payment_failed"
+  | "store_order_cancelled"
+  | "store_delivery_failed"
+  | "store_order_delivered";
+
+export type LifecycleEmailKind =
+  | "payment_failed"
+  | "delivery_failed"
+  | "review_request";
 
 type OrderEmailRecord = {
   id: string;
@@ -75,7 +86,24 @@ async function reserveNotification(
   });
 
   if (!error) return true;
-  if (error.code === "23505") return false;
+  if (error.code === "23505") {
+    const { data: existing, error: lookupError } = await admin
+      .from("email_notifications")
+      .select("status")
+      .eq("event_type", eventType)
+      .eq("entity_id", entityId)
+      .maybeSingle();
+    if (lookupError) throw new Error(`Unable to inspect email notification: ${lookupError.message}`);
+    if (existing?.status === "sent") return false;
+    const { error: resetError } = await admin
+      .from("email_notifications")
+      .update({ status: "pending", error_message: null })
+      .eq("event_type", eventType)
+      .eq("entity_id", entityId)
+      .eq("status", "failed");
+    if (resetError) throw new Error(`Unable to retry email notification: ${resetError.message}`);
+    return true;
+  }
   throw new Error(`Unable to reserve email notification: ${error.message}`);
 }
 
@@ -288,10 +316,11 @@ export async function sendOrderConfirmationEmail(orderId: string) {
   }
 }
 
-export async function sendOrderStatusEmail(orderId: string) {
+export async function sendOrderStatusEmail(orderId: string, statusOverride?: OrderStatus) {
   const order = await getOrderEmailRecord(orderId);
+  const status = statusOverride ?? order.status;
   const recipient = await getRecipient(order.shopper_id);
-  const eventId = `${order.id}:${order.status}`;
+  const eventId = `${order.id}:${status}`;
   const reserved = await reserveNotification(
     "order_status",
     eventId,
@@ -305,12 +334,12 @@ export async function sendOrderStatusEmail(orderId: string) {
     const resendId = await sendWithRetry("order_status", eventId, {
       from,
       to: [recipient.email],
-      subject: `Your Morni order ${order.order_number} is ${orderStatusLabel(order.status).toLowerCase()}`,
+      subject: `Your Morni order ${order.order_number} is ${orderStatusLabel(status).toLowerCase()}`,
       react: OrderStatusEmail({
         name: recipient.name,
         orderNumber: order.order_number,
-        statusLabel: orderStatusLabel(order.status),
-        statusMessage: statusMessage(order.status),
+        statusLabel: orderStatusLabel(status),
+        statusMessage: statusMessage(status),
         orderUrl: `${siteUrl}/orders/${order.id}`,
       }),
     });
@@ -404,6 +433,157 @@ export async function sendStoreNewOrderEmails(orderId: string) {
   }
 
   return { sent, failed, skipped };
+}
+
+export async function sendLifecycleEmail(
+  kind: LifecycleEmailKind,
+  orderId: string,
+  detail?: string | null,
+) {
+  const order = await getOrderEmailRecord(orderId);
+  const recipient = await getRecipient(order.shopper_id);
+  const reserved = await reserveNotification(kind, orderId, order.shopper_id, recipient.email);
+  if (!reserved) return { sent: false, reason: "already_sent" as const };
+
+  const content = {
+    payment_failed: {
+      subject: `Payment needed for Morni order ${order.order_number}`,
+      preview: `Payment for order ${order.order_number} needs your attention.`,
+      title: "Payment needs your attention",
+      message: "We couldn’t confirm your payment. Your order is still waiting, so please return to checkout and try again.",
+      action: "Retry payment",
+      path: `/checkout/pay/${order.id}`,
+    },
+    delivery_failed: {
+      subject: `A delivery update for Morni order ${order.order_number}`,
+      preview: `We need your help completing order ${order.order_number}.`,
+      title: "We need your help with delivery",
+      message: detail?.trim() || "Your rider could not complete delivery. Please open your order for the latest next step.",
+      action: "Open your order",
+      path: `/orders/${order.id}`,
+    },
+    review_request: {
+      subject: `How did your Morni order ${order.order_number} go?`,
+      preview: `Your Morni order has arrived — tell us what you think.`,
+      title: "How did we do?",
+      message: "Your order has arrived. A quick review helps independent UAE boutiques and helps other shoppers discover something special.",
+      action: "Leave a review",
+      path: `/orders/${order.id}`,
+    },
+  }[kind];
+
+  try {
+    const { from } = getMailer();
+    const resendId = await sendWithRetry(kind, orderId, {
+      from,
+      to: [recipient.email],
+      subject: content.subject,
+      react: LifecycleEmail({
+        name: recipient.name,
+        orderNumber: order.order_number,
+        preview: content.preview,
+        title: content.title,
+        message: content.message,
+        action: { label: content.action, href: `${siteUrl}${content.path}` },
+      }),
+    });
+    await finishNotification(kind, orderId, resendId);
+    return { sent: true, resendId };
+  } catch (error) {
+    await finishNotification(kind, orderId, null, error instanceof Error ? error.message : "Unknown email error");
+    throw error;
+  }
+}
+
+export async function processEmailOutbox(limit = 25) {
+  const admin = createAdminClient();
+  const { data: jobs, error } = await admin
+    .from("email_outbox")
+    .select("id, event_type, order_id, detail, attempts")
+    .is("sent_at", null)
+    .lt("attempts", 8)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(`Unable to load email outbox: ${error.message}`);
+
+  let sent = 0;
+  let failed = 0;
+  for (const job of jobs ?? []) {
+    const { data: claimed, error: claimError } = await admin
+      .from("email_outbox")
+      .update({ attempts: (job.attempts ?? 0) + 1 })
+      .eq("id", job.id)
+      .is("sent_at", null)
+      .eq("attempts", job.attempts ?? 0)
+      .select("id")
+      .maybeSingle();
+    if (claimError || !claimed) continue;
+
+    try {
+      if (job.event_type === "order_status") await sendOrderStatusEmail(job.order_id, job.detail as OrderStatus);
+      if (job.event_type === "payment_failed") await sendLifecycleEmail("payment_failed", job.order_id);
+      if (job.event_type === "delivery_failed") await sendLifecycleEmail("delivery_failed", job.order_id, job.detail);
+      if (job.event_type === "review_request") await sendLifecycleEmail("review_request", job.order_id);
+      if (job.event_type === "store_payment_failed") await sendStoreOrderAlertEmails(job.order_id, "payment_failed");
+      if (job.event_type === "store_order_cancelled") await sendStoreOrderAlertEmails(job.order_id, "cancelled");
+      if (job.event_type === "store_delivery_failed") await sendStoreOrderAlertEmails(job.order_id, "delivery_failed", job.detail);
+      if (job.event_type === "store_order_delivered") await sendStoreOrderAlertEmails(job.order_id, "delivered");
+      await admin.from("email_outbox").update({ sent_at: new Date().toISOString(), last_error: null }).eq("id", job.id);
+      sent += 1;
+    } catch (sendError) {
+      failed += 1;
+      await admin.from("email_outbox").update({ last_error: sendError instanceof Error ? sendError.message : "Unknown email error" }).eq("id", job.id);
+      console.error("Email outbox job failed", { id: job.id, eventType: job.event_type, error: sendError });
+    }
+  }
+  return { inspected: jobs?.length ?? 0, sent, failed };
+}
+
+async function sendStoreOrderAlertEmails(
+  orderId: string,
+  kind: "payment_failed" | "cancelled" | "delivery_failed" | "delivered",
+  detail?: string | null,
+) {
+  const order = await getOrderEmailRecord(orderId);
+  const memberIds = await getStoreMemberIds(order.store_id);
+  const content = {
+    payment_failed: ["Payment failed", "Payment for this order could not be confirmed. Review the order before taking action."],
+    cancelled: ["Order cancelled", "This order has been cancelled. Review the order and any required fulfilment or refund action."],
+    delivery_failed: ["Delivery needs attention", detail?.trim() || "The rider reported a delivery issue. Open the order to coordinate the next step."],
+    delivered: ["Order delivered", "The rider has completed delivery. The shopper can now leave a verified review."],
+  }[kind];
+
+  for (const memberId of memberIds) {
+    const recipient = await getRecipient(memberId);
+    const event = ({
+      payment_failed: "store_payment_failed",
+      cancelled: "store_order_cancelled",
+      delivery_failed: "store_delivery_failed",
+      delivered: "store_order_delivered",
+    } as const)[kind];
+    const eventId = `${order.id}:${memberId}`;
+    if (!(await reserveNotification(event, eventId, memberId, recipient.email))) continue;
+    try {
+      const { from } = getMailer();
+      const resendId = await sendWithRetry(event, eventId, {
+        from,
+        to: [recipient.email],
+        subject: `${content[0]} for Morni order ${order.order_number}`,
+        react: LifecycleEmail({
+          name: recipient.name,
+          orderNumber: order.order_number,
+          preview: `${content[0]} for order ${order.order_number}.`,
+          title: content[0],
+          message: content[1],
+          action: { label: "Open store orders", href: `${siteUrl}/portal/orders` },
+        }),
+      });
+      await finishNotification(event, eventId, resendId);
+    } catch (error) {
+      await finishNotification(event, eventId, null, error instanceof Error ? error.message : "Unknown email error");
+      throw error;
+    }
+  }
 }
 
 function recipientId(order: OrderEmailRecord) {
