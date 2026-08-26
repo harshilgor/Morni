@@ -24,7 +24,6 @@ import {
 } from "@/lib/media-upload";
 import {
   getOnboardingChecklist,
-  isStoreLaunchReady,
 } from "@/lib/onboarding";
 import {
   ensureStoreCategory,
@@ -448,20 +447,46 @@ export default function SellSetupPage() {
 
   async function launchStore() {
     if (!store) return;
-    if (!isStoreLaunchReady(store, products)) {
-      setMessage("Finish every checklist item before launching.");
-      return;
-    }
 
     setBusy(true);
     setMessage(null);
     const supabase = createClient();
-    const { error: launchError } = await supabase.rpc("launch_owned_store", {
+    const { data: readiness, error: readinessError } = await supabase.rpc(
+      "get_owned_store_launch_readiness",
+      { p_store_id: store.id },
+    );
+
+    if (readinessError) {
+      setMessage(readinessError.message);
+      setBusy(false);
+      return;
+    }
+
+    const readinessResult = readiness as { ready?: boolean; blockers?: string[] } | null;
+    if (!readinessResult?.ready) {
+      setMessage(
+        readinessResult?.blockers?.join(" ") ??
+          "Finish the required store setup before launching.",
+      );
+      setBusy(false);
+      return;
+    }
+
+    const { data: launchedStore, error: launchError } = await supabase.rpc(
+      "launch_owned_store",
+      {
       p_store_id: store.id,
-    });
+      },
+    );
 
     if (launchError) {
       setMessage(launchError.message);
+      setBusy(false);
+      return;
+    }
+
+    if (!(launchedStore as Store | null)?.is_active) {
+      setMessage("Launch did not complete. Please try again or contact support.");
       setBusy(false);
       return;
     }
@@ -746,7 +771,7 @@ export default function SellSetupPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={busy || !isStoreLaunchReady(store, products)}
+                  disabled={busy}
                   onClick={launchStore}
                   className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-mint disabled:opacity-50 sm:flex-none"
                 >
