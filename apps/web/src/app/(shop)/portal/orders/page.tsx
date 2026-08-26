@@ -25,8 +25,10 @@ const FILTERS: { status: "all" | OrderStatus; label: string }[] = [
 
 const FLOW: OrderStatus[] = ["placed", "accepted", "picking", "out_for_delivery", "delivered"];
 type OrderFilter = "all" | "preparing" | OrderStatus;
-type DeliveryJobSummary = { id: string; status: "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled" };
+type DeliveryProofSummary = { id: string; storage_path: string; created_at: string };
+type DeliveryJobSummary = { id: string; status: "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled"; delivery_proofs?: DeliveryProofSummary[] | null };
 type OrderWithItems = Order & { order_items?: OrderItem[] | null; delivery_jobs?: DeliveryJobSummary[] | null };
+type PickupHandoff = { id: string; status: "pending" | "verified" | "expired"; otp_code: string; requested_at: string };
 
 function dueText(order: Order) {
   const due = new Date(new Date(order.placed_at).getTime() + order.delivery_eta_minutes * 60000);
@@ -58,10 +60,13 @@ export default function PortalOrdersPage() {
   const [mobileOrderId, setMobileOrderId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [pickupHandoff, setPickupHandoff] = useState<PickupHandoff | null>(null);
+  const [proofUrls, setProofUrls] = useState<string[]>([]);
   const deferredQuery = useDeferredValue(query);
+  const selectedOrder = orders.find((order) => order.id === selectedId) ?? null;
 
   const loadOrders = useCallback(async (storeId: string) => {
-    const { data } = await createClient().from("orders").select("*, order_items(*), delivery_jobs(id, status)").eq("store_id", storeId).order("placed_at", { ascending: false });
+    const { data } = await createClient().from("orders").select("*, order_items(*), delivery_jobs(id, status, delivery_proofs(id, storage_path, created_at))").eq("store_id", storeId).order("placed_at", { ascending: false });
     const rows = (data as OrderWithItems[]) ?? [];
     setOrders(rows);
     setSelectedId((current) => current && rows.some((order) => order.id === current) ? current : rows.find((order) => order.status === "placed")?.id ?? rows[0]?.id ?? null);
@@ -77,9 +82,34 @@ export default function PortalOrdersPage() {
   useEffect(() => {
     if (!store) return;
     const supabase = createClient();
-    const channel = supabase.channel(`portal-orders-${store.id}`).on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${store.id}` }, () => void loadOrders(store.id)).subscribe();
+    const channel = supabase.channel(`portal-orders-${store.id}`).on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${store.id}` }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_handoffs" }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_proofs" }, () => void loadOrders(store.id)).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [loadOrders, store]);
+
+  useEffect(() => {
+    const job = selectedOrder?.delivery_jobs?.[0];
+    if (!job || job.status !== "at_pickup") { window.queueMicrotask(() => setPickupHandoff(null)); return; }
+    let active = true;
+    const check = async () => {
+      const { data } = await createClient().rpc("store_delivery_handoff", { p_delivery_job_id: job.id });
+      const next = data as PickupHandoff | { status: "not_requested" } | null;
+      if (active && next && next.status === "pending" && "otp_code" in next) setPickupHandoff(next);
+    };
+    void check();
+    const interval = window.setInterval(() => void check(), 5000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, [selectedOrder]);
+
+  useEffect(() => {
+    const proofs = selectedOrder?.delivery_jobs?.[0]?.delivery_proofs ?? [];
+    if (!proofs.length) { window.queueMicrotask(() => setProofUrls([])); return; }
+    let active = true;
+    void Promise.all(proofs.map(async (proof) => {
+      const { data } = await createClient().storage.from("delivery-proofs").createSignedUrl(proof.storage_path, 3600);
+      return data?.signedUrl ?? null;
+    })).then((urls) => { if (active) setProofUrls(urls.filter((url): url is string => Boolean(url))); });
+    return () => { active = false; };
+  }, [selectedOrder]);
 
   const visibleOrders = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
@@ -89,7 +119,6 @@ export default function PortalOrdersPage() {
       return matchesStatus && matchesQuery;
     });
   }, [deferredQuery, orders, statusFilter]);
-  const selectedOrder = orders.find((order) => order.id === selectedId) ?? null;
   const mobileOrder = visibleOrders.find((order) => order.id === mobileOrderId) ?? null;
   const stats = useMemo(() => ({
     newOrders: orders.filter((order) => order.status === "placed").length,
@@ -158,10 +187,12 @@ export default function PortalOrdersPage() {
       {message ? <p role="status" className="border-b border-[#c9e7d4] bg-[#f1faf5] px-5 py-3 text-sm text-[#277044]">{message}</p> : null}
       {orders.length === 0 ? <div className="p-5"><PortalEmpty icon="orders" title="Your queue is clear" description="When customers order from your store, the next step will be ready right here." /></div> : <>
         <div className="sm:hidden">
-          {mobileOrder ? <div><button type="button" onClick={() => setMobileOrderId(null)} className="flex w-full items-center gap-2 border-b border-[#edf1ef] px-4 py-3 text-sm font-semibold text-[#42675c]"><PortalIcon name="arrow" className="h-3.5 w-3.5 rotate-180" />All orders</button><OrderDetail order={mobileOrder} onAdvance={advance} onReadyForPickup={markReadyForPickup} updatingId={updatingId} onCopyAddress={copyAddress} /></div> : <MobileOrderList orders={visibleOrders} onSelect={(order) => { setSelectedId(order.id); setMobileOrderId(order.id); }} />}
+          {mobileOrder ? <div><button type="button" onClick={() => setMobileOrderId(null)} className="flex w-full items-center gap-2 border-b border-[#edf1ef] px-4 py-3 text-sm font-semibold text-[#42675c]"><PortalIcon name="arrow" className="h-3.5 w-3.5 rotate-180" />All orders</button><OrderDetail order={mobileOrder} proofUrls={mobileOrder.id === selectedId ? proofUrls : []} onAdvance={advance} onReadyForPickup={markReadyForPickup} updatingId={updatingId} onCopyAddress={copyAddress} /></div> : <MobileOrderList orders={visibleOrders} onSelect={(order) => { setSelectedId(order.id); setMobileOrderId(order.id); }} />}
         </div>
-        <div className="hidden min-h-[34rem] sm:grid xl:grid-cols-[minmax(0,1fr)_24rem]"><div className="min-w-0 overflow-x-auto"><table className="portal-table min-w-[740px] w-full text-left"><thead className="bg-[#fbfdfc]"><tr><th className="px-5 py-3">Order</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Due</th><th className="px-5 py-3 text-right">Total</th></tr></thead><tbody>{visibleOrders.map((order) => <tr key={order.id} onClick={() => setSelectedId(order.id)} className={`cursor-pointer transition hover:bg-[#f8faf9] ${selectedId === order.id ? "bg-[#edf7f3]" : ""}`}><td className="px-5 py-4"><p className="text-sm font-semibold text-[#263530]">{order.order_number}</p><p className="mt-1 text-xs text-[#7b8882]">{placedText(order.placed_at)} · {(order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0)} item{(order.order_items ?? []).reduce((sum, item) => item.quantity + sum, 0) === 1 ? "" : "s"}</p></td><td className="px-4 py-4"><p className="text-sm text-[#34423d]">{order.delivery_area}</p><p className="mt-1 text-xs text-[#7b8882]">{order.delivery_emirate.replace("_", " ")}</p></td><td className="px-4 py-4"><StatusBadge status={order.status} /></td><td className={`px-4 py-4 text-xs font-semibold ${dueText(order).includes("overdue") ? "text-[#b55a36]" : "text-[#65746e]"}`}>{dueText(order)}</td><td className="px-5 py-4 text-right text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</td></tr>)}</tbody></table>{visibleOrders.length === 0 ? <div className="p-8 text-center text-sm text-[#7b8882]">No orders match these filters.</div> : null}</div><OrderDetail order={selectedOrder} onAdvance={advance} onReadyForPickup={markReadyForPickup} updatingId={updatingId} onCopyAddress={copyAddress} /></div>
-      </>}</section>
+        <div className="hidden min-h-[34rem] sm:grid xl:grid-cols-[minmax(0,1fr)_24rem]"><div className="min-w-0 overflow-x-auto"><table className="portal-table min-w-[740px] w-full text-left"><thead className="bg-[#fbfdfc]"><tr><th className="px-5 py-3">Order</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Due</th><th className="px-5 py-3 text-right">Total</th></tr></thead><tbody>{visibleOrders.map((order) => <tr key={order.id} onClick={() => setSelectedId(order.id)} className={`cursor-pointer transition hover:bg-[#f8faf9] ${selectedId === order.id ? "bg-[#edf7f3]" : ""}`}><td className="px-5 py-4"><p className="text-sm font-semibold text-[#263530]">{order.order_number}</p><p className="mt-1 text-xs text-[#7b8882]">{placedText(order.placed_at)} · {(order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0)} item{(order.order_items ?? []).reduce((sum, item) => item.quantity + sum, 0) === 1 ? "" : "s"}</p></td><td className="px-4 py-4"><p className="text-sm text-[#34423d]">{order.delivery_area}</p><p className="mt-1 text-xs text-[#7b8882]">{order.delivery_emirate.replace("_", " ")}</p></td><td className="px-4 py-4"><StatusBadge status={order.status} /></td><td className={`px-4 py-4 text-xs font-semibold ${dueText(order).includes("overdue") ? "text-[#b55a36]" : "text-[#65746e]"}`}>{dueText(order)}</td><td className="px-5 py-4 text-right text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</td></tr>)}</tbody></table>{visibleOrders.length === 0 ? <div className="p-8 text-center text-sm text-[#7b8882]">No orders match these filters.</div> : null}</div><OrderDetail order={selectedOrder} proofUrls={proofUrls} onAdvance={advance} onReadyForPickup={markReadyForPickup} updatingId={updatingId} onCopyAddress={copyAddress} /></div>
+      </>}
+      {pickupHandoff ? <div className="fixed inset-0 z-50 grid place-items-center bg-[#132c2a]/45 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-[1.5rem] bg-white p-6 text-center shadow-2xl"><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#fff1df] text-[#b55a36]"><PortalIcon name="package" className="h-5 w-5" /></span><p className="mt-4 text-[10px] font-bold uppercase tracking-[0.15em] text-[#b55a36]">Pickup handoff</p><h2 className="mt-1 text-2xl font-semibold text-[#19342b]">Give this code to the rider</h2><p className="mt-2 text-sm leading-6 text-[#64736c]">The rider requested a pickup verification code for this order.</p><p className="mt-5 rounded-xl bg-[#fff7ed] py-4 text-4xl font-bold tracking-[0.3em] text-[#8a4b2c]">{pickupHandoff.otp_code}</p><button type="button" onClick={() => setPickupHandoff(null)} className="mt-5 min-h-11 w-full rounded-xl border border-[#dce5e0] px-4 py-2.5 text-sm font-semibold text-[#42675c]">Close</button></div></div> : null}
+    </section>
   </div>;
 }
 
@@ -183,7 +214,7 @@ function MobileOrderList({ orders, onSelect }: { orders: OrderWithItems[]; onSel
   </ol>;
 }
 
-function OrderDetail({ order, onAdvance, onReadyForPickup, updatingId, onCopyAddress }: { order: OrderWithItems | null; onAdvance: (order: OrderWithItems) => void; onReadyForPickup: (order: OrderWithItems) => void; updatingId: string | null; onCopyAddress: (order: Order) => void }) {
+function OrderDetail({ order, proofUrls, onAdvance, onReadyForPickup, updatingId, onCopyAddress }: { order: OrderWithItems | null; proofUrls: string[]; onAdvance: (order: OrderWithItems) => void; onReadyForPickup: (order: OrderWithItems) => void; updatingId: string | null; onCopyAddress: (order: Order) => void }) {
   if (!order) return <aside className="border-l border-[#edf1ef] bg-[#fbfdfc] p-5"><p className="text-sm text-[#7b8882]">Select an order to see its delivery and fulfilment details.</p></aside>;
   const next = NEXT_STATUS[order.status];
   const currentIndex = FLOW.indexOf(order.status);
@@ -198,6 +229,7 @@ function OrderDetail({ order, onAdvance, onReadyForPickup, updatingId, onCopyAdd
     {deliveryJob ? <div className="mt-5 rounded-lg border border-[#cfe5dc] bg-[#f2f9f5] px-3 py-3"><p className="portal-eyebrow text-[#3f7567]">Delivery dispatch</p><p className="mt-1 text-sm font-semibold capitalize text-[#245448]">{deliveryJob.status.replaceAll("_", " ")}</p><p className="mt-1 text-xs leading-5 text-[#5b756b]">Morni automatically assigns an eligible delivery partner and rider. You will be notified when the rider collects this order.</p></div> : null}
     <div className="mt-6 border-t border-[#e5ece8] pt-5"><div className="flex items-center justify-between"><p className="portal-eyebrow">Delivery</p><span className={`text-xs font-semibold ${dueText(order).includes("overdue") ? "text-[#b55a36]" : "text-[#477064]"}`}>{dueText(order)}</span></div><p className="mt-2 text-sm font-medium leading-6 text-[#34423d]">{orderAddress(order)}</p>{order.delivery_notes ? <p className="mt-2 rounded-lg bg-[#f2f6f3] px-3 py-2 text-xs leading-5 text-[#5a6d66]">“{order.delivery_notes}”</p> : null}<div className="mt-3 flex flex-wrap gap-2">{order.delivery_phone ? <a href={`tel:${order.delivery_phone}`} className="portal-button-secondary text-xs"><PortalIcon name="phone" className="h-3.5 w-3.5" />Call customer</a> : null}<button type="button" onClick={() => onCopyAddress(order)} className="portal-button-secondary text-xs">Copy address</button></div></div>
     <div className="mt-6 border-t border-[#e5ece8] pt-5"><p className="portal-eyebrow">Items</p><ul className="mt-3 space-y-3">{order.order_items?.length ? order.order_items.map((item) => { const measurements = formatCustomizationValues(null, item.customization); return <li key={item.id} className="flex gap-3 text-sm"><span className="grid h-6 min-w-6 place-items-center rounded-md bg-[#edf3f0] text-[11px] font-bold text-[#3c685c]">{item.quantity}</span><span className="min-w-0 flex-1"><span className="block font-medium text-[#34423d]">{item.title}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{[item.color_name, item.size ? `Size ${item.size}` : null].filter(Boolean).join(" · ") || "Standard"}</span>{measurements.length ? <span className="mt-1 block rounded-md bg-[#fff8f3] px-2 py-1 text-[11px] leading-5 text-[#8a5a42]">Custom: {measurements.map((measurement) => `${measurement.label} ${measurement.value}`).join(" · ")}</span> : null}</span><span className="text-xs font-semibold text-[#5b6a64]">{formatAed(item.line_total_aed)}</span></li>; }) : <li className="text-sm text-[#7b8882]">No items listed.</li>}</ul><div className="mt-4 flex justify-between border-t border-[#e5ece8] pt-3 text-sm font-semibold text-[#263530]"><span>Order total</span><span>{formatAed(order.total_aed)}</span></div></div>
+    {proofUrls.length ? <div className="mt-6 border-t border-[#e5ece8] pt-5"><div className="flex items-center justify-between gap-3"><p className="portal-eyebrow">Proof of delivery</p><span className="text-xs font-semibold text-[#277044]">{proofUrls.length} photo{proofUrls.length === 1 ? "" : "s"}</span></div><div className="mt-3 grid grid-cols-3 gap-2">{proofUrls.map((url, index) => <a key={url} href={url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-lg border border-[#dce5e0] bg-white"><img src={url} alt={`Delivery proof ${index + 1}`} className="aspect-square h-full w-full object-cover" /></a>)}</div><p className="mt-2 text-xs leading-5 text-[#718079]">The rider uploaded these parcel photos before delivery verification.</p></div> : null}
     <button type="button" onClick={() => window.print()} className="mt-5 flex w-full items-center justify-center gap-2 text-xs font-semibold text-[#65746e] hover:text-[#2f6f66]"><PortalIcon name="external" className="h-3.5 w-3.5" />Print order details</button>
   </aside>;
 }

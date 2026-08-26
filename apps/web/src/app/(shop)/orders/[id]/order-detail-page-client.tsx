@@ -21,6 +21,7 @@ type OrderStore = {
 type OrderWithStore = Order & {
   stores: OrderStore | OrderStore[] | null;
 };
+type DeliveryCode = { status: "pending"; otp_code: string };
 
 function resolveStore(stores: OrderWithStore["stores"]): OrderStore | null {
   if (!stores) return null;
@@ -40,6 +41,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<OrderWithStore | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [deliveryCode, setDeliveryCode] = useState<DeliveryCode | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const paymentFlash = searchParams.get("paid") === "1"
     ? "paid"
@@ -84,6 +86,29 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
       setReviews((reviewData as ProductReview[]) ?? []);
     })();
   }, [orderId, reloadKey]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`order-tracking-${orderId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` }, () => setReloadKey((value) => value + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" }, () => setReloadKey((value) => value + 1))
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!order || order.status !== "out_for_delivery") { window.queueMicrotask(() => setDeliveryCode(null)); return; }
+    let active = true;
+    const checkCode = async () => {
+      const { data } = await createClient().rpc("shopper_delivery_handoff_code", { p_order_id: order.id });
+      const next = data as DeliveryCode | { status: "not_requested" } | null;
+      if (active) setDeliveryCode(next && next.status === "pending" && "otp_code" in next ? next : null);
+    };
+    void checkCode();
+    const interval = window.setInterval(() => void checkCode(), 5000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, [order]);
 
   if (!order) {
     return <div className="mx-auto max-w-3xl px-4 py-14 text-muted">Loading…</div>;
@@ -254,6 +279,14 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
         ) : null}
         {order.delivery_notes ? (
           <p className="mt-2 text-muted">Notes: {order.delivery_notes}</p>
+        ) : null}
+        {deliveryCode ? (
+          <div className="mt-5 rounded-2xl border border-[#b9d9c7] bg-[#f0faf3] p-4 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#277044]">Delivery verification</p>
+            <h3 className="mt-1 text-lg font-semibold text-[#19342b]">Show this code to your rider</h3>
+            <p className="mt-1 text-sm text-[#5d7268]">Your order is on the way. The rider needs this code to complete delivery.</p>
+            <p className="mt-4 rounded-xl bg-white py-3 text-3xl font-bold tracking-[0.3em] text-[#155C4B]">{deliveryCode.otp_code}</p>
+          </div>
         ) : null}
       </div>
     </div>

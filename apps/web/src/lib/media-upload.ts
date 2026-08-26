@@ -7,7 +7,7 @@ export const PRODUCT_IMAGE_LIMIT = 5;
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-export type MediaBucket = "store-logos" | "product-images";
+export type MediaBucket = "store-logos" | "product-images" | "delivery-proofs";
 
 export type ValidatedImage = {
   file: File;
@@ -118,4 +118,36 @@ export async function uploadProductImages(options: {
     urls.push(url);
   }
   return urls;
+}
+
+export async function uploadDeliveryProof(options: { deliveryJobId: string; file: File }) {
+  const error = validateImageFile(options.file);
+  if (error) throw new Error(error);
+
+  const supabase = createClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) throw new Error(`Could not verify your session: ${userError.message}`);
+  if (!user) throw new Error("Sign in before uploading delivery proof.");
+
+  const safeName = sanitizeFileName(options.file.name);
+  const uploadId = typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const path = `${options.deliveryJobId}/${uploadId}-${safeName}`;
+  const { error: uploadError } = await supabase.storage
+    .from("delivery-proofs")
+    .upload(path, options.file, { upsert: false, contentType: options.file.type });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { error: proofError } = await supabase.from("delivery_proofs").insert({
+    delivery_job_id: options.deliveryJobId,
+    storage_path: path,
+    content_type: options.file.type,
+    captured_by: user.id,
+  });
+  if (proofError) {
+    await supabase.storage.from("delivery-proofs").remove([path]);
+    throw new Error(proofError.message);
+  }
+  return path;
 }
