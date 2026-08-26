@@ -23,7 +23,8 @@ export function getOnboardingChecklist(
       product.description?.trim() &&
       product.price_aed > 0 &&
       (product.image_urls?.length ?? 0) > 0 &&
-      (product.sizes?.length ?? 0) > 0,
+      (product.category?.slug === "gifting" ||
+        (product.sizes?.length ?? 0) > 0),
   );
 
   return [

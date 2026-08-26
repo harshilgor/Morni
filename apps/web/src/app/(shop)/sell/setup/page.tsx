@@ -130,7 +130,7 @@ export default function SellSetupPage() {
           setProductForm({
             title: first.title ?? "",
             description: first.description ?? "",
-            categorySlug: "",
+            categorySlug: first.category?.slug ?? "",
             price_aed: String(first.price_aed ?? ""),
             compare_at_price_aed: first.compare_at_price_aed
               ? String(first.compare_at_price_aed)
@@ -157,7 +157,7 @@ export default function SellSetupPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("products")
-      .select("*")
+      .select("*, categories(name, slug)")
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
     const next = (data as Product[]) ?? [];

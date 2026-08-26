@@ -67,6 +67,7 @@ export type Product = {
   id: string;
   store_id: string;
   category_id: string | null;
+  category?: { name?: string | null; slug?: string | null } | null;
   title: string;
   description: string | null;
   price_aed: number;
