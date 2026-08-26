@@ -29,7 +29,7 @@ export function PortalBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { store } = useOwnerStore();
-  const newOrderCount = useNewOrderCount(store?.id);
+  const newOrderCount = useNewOrderCount(store?.id, "bottom-nav");
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {

@@ -73,7 +73,7 @@ export function PortalNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { store } = useOwnerStore();
-  const newOrderCount = useNewOrderCount(store?.id);
+  const newOrderCount = useNewOrderCount(store?.id, "sidebar");
 
   async function signOut() {
     await createClient().auth.signOut();

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 /** Keeps order-navigation badges in sync with orders awaiting acceptance. */
-export function useNewOrderCount(storeId?: string) {
+export function useNewOrderCount(storeId?: string, channelScope = "portal") {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export function useNewOrderCount(storeId?: string) {
 
     const supabase = createClient();
     const channel = supabase
-      .channel(`portal-new-order-count-${storeId}`)
+      .channel(`portal-new-order-count-${channelScope}-${storeId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${storeId}` },
@@ -40,7 +40,7 @@ export function useNewOrderCount(storeId?: string) {
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [storeId]);
+  }, [channelScope, storeId]);
 
   return count;
 }
