@@ -55,6 +55,7 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const paymentMethod = "card" as const;
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
@@ -111,6 +112,10 @@ export default function CheckoutPage() {
     }
     if (!cardPaymentsEnabled) {
       setPlaceError("Online card payments are temporarily unavailable. Please try again later.");
+      return;
+    }
+    if (!legalAccepted) {
+      setPlaceError("Please review and accept the Customer Terms & Conditions and Privacy Policy.");
       return;
     }
 
@@ -732,10 +737,14 @@ export default function CheckoutPage() {
           <span>Total</span>
           <span>{formatAed(orderTotal)}</span>
         </div>
+        <label className="mt-5 flex items-start gap-2 text-xs leading-5 text-muted">
+          <input type="checkbox" checked={legalAccepted} onChange={(event) => setLegalAccepted(event.target.checked)} className="mt-1" />
+          <span>I have read and agree to the <Link href="/terms" className="font-semibold text-ink underline underline-offset-2">Customer Terms &amp; Conditions</Link> and acknowledge the <Link href="/privacy" className="font-semibold text-ink underline underline-offset-2">Privacy Policy</Link>.</span>
+        </label>
         {placeError ? <p className="mt-4 text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
         <button
           type="button"
-          disabled={placing || !cardPaymentsEnabled || (!mobileAddressReady && authed !== false)}
+          disabled={placing || !cardPaymentsEnabled || !legalAccepted || (!mobileAddressReady && authed !== false)}
           onClick={() => void placeOrder()}
           className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >

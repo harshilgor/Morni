@@ -1,15 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useAuthUser } from "@/lib/use-auth-user";
 export function SiteFooter() {
-  const pathname = usePathname();
   const { auth } = useAuthUser();
-
-  if (pathname !== "/") {
-    return null;
-  }
 
   const accountLinks = auth
     ? [
@@ -98,6 +92,10 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-white/45 sm:px-5">
           <span>© {new Date().getFullYear()} Morni · Real Magic Trading LLC</span>
+          <span className="flex gap-4">
+            <Link href="/terms" className="transition hover:text-white">Customer Terms</Link>
+            <Link href="/privacy" className="transition hover:text-white">Privacy Policy</Link>
+          </span>
         </div>
       </div>
     </footer>
