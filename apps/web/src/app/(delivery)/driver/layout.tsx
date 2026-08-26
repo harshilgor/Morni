@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export const instant = false;
 
 export const viewport: Viewport = {
-  themeColor: "#213d33",
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -31,7 +31,7 @@ export default function DriverLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="min-h-dvh bg-[#f6f7f5] text-[#19342b] [padding:env(safe-area-inset-top)_env(safe-area-inset-right)_env(safe-area-inset-bottom)_env(safe-area-inset-left)]">
+    <div className="driver-experience min-h-dvh [padding:env(safe-area-inset-top)_env(safe-area-inset-right)_env(safe-area-inset-bottom)_env(safe-area-inset-left)]">
       {children}
     </div>
   );

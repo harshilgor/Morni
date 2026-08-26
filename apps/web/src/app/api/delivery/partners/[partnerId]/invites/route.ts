@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendDeliveryInviteEmail } from "@/lib/email";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type InviteRole = "dispatcher" | "driver";
@@ -37,12 +38,30 @@ export async function POST(
   const inviteUrl = new URL(joinPath, request.url);
   inviteUrl.searchParams.set("token", invite.token);
 
+  // Generate the Supabase link without using its mailer. Resend then delivers
+  // the same secure, one-click access link alongside the delivery invitation.
+  const callbackUrl = new URL("/auth/callback", request.url);
+  callbackUrl.searchParams.set("flow", role === "driver" ? "driver" : "partner");
+  callbackUrl.searchParams.set("next", `${joinPath}?token=${encodeURIComponent(invite.token)}`);
+  const { data: authLink, error: authLinkError } = await createAdminClient().auth.admin.generateLink({
+    type: "magiclink",
+    email,
+    options: { redirectTo: callbackUrl.toString() },
+  });
+  if (authLinkError || !authLink.properties?.action_link) {
+    console.error("Unable to generate delivery access link", { partnerId, email, error: authLinkError });
+    return NextResponse.json(
+      { error: "Invite created, but the secure access link could not be generated. Please try again." },
+      { status: 500 },
+    );
+  }
+
   try {
     await sendDeliveryInviteEmail({
       email,
       partnerName: invite.partner_name,
       role,
-      inviteUrl: inviteUrl.toString(),
+      accessUrl: authLink.properties.action_link,
       inviteToken: invite.token,
     });
     return NextResponse.json({

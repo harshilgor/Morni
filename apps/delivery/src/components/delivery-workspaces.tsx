@@ -91,9 +91,13 @@ export function PartnerWorkspace() {
     if (!data) return;
     setSendingInvite(true); setInviteError(null); setInviteUrl(null);
     const response = await fetch(`/api/delivery/partners/${data.partner.id}/invites`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, role }) });
-    const payload = (await response.json().catch(() => null)) as { inviteUrl?: string; error?: string } | null;
+    const payload = (await response.json().catch(() => null)) as { inviteUrl?: string; emailSent?: boolean; error?: string } | null;
     if (!response.ok || !payload?.inviteUrl) setInviteError(payload?.error ?? "Unable to create the invite.");
-    else { setInviteUrl(payload.inviteUrl); setEmail(""); }
+    else {
+      setInviteUrl(payload.inviteUrl);
+      if (!payload.emailSent) setInviteError(payload.error ?? "The access email could not be sent. Copy the backup invite link instead.");
+      setEmail("");
+    }
     setSendingInvite(false);
   }
 

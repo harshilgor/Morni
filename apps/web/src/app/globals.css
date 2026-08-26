@@ -110,6 +110,136 @@ body.portal-mode {
   background: #eef2f0 !important;
 }
 
+/* Rider workspace: a focused, map-first delivery surface. Scoped here so the
+   shopper, founder, and delivery-partner workspaces retain their own systems. */
+.driver-experience {
+  background: #f3f3f3;
+  color: #000;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.driver-experience .driver-app,
+.driver-experience .driver-loading,
+.driver-experience .driver-access {
+  background: #f3f3f3;
+  color: #000;
+}
+
+.driver-experience > main:not(.driver-app):not(.driver-sign-in) {
+  background: #f3f3f3 !important;
+}
+
+.driver-experience > main:not(.driver-app):not(.driver-sign-in) > section {
+  border-color: #dedede !important;
+  border-radius: 0.875rem !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%) !important;
+}
+
+.driver-experience .driver-app h1,
+.driver-experience .driver-app h2,
+.driver-experience .driver-app h3,
+.driver-experience .driver-access h1 {
+  color: #000 !important;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.driver-experience .driver-app > header {
+  border-color: #000 !important;
+  background: #000 !important;
+  color: #fff;
+}
+
+.driver-experience .driver-app > header p,
+.driver-experience .driver-app > header span,
+.driver-experience .driver-app > header button {
+  color: #fff !important;
+}
+
+.driver-experience .driver-app > header button {
+  border-color: #424242 !important;
+  background: #1f1f1f !important;
+}
+
+.driver-experience .driver-map,
+.driver-experience .driver-job-card,
+.driver-experience .driver-app section[class*="rounded-2xl"],
+.driver-experience .driver-access section {
+  border-color: #dedede !important;
+  border-radius: 0.875rem !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%) !important;
+}
+
+.driver-experience .driver-map iframe {
+  filter: grayscale(1) contrast(1.08);
+}
+
+.driver-experience .driver-map > div:first-child,
+.driver-experience .driver-job-card > div:first-child {
+  border-color: #dedede !important;
+}
+
+.driver-experience .driver-job-card [class*="bg-[#F97316]"],
+.driver-experience .driver-job-card [class*="bg-[#16824B]"],
+.driver-experience .driver-job-card [class*="bg-[#155C4B]"],
+.driver-experience .driver-map [class*="bg-[#155C4B]"] {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+.driver-experience .driver-job-card [class*="text-[#132C2A]"] {
+  color: #fff !important;
+}
+
+.driver-experience .driver-app [class*="text-[#4e8875]"],
+.driver-experience .driver-app [class*="text-[#487767]"] {
+  color: #6b6b6b !important;
+}
+
+.driver-experience nav[aria-label="Rider sections"] {
+  border-color: #dedede !important;
+  background: rgb(255 255 255 / 96%) !important;
+}
+
+.driver-experience nav[aria-label="Rider sections"] button[aria-current="page"] {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+.driver-experience .driver-app button:focus-visible,
+.driver-experience .driver-app a:focus-visible,
+.driver-experience nav[aria-label="Rider sections"] button:focus-visible {
+  outline: 3px solid #276ef1;
+  outline-offset: 2px;
+}
+
+.driver-experience .driver-sign-in > div {
+  border-color: #dedede !important;
+  border-radius: 0.875rem !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%) !important;
+}
+
+.driver-experience .driver-sign-in h1 {
+  color: #000 !important;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.driver-experience .driver-sign-in button[type="submit"] {
+  background: #000 !important;
+}
+
+@media (max-width: 639px) {
+  .driver-experience .driver-app > header {
+    position: sticky;
+  }
+
+  .driver-experience .driver-map,
+  .driver-experience .driver-job-card {
+    border-radius: 0.75rem !important;
+  }
+}
+
 .portal-shell {
   --background: #ffffff;
   --surface: #ffffff;

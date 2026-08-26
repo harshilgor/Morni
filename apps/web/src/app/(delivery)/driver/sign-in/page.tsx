@@ -78,7 +78,7 @@ function DriverSignInForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-10">
+    <main className="driver-sign-in mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-10">
       <div className="rounded-2xl border border-[#dce5e0] bg-white p-6 shadow-[0_24px_70px_-40px_rgba(25,42,35,0.45)]">
         <span className="grid h-12 w-12 place-items-center rounded-xl border border-[#dce5e0] bg-[#f6f7f5] p-2">
           <BrandMark className="h-full w-full object-contain" />

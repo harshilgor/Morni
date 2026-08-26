@@ -249,13 +249,13 @@ export async function sendDeliveryInviteEmail({
   email,
   partnerName,
   role,
-  inviteUrl,
+  accessUrl,
   inviteToken,
 }: {
   email: string;
   partnerName: string;
   role: "dispatcher" | "driver";
-  inviteUrl: string;
+  accessUrl: string;
   inviteToken: string;
 }) {
   const { from } = getMailer();
@@ -263,7 +263,7 @@ export async function sendDeliveryInviteEmail({
     from,
     to: [email],
     subject: `Welcome to Morni delivery with ${partnerName}`,
-    react: DeliveryInviteEmail({ partnerName, role, joinUrl: inviteUrl }),
+    react: DeliveryInviteEmail({ partnerName, role, accessUrl }),
   });
 
   return { sent: true, resendId };

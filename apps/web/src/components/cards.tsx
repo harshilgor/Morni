@@ -1,11 +1,11 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Store } from "@/lib/types";
 import { emirateLabel, formatAed } from "@/lib/format";
 import { formatRatingLabel, type ProductRatingSummary } from "@/lib/product-ratings";
 import { StarRating } from "@/components/star-rating";
 import { WishlistToggle } from "@/components/wishlist-toggle";
 import { NewStoreBadge } from "@/components/new-store-badge";
+import { ProductCardImage } from "@/components/product-card-image";
 
 export function StoreCard({ store, compact = false }: { store: Store; compact?: boolean }) {
   return (
@@ -91,16 +91,7 @@ export function ProductCard({
             : "relative aspect-[4/5] overflow-hidden rounded-md bg-sand sm:rounded-xl"
         }
       >
-        {image ? (
-          <Image
-            src={image}
-            alt={product.title}
-            fill
-            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 180px"
-            priority={priority}
-            className="object-cover transition duration-500 group-hover:scale-[1.04]"
-          />
-        ) : null}
+        <ProductCardImage src={image} alt={product.title} priority={priority} />
         {!sharp ? (
           <div className="absolute right-1.5 top-1.5 z-10 sm:right-2.5 sm:top-2.5">
             <WishlistToggle
