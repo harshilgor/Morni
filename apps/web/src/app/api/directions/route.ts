@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
-const OSRM = "https://router.project-osrm.org/route/v1/driving";
+const GOOGLE_ROUTES = "https://routes.googleapis.com/directions/v2:computeRoutes";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -21,28 +21,48 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Provide valid start and destination coordinates." }, { status: 400 });
   }
 
-  const url = `${OSRM}/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&steps=true&annotations=false`;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return NextResponse.json({ error: "Google Maps is not configured." }, { status: 503 });
+
   try {
-    const response = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000), next: { revalidate: 0 } });
+    const response = await fetch(GOOGLE_ROUTES, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.geoJsonLinestring,routes.legs.steps.distanceMeters,routes.legs.steps.navigationInstruction.instructions",
+      },
+      body: JSON.stringify({
+        origin: { location: { latLng: { latitude: fromLat, longitude: fromLng } } },
+        destination: { location: { latLng: { latitude: toLat, longitude: toLng } } },
+        travelMode: "DRIVE",
+        routingPreference: "TRAFFIC_AWARE",
+        polylineEncoding: "GEO_JSON_LINESTRING",
+        languageCode: "en",
+        units: "METRIC",
+      }),
+      signal: AbortSignal.timeout(7000),
+      next: { revalidate: 0 },
+    });
     if (!response.ok) return NextResponse.json({ error: "Directions are temporarily unavailable." }, { status: 502 });
     const payload = await response.json() as {
-      code?: string;
       routes?: Array<{
-        distance: number;
-        duration: number;
-        geometry?: { coordinates?: Array<[number, number]> };
-        legs?: Array<{ steps?: Array<{ distance: number; duration: number; name?: string; maneuver?: { type?: string; modifier?: string } }> }>;
+        distanceMeters?: number;
+        duration?: string;
+        polyline?: { geoJsonLinestring?: { coordinates?: Array<[number, number]> } };
+        legs?: Array<{ steps?: Array<{ distanceMeters?: number; navigationInstruction?: { instructions?: string } }> }>;
       }>;
     };
     const route = payload.routes?.[0];
-    if (payload.code !== "Ok" || !route) return NextResponse.json({ error: "No drivable route was found." }, { status: 404 });
-    const steps = (route.legs ?? []).flatMap((leg) => leg.steps ?? []).filter((step) => step.distance > 5).slice(0, 8).map((step) => ({
-      name: step.name || "Unnamed road",
-      distanceMeters: Math.round(step.distance),
-      durationSeconds: Math.round(step.duration),
-      instruction: [step.maneuver?.type, step.maneuver?.modifier].filter(Boolean).join(" ") || "Continue",
+    if (!route) return NextResponse.json({ error: "No drivable route was found." }, { status: 404 });
+    const durationSeconds = Number.parseInt(route.duration?.replace(/s$/, "") ?? "0", 10);
+    const steps = (route.legs ?? []).flatMap((leg) => leg.steps ?? []).filter((step) => (step.distanceMeters ?? 0) > 5).slice(0, 8).map((step) => ({
+      name: "Google Maps route",
+      distanceMeters: Math.round(step.distanceMeters ?? 0),
+      durationSeconds: 0,
+      instruction: step.navigationInstruction?.instructions || "Continue",
     }));
-    return NextResponse.json({ distanceMeters: Math.round(route.distance), durationSeconds: Math.round(route.duration), geometry: route.geometry?.coordinates ?? [], steps }, { headers: { "Cache-Control": "private, max-age=30" } });
+    return NextResponse.json({ distanceMeters: Math.round(route.distanceMeters ?? 0), durationSeconds, geometry: route.polyline?.geoJsonLinestring?.coordinates ?? [], steps }, { headers: { "Cache-Control": "private, max-age=30" } });
   } catch {
     return NextResponse.json({ error: "Directions lookup failed." }, { status: 500 });
   }

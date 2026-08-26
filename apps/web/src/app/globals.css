@@ -113,20 +113,20 @@ body.portal-mode {
 /* Rider workspace: a focused, map-first delivery surface. Scoped here so the
    shopper, founder, and delivery-partner workspaces retain their own systems. */
 .driver-experience {
-  background: #f3f3f3;
-  color: #000;
+  background: #f5f7fa;
+  color: #111827;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .driver-experience .driver-app,
 .driver-experience .driver-loading,
 .driver-experience .driver-access {
-  background: #f3f3f3;
-  color: #000;
+  background: #f5f7fa;
+  color: #111827;
 }
 
 .driver-experience > main:not(.driver-app):not(.driver-sign-in) {
-  background: #f3f3f3 !important;
+  background: #f5f7fa !important;
 }
 
 .driver-experience > main:not(.driver-app):not(.driver-sign-in) > section {
@@ -139,26 +139,26 @@ body.portal-mode {
 .driver-experience .driver-app h2,
 .driver-experience .driver-app h3,
 .driver-experience .driver-access h1 {
-  color: #000 !important;
+  color: #111827 !important;
   font-weight: 700;
   letter-spacing: -0.035em;
 }
 
 .driver-experience .driver-app > header {
-  border-color: #000 !important;
-  background: #000 !important;
-  color: #fff;
+  border-color: #e5e9ef !important;
+  background: #fff !important;
+  color: #111827;
 }
 
 .driver-experience .driver-app > header p,
 .driver-experience .driver-app > header span,
 .driver-experience .driver-app > header button {
-  color: #fff !important;
+  color: #111827 !important;
 }
 
 .driver-experience .driver-app > header button {
-  border-color: #424242 !important;
-  background: #1f1f1f !important;
+  border-color: #e5e9ef !important;
+  background: #fff !important;
 }
 
 .driver-experience .driver-map,
@@ -171,7 +171,28 @@ body.portal-mode {
 }
 
 .driver-experience .driver-map iframe {
-  filter: grayscale(1) contrast(1.08);
+  filter: none;
+}
+
+/* The reference screens use one clear content column, generous white cards,
+   and blue route affordances over a quiet gray canvas. */
+.driver-experience .driver-app > div[class*="max-w-6xl"] {
+  max-width: 72rem;
+}
+
+.driver-experience .driver-app > div[class*="max-w-6xl"] > div:first-child {
+  display: none !important;
+}
+
+.driver-experience .driver-app > header button[aria-label="Refresh deliveries"] {
+  display: none !important;
+}
+
+.driver-experience .driver-map,
+.driver-experience .driver-job-card,
+.driver-experience .driver-app section[class*="rounded-2xl"] {
+  background: #fff !important;
+  border-radius: 1.25rem !important;
 }
 
 .driver-experience .driver-map > div:first-child,
@@ -183,7 +204,7 @@ body.portal-mode {
 .driver-experience .driver-job-card [class*="bg-[#16824B]"],
 .driver-experience .driver-job-card [class*="bg-[#155C4B]"],
 .driver-experience .driver-map [class*="bg-[#155C4B]"] {
-  background: #000 !important;
+  background: #0a84e5 !important;
   color: #fff !important;
 }
 
@@ -202,7 +223,7 @@ body.portal-mode {
 }
 
 .driver-experience nav[aria-label="Rider sections"] button[aria-current="page"] {
-  background: #000 !important;
+  background: #0a84e5 !important;
   color: #fff !important;
 }
 

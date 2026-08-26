@@ -2,28 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
-const NOMINATIM = "https://nominatim.openstreetmap.org";
-const UA = "MorniMarketplace/1.0 (store-location; https://morni-eosin.vercel.app)";
+const GOOGLE_GEOCODE = "https://geocode.googleapis.com/v4/geocode";
 const LOOKUP_HEADERS = {
   "Cache-Control": "private, max-age=60",
 };
 
-type NominatimResult = {
-  lat: string;
-  lon: string;
-  display_name: string;
-  address?: {
-    suburb?: string;
-    neighbourhood?: string;
-    city_district?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    state?: string;
-    road?: string;
-    house_number?: string;
-    building?: string;
-  };
+function googleConfigurationError() {
+  return NextResponse.json(
+    { error: "Google Geocoding is unavailable. Enable the Geocoding API and billing for this Google Cloud project, then check the key restrictions." },
+    { status: 503, headers: LOOKUP_HEADERS },
+  );
+}
+
+type GoogleGeocodeResult = {
+  formattedAddress?: string;
+  location?: { latitude?: number; longitude?: number };
+  addressComponents?: Array<{ longText?: string; types?: string[] }>;
 };
 
 function mapEmirate(state?: string): string | null {
@@ -39,18 +33,20 @@ function mapEmirate(state?: string): string | null {
   return null;
 }
 
-function normalize(hit: NominatimResult) {
-  const a = hit.address ?? {};
-  const area =
-    a.suburb || a.neighbourhood || a.city_district || a.town || a.village || "";
-  const streetParts = [a.house_number, a.road, a.building].filter(Boolean);
+function component(hit: GoogleGeocodeResult, type: string) {
+  return hit.addressComponents?.find((item) => item.types?.includes(type))?.longText ?? "";
+}
+
+function normalize(hit: GoogleGeocodeResult) {
+  const area = component(hit, "sublocality_level_1") || component(hit, "locality") || component(hit, "administrative_area_level_2");
+  const streetParts = [component(hit, "street_number"), component(hit, "route")].filter(Boolean);
   return {
-    lat: Number(hit.lat),
-    lng: Number(hit.lon),
-    label: hit.display_name,
+    lat: Number(hit.location?.latitude),
+    lng: Number(hit.location?.longitude),
+    label: hit.formattedAddress ?? "",
     area,
     street: streetParts.join(" "),
-    emirate: mapEmirate(a.state),
+    emirate: mapEmirate(component(hit, "administrative_area_level_1")),
   };
 }
 
@@ -71,6 +67,8 @@ export async function GET(request: NextRequest) {
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
   const hasCoordinates = lat !== null || lng !== null;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return NextResponse.json({ error: "Google Maps is not configured." }, { status: 503, headers: LOOKUP_HEADERS });
 
   try {
     if (hasCoordinates) {
@@ -91,25 +89,23 @@ export async function GET(request: NextRequest) {
           { status: 400, headers: LOOKUP_HEADERS },
         );
       }
-      const url = new URL(`${NOMINATIM}/reverse`);
-      url.searchParams.set("lat", String(latitude));
-      url.searchParams.set("lon", String(longitude));
-      url.searchParams.set("format", "json");
-      url.searchParams.set("addressdetails", "1");
+      const url = new URL(`${GOOGLE_GEOCODE}/location/${latitude},${longitude}`);
 
       const res = await fetch(url, {
-        headers: { "User-Agent": UA, Accept: "application/json" },
+        headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "results.formattedAddress,results.location,results.addressComponents", Accept: "application/json" },
         next: { revalidate: 0 },
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) return googleConfigurationError();
         return NextResponse.json(
           { error: "Could not reverse-geocode location." },
           { status: 502, headers: LOOKUP_HEADERS },
         );
       }
-      const data = (await res.json()) as NominatimResult;
-      return NextResponse.json({ results: [normalize(data)] }, { headers: LOOKUP_HEADERS });
+      const data = (await res.json()) as { results?: GoogleGeocodeResult[] };
+      if (!data.results?.[0]) return NextResponse.json({ error: "Could not reverse-geocode location." }, { status: 502, headers: LOOKUP_HEADERS });
+      return NextResponse.json({ results: [normalize(data.results[0])] }, { headers: LOOKUP_HEADERS });
     }
 
     if (!q || q.length < 2 || q.length > 160) {
@@ -119,26 +115,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const url = new URL(`${NOMINATIM}/search`);
-    url.searchParams.set("q", q);
-    url.searchParams.set("countrycodes", "ae");
-    url.searchParams.set("format", "json");
-    url.searchParams.set("addressdetails", "1");
-    url.searchParams.set("limit", "6");
+    const url = new URL(`${GOOGLE_GEOCODE}/address/${encodeURIComponent(q)}`);
 
     const res = await fetch(url, {
-      headers: { "User-Agent": UA, Accept: "application/json" },
+      headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "results.formattedAddress,results.location,results.addressComponents", Accept: "application/json" },
       next: { revalidate: 0 },
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403) return googleConfigurationError();
       return NextResponse.json(
         { error: "Could not search locations." },
         { status: 502, headers: LOOKUP_HEADERS },
       );
     }
-    const data = (await res.json()) as NominatimResult[];
-    return NextResponse.json({ results: data.map(normalize) }, { headers: LOOKUP_HEADERS });
+    const data = (await res.json()) as { results?: GoogleGeocodeResult[] };
+    return NextResponse.json({ results: (data.results ?? []).slice(0, 6).map(normalize) }, { headers: LOOKUP_HEADERS });
   } catch {
     return NextResponse.json(
       { error: "Location lookup failed." },

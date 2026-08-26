@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from "react";
+import { useRef } from "react";
+import Script from "next/script";
 import { PortalIcon } from "@/components/portal-icons";
 
 type MapJob = {
@@ -24,6 +26,10 @@ type Route = { distanceMeters: number; durationSeconds: number; geometry: Array<
 
 function destinationFor(job: MapJob) {
   return [job.delivery_street, job.delivery_building, job.delivery_apartment, job.delivery_area, job.delivery_emirate, "UAE"].filter(Boolean).join(", ");
+}
+
+export function DriverMap(props: DriverMapProps) {
+  return <MapErrorBoundary><DriverMapInner {...props} /></MapErrorBoundary>;
 }
 
 function boundsFor(points: Point[]): Bounds {
@@ -54,7 +60,20 @@ function durationLabel(seconds: number) {
   return `${Math.max(1, Math.round(seconds / 60))} min`;
 }
 
-export function DriverMap({ job, driverLat, driverLng, locationUpdatedAt, online, updating, onRefreshLocation }: { job: MapJob | null; driverLat: number | null; driverLng: number | null; locationUpdatedAt: string | null; online: boolean; updating: boolean; onRefreshLocation: () => void }) {
+type DriverMapProps = { job: MapJob | null; driverLat: number | null; driverLng: number | null; locationUpdatedAt: string | null; online: boolean; updating: boolean; onRefreshLocation: () => void };
+
+class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(_error: unknown, _info: ErrorInfo) {}
+  render() {
+    return this.state.hasError ? <div className="grid h-full min-h-[18rem] place-items-center bg-[#e8eef5] px-8 text-center"><div><p className="text-sm font-semibold text-[#33473e]">Map preview unavailable</p><p className="mt-1 text-xs text-[#718079]">Use “Open navigation” for turn-by-turn directions.</p></div></div> : this.props.children;
+  }
+}
+
+function DriverMapInner({ job, driverLat, driverLng, locationUpdatedAt, online, updating, onRefreshLocation }: DriverMapProps) {
+  const mapHostRef = useRef<HTMLDivElement>(null);
+  const [googleReady, setGoogleReady] = useState(false);
   const [dropoff, setDropoff] = useState<{ lat: number; lng: number } | null>(null);
   const [geocoding, setGeocoding] = useState(false);
   const [route, setRoute] = useState<Route | null>(null);
@@ -99,11 +118,35 @@ export function DriverMap({ job, driverLat, driverLng, locationUpdatedAt, online
   }, [job, online, routeFrom?.lat, routeFrom?.lng, routeTo?.lat, routeTo?.lng]);
 
   const bounds = useMemo(() => points.length ? boundsFor(points) : null, [points]);
-  const mapUrl = useMemo(() => {
-    if (!bounds || !points.length) return null;
-    const marker = points.find((point) => point.id === (goingToDropoff ? "dropoff" : "pickup")) ?? points[0];
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${bounds.west}%2C${bounds.south}%2C${bounds.east}%2C${bounds.north}&layer=mapnik&marker=${marker.lat}%2C${marker.lng}`;
-  }, [bounds, goingToDropoff, points]);
+  useEffect(() => {
+    if (!googleReady || !bounds || !mapHostRef.current) return;
+    let active = true;
+    void (async () => {
+      try {
+        const maps = (window as Window & { google?: { maps?: { importLibrary?: (name: string) => Promise<unknown> } } }).google?.maps;
+        if (!maps?.importLibrary) return;
+        const library = await maps.importLibrary("maps") as {
+          Map: new (element: HTMLElement, options: Record<string, unknown>) => { fitBounds: (bounds: unknown) => void };
+          LatLngBounds: new () => { extend: (point: { lat: number; lng: number }) => void };
+        };
+        if (!active || !mapHostRef.current || typeof library.Map !== "function") return;
+        const map = new library.Map(mapHostRef.current, {
+          center: { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 },
+          zoom: 13,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+        });
+        const viewport = new library.LatLngBounds();
+        points.forEach((point) => viewport.extend({ lat: point.lat, lng: point.lng }));
+        map.fitBounds(viewport);
+      } catch {
+        // A restricted key or older mobile browser should not crash the rider portal.
+      }
+    })();
+    return () => { active = false; if (mapHostRef.current) mapHostRef.current.replaceChildren(); };
+  }, [bounds, googleReady, points]);
   const mapsTarget = goingToDropoff && dropoff ? `${dropoff.lat},${dropoff.lng}` : job?.store_lat != null && job.store_lng != null ? `${job.store_lat},${job.store_lng}` : job?.store_address ?? destination;
   const mapsHref = `https://www.google.com/maps/dir/?api=1${driverLat != null && driverLng != null ? `&origin=${driverLat},${driverLng}` : ""}&destination=${encodeURIComponent(mapsTarget)}`;
   const routeLine = route?.geometry.map(([lng, lat]) => markerStyle({ lat, lng }, bounds ?? { north: 1, south: 0, east: 1, west: 0 })).map((style) => `${parseFloat(style.left)} ${parseFloat(style.top)}`).join(",");
@@ -114,8 +157,8 @@ export function DriverMap({ job, driverLat, driverLng, locationUpdatedAt, online
       <div className="flex gap-2"><a href={mapsHref} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#155C4B] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#0F4639]"><PortalIcon name="location" className="h-3.5 w-3.5" />Open navigation</a><button type="button" onClick={onRefreshLocation} disabled={!online || updating} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#cfdcd5] px-3 py-2 text-xs font-semibold text-[#3f6155] transition hover:bg-[#f5f8f6] disabled:opacity-50"><PortalIcon name="refresh" className={updating ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />{updating ? "Updating…" : "Refresh"}</button></div>
     </div>
     {job ? <div className="grid gap-2 border-b border-[#e8efeb] bg-[#f7faf8] px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-5"><span className={`grid h-7 w-7 place-items-center rounded-full text-[11px] font-bold ${goingToDropoff ? "bg-[#dceafd] text-[#2b6cb0]" : "bg-[#fff0df] text-[#b85a10]"}`}>{goingToDropoff ? "2" : "1"}</span><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#708078]">{goingToDropoff ? "Deliver to" : "Pick up from"}</p><p className="mt-0.5 truncate text-sm font-semibold text-[#33473e]">{goingToDropoff ? destination : job.store_address}</p></div><span className="text-[11px] font-semibold text-[#5b7469]">{route ? `${distanceLabel(route.distanceMeters)} · ${durationLabel(route.durationSeconds)}` : routeLoading ? "Calculating…" : "Route ready"}</span></div> : null}
-    <div className="relative h-[18rem] overflow-hidden bg-[#FFF4D6] sm:h-[23rem]">
-      {mapUrl ? <iframe title="Driver road map" src={mapUrl} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" /> : <div className="grid h-full place-items-center px-8 text-center"><div><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-[#4e8875] shadow-sm"><PortalIcon name="location" className="h-5 w-5" /></span><p className="mt-3 text-sm font-semibold text-[#33473e]">Waiting for a location pin</p><p className="mt-1 max-w-xs text-xs leading-5 text-[#718079]">Allow location access and tap “Refresh” to place yourself on the map.</p></div></div>}
+    <div className="relative h-[18rem] overflow-hidden bg-[#e8eef5] sm:h-[23rem]">
+      {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && points.length ? <><Script id="google-maps-js" src={`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)}&libraries=maps&v=weekly&auth_referrer_policy=origin`} strategy="afterInteractive" onLoad={() => setGoogleReady(true)} onError={() => setGoogleReady(false)} /><div ref={mapHostRef} className="h-full w-full" />{!googleReady ? <div className="absolute inset-0 grid place-items-center bg-[#e8eef5]/90 px-8 text-center"><p className="text-sm font-semibold text-[#33473e]">Loading Google Maps…</p></div> : null}</> : <div className="grid h-full place-items-center px-8 text-center"><div><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-[#4e8875] shadow-sm"><PortalIcon name="location" className="h-5 w-5" /></span><p className="mt-3 text-sm font-semibold text-[#33473e]">Waiting for a location pin</p><p className="mt-1 max-w-xs text-[11px] leading-5 text-[#718079]">Allow location access and tap “Refresh” to place yourself on the map.</p></div></div>}
       {bounds && routeLine ? <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points={routeLine} fill="none" stroke="white" strokeWidth="2.7" vectorEffect="non-scaling-stroke" opacity="0.9" /><polyline points={routeLine} fill="none" stroke={goingToDropoff ? "#2B6CB0" : "#F97316"} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" /></svg> : null}
       {bounds ? <div className="pointer-events-none absolute inset-0">{points.map((point) => <span key={point.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={markerStyle(point, bounds)}><span className={`flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold text-white shadow-lg ${point.tone}`}><span className="h-1.5 w-1.5 rounded-full bg-white" />{point.label}</span></span>)}</div> : null}
       {routeLoading ? <span className="absolute right-2 top-2 rounded-lg bg-white/90 px-2.5 py-1.5 text-[10px] font-bold text-[#376f5c] shadow-sm">Finding best road route…</span> : null}
@@ -128,3 +171,5 @@ export function DriverMap({ job, driverLat, driverLng, locationUpdatedAt, online
     </div>
   </section>;
 }
+
+
