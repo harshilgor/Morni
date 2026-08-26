@@ -78,7 +78,7 @@ export function StatusBadge({ status }: { status: OrderStatus | "low_stock" | "l
     paused: "Paused",
     draft: "Needs setup",
   };
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${styles[status]}`}>{labels[status] ?? orderStatusLabel(status)}</span>;
+  return <span className={`inline-flex shrink-0 whitespace-nowrap items-center rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4 ring-1 ring-inset ${styles[status]}`}>{labels[status] ?? orderStatusLabel(status)}</span>;
 }
 
 export function PortalEmpty({

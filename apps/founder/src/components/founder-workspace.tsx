@@ -16,8 +16,8 @@ type FounderDeliveryData = {
   generated_at: string;
   metrics: { active_jobs: number; waiting_jobs: number; exceptions: number; available_drivers: number };
   partners: Array<{ id: string; name: string; is_active: boolean; auto_dispatch_enabled: boolean; active_jobs: number; available_drivers: number; total_drivers: number }>;
-  drivers: Array<{ id: string; display_name: string; partner_name: string; availability: "offline" | "available" | "assigned" | "paused"; is_active: boolean; last_location_at: string | null }>;
-  jobs: Array<{ id: string; order_number: string; status: DeliveryJobStatus; store_name: string; pickup_area: string; delivery_area: string; partner_name: string | null; driver_name: string | null; attempts: number; ready_at: string; failure_reason: string | null }>;
+  drivers: Array<{ id: string; display_name: string; partner_name: string; availability: "offline" | "available" | "assigned" | "paused"; is_active: boolean; last_location_at: string | null; last_lat: number | null; last_lng: number | null }>;
+  jobs: Array<{ id: string; order_number: string; status: DeliveryJobStatus; store_name: string; pickup_area: string; delivery_area: string; partner_name: string | null; driver_name: string | null; attempts: number; ready_at: string; failure_reason: string | null; store_lat: number | null; store_lng: number | null; delivery_street: string; delivery_building: string | null; delivery_apartment: string | null; delivery_emirate: string | null }>;
 };
 
 type FounderData = {
@@ -464,6 +464,44 @@ function DeliveryStatusPill({ status }: { status: DeliveryJobStatus }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${styles[status]}`}>{deliveryStatusText[status]}</span>;
 }
 
+function LiveDeliveryMap({ data }: { data: FounderDeliveryData }) {
+  const [customerPins, setCustomerPins] = useState<Array<{ id: string; lat: number; lng: number; label: string }>>([]);
+  const moving = data.jobs.filter((job) => ["assigned", "accepted", "at_pickup", "collected"].includes(job.status));
+  useEffect(() => {
+    let active = true;
+    void Promise.all(moving.map(async (job) => {
+      const address = [job.delivery_street, job.delivery_building, job.delivery_apartment, job.delivery_area, job.delivery_emirate, "UAE"].filter(Boolean).join(", ");
+      const response = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`);
+      const payload = response.ok ? await response.json() as { results?: Array<{ lat: number; lng: number }> } : null;
+      const result = payload?.results?.[0];
+      return result && Number.isFinite(result.lat) && Number.isFinite(result.lng) ? { id: job.id, lat: result.lat, lng: result.lng, label: job.order_number } : null;
+    })).then((pins) => { if (active) setCustomerPins(pins.filter((pin): pin is { id: string; lat: number; lng: number; label: string } => pin !== null)); }).catch(() => { if (active) setCustomerPins([]); });
+    return () => { active = false; };
+  }, [data.jobs]);
+  const points = [
+    ...data.drivers.filter((driver) => driver.last_lat != null && driver.last_lng != null).map((driver) => ({ id: `driver-${driver.id}`, lat: driver.last_lat!, lng: driver.last_lng!, label: driver.display_name, type: "driver" as const })),
+    ...data.jobs.filter((job) => job.store_lat != null && job.store_lng != null).map((job) => ({ id: `store-${job.id}`, lat: job.store_lat!, lng: job.store_lng!, label: job.store_name, type: "store" as const })),
+    ...customerPins.map((pin) => ({ ...pin, id: `customer-${pin.id}`, type: "customer" as const })),
+  ];
+  const bounds = points.length ? {
+    north: Math.max(...points.map((point) => point.lat)) + 0.012,
+    south: Math.min(...points.map((point) => point.lat)) - 0.012,
+    east: Math.max(...points.map((point) => point.lng)) + 0.015,
+    west: Math.min(...points.map((point) => point.lng)) - 0.015,
+  } : null;
+  const position = (lat: number, lng: number) => bounds ? { left: `${Math.min(92, Math.max(8, ((lng - bounds.west) / (bounds.east - bounds.west)) * 100))}%`, top: `${Math.min(88, Math.max(12, ((bounds.north - lat) / (bounds.north - bounds.south)) * 100))}%` } : {};
+
+  return <Panel className="overflow-hidden">
+    <div className="flex flex-wrap items-start justify-between gap-4 p-5 sm:p-6"><SectionTitle title="Live delivery map" detail="Drivers, pickup points, and orders currently moving through the network." /><div className="flex gap-2 text-[11px] font-semibold"><span className="rounded-full bg-[#e5f5eb] px-2.5 py-1 text-[#277044]">{data.drivers.filter((driver) => driver.last_location_at).length} live riders</span><span className="rounded-full bg-[#fff1dc] px-2.5 py-1 text-[#9c5b05]">{data.metrics.waiting_jobs} waiting</span></div></div>
+    <div className="relative h-[27rem] overflow-hidden border-y border-[#dbe5df] bg-[#eaf2ee] sm:h-[34rem]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.54) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.54) 1px,transparent 1px),radial-gradient(circle at 74% 20%,#d6e9df,transparent 36%)", backgroundSize: "42px 42px,42px 42px,auto" }}>
+      <div className="absolute inset-x-[8%] top-[22%] h-1 rotate-[-13deg] rounded-full bg-white/75 shadow-sm" /><div className="absolute inset-x-[16%] top-[62%] h-1 rotate-[18deg] rounded-full bg-white/75 shadow-sm" /><div className="absolute left-[48%] top-[8%] h-[84%] w-1 rotate-[25deg] rounded-full bg-white/65" />
+      {bounds ? points.map((point) => <div key={point.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={position(point.lat, point.lng)}><span className={`grid h-9 w-9 place-items-center rounded-full border-2 border-white text-xs font-bold text-white shadow-lg ${point.type === "driver" ? "bg-[#276d61]" : point.type === "store" ? "bg-[#f08a32]" : "bg-[#356bb3]"}`}><PortalIcon name={point.type === "store" ? "store" : "location"} className="h-4 w-4" /></span><span className="mt-1 block max-w-28 truncate rounded bg-white/90 px-1.5 py-1 text-center text-[10px] font-bold text-[#27433a] shadow-sm">{point.label}</span></div>) : <div className="grid h-full place-items-center px-6 text-center"><div><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-[#276d61] shadow-sm"><PortalIcon name="location" className="h-5 w-5" /></span><p className="mt-3 text-sm font-semibold text-[#21342e]">Waiting for live location sharing</p><p className="mt-1 max-w-sm text-xs leading-5 text-[#687770]">Driver and store pins appear as soon as their coordinates are available.</p></div></div>}
+      <div className="absolute bottom-4 left-4 rounded-xl bg-white/95 p-3 shadow-lg backdrop-blur"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#6a7d75]">Map key</p><div className="mt-2 flex gap-3 text-[11px] font-semibold text-[#405a50]"><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#276d61]" />Rider</span><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#f08a32]" />Pickup</span><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#356bb3]" />Customer</span></div></div>
+    </div>
+    <div className="grid divide-y divide-[#e4ece8] sm:grid-cols-3 sm:divide-x sm:divide-y-0"><div className="p-4"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">Moving now</p><p className="mt-1 text-lg font-bold text-[#17231f]">{moving.length} orders</p></div><div className="p-4"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">Pickup locations</p><p className="mt-1 text-lg font-bold text-[#17231f]">{new Set(moving.map((job) => job.store_name)).size} stores</p></div><div className="p-4"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">Customer destinations</p><p className="mt-1 text-sm font-semibold text-[#17231f]">Shown inside each active order</p></div></div>
+  </Panel>;
+}
+
 function DeliveryView({ data, onRefresh }: { data: FounderDeliveryData; onRefresh: () => void }) {
   const [partnerName, setPartnerName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
@@ -592,6 +630,7 @@ function DeliveryView({ data, onRefresh }: { data: FounderDeliveryData; onRefres
         <MetricCard label="Exceptions" value={number(data.metrics.exceptions)} detail="Failed or overdue" tone={data.metrics.exceptions ? "attention" : "default"} icon="warning" />
         <MetricCard label="Riders available" value={number(data.metrics.available_drivers)} detail="Ready for pickup" icon="location" />
       </div>
+      <LiveDeliveryMap data={data} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(20rem,0.7fr)]">
         <Panel>
           <div className="p-5 sm:p-6">
@@ -650,15 +689,15 @@ function DeliveryView({ data, onRefresh }: { data: FounderDeliveryData; onRefres
               const busy = managingPartnerId === partner.id;
               const dispatching = partner.is_active && partner.auto_dispatch_enabled;
               return (
-                <div key={partner.id} className="rounded-lg border border-[#d5ddd9] bg-[#f7faf8] p-3.5">
-                  <div className="flex items-start justify-between gap-3">
+                <div key={partner.id} className="rounded-xl border border-[#d5ddd9] bg-[#f7faf8] p-4">
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-[#17231f]">{partner.name}</span>
                       <span className="mt-1 block text-xs text-[#687770]">
                         {number(partner.available_drivers)} of {number(partner.total_drivers)} riders available
                       </span>
                     </span>
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${dispatching ? "bg-[#e5f5eb] text-[#277044]" : "bg-[#f8e8e9] text-[#a3444c]"}`}>
+                    <span className={`justify-self-start whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold sm:justify-self-end ${dispatching ? "bg-[#e5f5eb] text-[#277044]" : "bg-[#f8e8e9] text-[#a3444c]"}`}>
                       {!partner.is_active ? "Inactive" : partner.auto_dispatch_enabled ? "Dispatching" : "Paused"}
                     </span>
                   </div>
