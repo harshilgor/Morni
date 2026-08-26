@@ -362,8 +362,8 @@ export default function PortalProductsPage() {
       setAiGenerated(false);
       setMessage(
         error instanceof Error
-          ? `${error.message} You can fill in the listing manually below.`
-          : "AI listing generation is unavailable. You can fill in the listing manually below.",
+          ? error.message
+          : "Could not generate a listing draft right now.",
       );
       setCreateStep(2);
     } finally {
@@ -875,17 +875,16 @@ export default function PortalProductsPage() {
               />
             ) : (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-[#c9ddd4] bg-[#f4faf7] p-4">
-                  <p className="text-sm font-semibold text-[#21463b]">
-                    {aiGenerated ? "AI draft ready for review" : "Finish your product listing"}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[#54756b]">
-                    {aiGenerated
-                      ? "Check every suggestion before publishing. You can edit anything below."
-                      : "AI suggestions are unavailable, so enter the listing details manually."
-                    }
-                  </p>
-                </div>
+                {aiGenerated ? (
+                  <div className="rounded-2xl border border-[#c9ddd4] bg-[#f4faf7] p-4">
+                    <p className="text-sm font-semibold text-[#21463b]">
+                      AI draft ready for review
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[#54756b]">
+                      Check every suggestion before publishing. You can edit anything below.
+                    </p>
+                  </div>
+                ) : null}
 
                 <label className="block space-y-1.5 text-sm">
                   <span className="font-medium text-[#40534d]">Title *</span>

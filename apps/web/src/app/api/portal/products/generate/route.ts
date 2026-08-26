@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const MAX_IMAGES = 3;
 const MAX_IMAGE_DATA_LENGTH = 5_500_000;
-const MODEL = "gemini-2.5-flash";
+const MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
 
 const requestSchema = z.object({
   storeId: z.string().uuid(),
@@ -78,11 +78,17 @@ async function generateWithGemini(options: {
     }),
   ].join("\n");
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
+  let lastError = "Gemini did not return a response.";
+
+  for (const model of MODELS) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }, ...imageParts] }],
         generationConfig: {
@@ -90,20 +96,27 @@ async function generateWithGemini(options: {
           responseMimeType: "application/json",
         },
       }),
-    },
-  );
+      },
+    );
 
-  if (!response.ok) {
-    throw new Error(`Gemini request failed with status ${response.status}.`);
+    if (response.status === 404) {
+      lastError = `Gemini model ${model} is unavailable for this API key.`;
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error(`Gemini request failed with status ${response.status}.`);
+    }
+
+    const payload = (await response.json()) as GeminiResponse;
+    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error("Gemini returned an empty listing.");
+
+    const parsed = suggestionSchema.safeParse(JSON.parse(text));
+    if (!parsed.success) throw new Error("Gemini returned an invalid listing format.");
+    return parsed.data;
   }
 
-  const payload = (await response.json()) as GeminiResponse;
-  const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Gemini returned an empty listing.");
-
-  const parsed = suggestionSchema.safeParse(JSON.parse(text));
-  if (!parsed.success) throw new Error("Gemini returned an invalid listing format.");
-  return parsed.data;
+  throw new Error(lastError);
 }
 
 export async function POST(request: NextRequest) {
@@ -178,7 +191,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Product listing generation failed", error);
     return NextResponse.json(
-      { error: "AI listing generation is unavailable right now. You can fill in the listing manually." },
+      { error: "Could not generate a listing draft right now." },
       { status: 503 },
     );
   }
