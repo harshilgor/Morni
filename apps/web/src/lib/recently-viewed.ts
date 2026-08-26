@@ -31,6 +31,8 @@ export const useRecentlyViewed = create<RecentlyViewedState>()(
         set({ items: next });
       },
     }),
-    { name: "morni-recently-viewed" },
+    // This rail can render on server pages, so defer browser storage until
+    // after React hydration to keep the initial markup deterministic.
+    { name: "morni-recently-viewed", skipHydration: true },
   ),
 );

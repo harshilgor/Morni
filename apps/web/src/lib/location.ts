@@ -119,6 +119,10 @@ export const useLocation = create<LocationState>()(
     }),
     {
       name: "morni-location",
+      // Restore a saved delivery location only after the initial React render.
+      // Otherwise a returning visitor can hydrate different header text than
+      // the server sent.
+      skipHydration: true,
       merge: (persistedState, currentState) => {
         const persisted = (persistedState ?? {}) as Partial<LocationState>;
         if (!isDeliverableEmirate(persisted.emirate)) {
