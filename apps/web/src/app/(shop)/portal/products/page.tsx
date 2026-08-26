@@ -678,7 +678,48 @@ export default function PortalProductsPage() {
         </button>
       </PortalPageHeader>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <section className="sm:hidden" aria-label="Catalog summary">
+        <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-[#dce5e0] bg-white shadow-[0_8px_24px_rgba(28,48,40,0.05)]">
+          <button
+            type="button"
+            onClick={() => {
+              setShowLowStock(false);
+              setShowHiddenOnly(false);
+            }}
+            aria-pressed={!showLowStock && !showHiddenOnly}
+            className={`min-w-0 px-2.5 py-3 text-left transition ${!showLowStock && !showHiddenOnly ? "bg-[#f3f8f5]" : "hover:bg-[#f8faf9]"}`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]"><PortalIcon name="products" className="h-3.5 w-3.5" />Live</span>
+            <span className="mt-1 block text-xl font-semibold tracking-[-0.04em] text-[#17231f]">{products.filter((product) => product.is_available).length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowLowStock(true);
+              setShowHiddenOnly(false);
+            }}
+            aria-pressed={showLowStock && !showHiddenOnly}
+            className={`min-w-0 border-x border-[#edf1ef] px-2.5 py-3 text-left transition ${showLowStock && !showHiddenOnly ? "bg-[#fff8f1]" : "hover:bg-[#f8faf9]"}`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]"><PortalIcon name="warning" className="h-3.5 w-3.5" />Low stock</span>
+            <span className={`mt-1 block text-xl font-semibold tracking-[-0.04em] ${products.some((product) => product.stock <= 5) ? "text-[#b55a36]" : "text-[#17231f]"}`}>{products.filter((product) => product.stock <= 5).length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowLowStock(false);
+              setShowHiddenOnly(true);
+            }}
+            aria-pressed={showHiddenOnly && !showLowStock}
+            className={`min-w-0 px-2.5 py-3 text-left transition ${showHiddenOnly && !showLowStock ? "bg-[#f3f8f5]" : "hover:bg-[#f8faf9]"}`}
+          >
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]"><PortalIcon name="eye" className="h-3.5 w-3.5" />Hidden</span>
+            <span className="mt-1 block text-xl font-semibold tracking-[-0.04em] text-[#17231f]">{products.filter((product) => !product.is_available).length}</span>
+          </button>
+        </div>
+      </section>
+
+      <div className="hidden gap-3 sm:grid sm:grid-cols-3">
         <PortalMetric
           label="Live products"
           value={String(products.filter((product) => product.is_available).length)}

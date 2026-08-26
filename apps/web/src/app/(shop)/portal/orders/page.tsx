@@ -24,6 +24,7 @@ const FILTERS: { status: "all" | OrderStatus; label: string }[] = [
 ];
 
 const FLOW: OrderStatus[] = ["placed", "accepted", "picking", "out_for_delivery", "delivered"];
+type OrderFilter = "all" | "preparing" | OrderStatus;
 type DeliveryJobSummary = { id: string; status: "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled" };
 type OrderWithItems = Order & { order_items?: OrderItem[] | null; delivery_jobs?: DeliveryJobSummary[] | null };
 
@@ -51,9 +52,10 @@ function placedText(value: string) {
 export default function PortalOrdersPage() {
   const { store, loading, error } = useOwnerStore();
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
-  const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<OrderFilter>("all");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mobileOrderId, setMobileOrderId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(query);
@@ -82,12 +84,13 @@ export default function PortalOrdersPage() {
   const visibleOrders = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
     return orders.filter((order) => {
-      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+      const matchesStatus = statusFilter === "all" || (statusFilter === "preparing" ? ["accepted", "picking"].includes(order.status) : order.status === statusFilter);
       const matchesQuery = !q || [order.order_number, order.delivery_area, order.delivery_phone, ...(order.order_items ?? []).map((item) => item.title)].filter(Boolean).some((value) => String(value).toLowerCase().includes(q));
       return matchesStatus && matchesQuery;
     });
   }, [deferredQuery, orders, statusFilter]);
   const selectedOrder = orders.find((order) => order.id === selectedId) ?? null;
+  const mobileOrder = visibleOrders.find((order) => order.id === mobileOrderId) ?? null;
   const stats = useMemo(() => ({
     newOrders: orders.filter((order) => order.status === "placed").length,
     preparing: orders.filter((order) => ["accepted", "picking"].includes(order.status)).length,
@@ -140,13 +143,44 @@ export default function PortalOrdersPage() {
   if (loading) return <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-white/65" />)}</div>;
   if (!store) return <PortalEmpty icon="store" title="Set up your store to receive orders" description="Once your store is live, every new shopper order will appear here." action={{ label: "Start store setup", href: "/sell/setup" }} />;
 
-  return <div className="space-y-6">
-    <PortalPageHeader eyebrow="Fulfilment" title="Orders command centre" description="Accept, prepare, and deliver every order without losing the context your team needs." />
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><PortalMetric label="New orders" value={String(stats.newOrders)} detail="Need acceptance" icon="orders" tone={stats.newOrders ? "urgent" : "default"} /><PortalMetric label="Preparing" value={String(stats.preparing)} detail="Accepted or being packed" icon="package" /><PortalMetric label="On delivery" value={String(stats.delivery)} detail="With a courier" icon="location" /><PortalMetric label="Sales today" value={formatAed(stats.today)} detail="Excludes cancelled orders" icon="analytics" /></div>
+  return <div className="space-y-5 sm:space-y-6">
+    <PortalPageHeader eyebrow="Fulfilment" title="Orders" description="See what needs attention, then move each order forward." />
+    <section className="sm:hidden" aria-label="Order summary">
+      <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-[#dce5e0] bg-white shadow-[0_8px_24px_rgba(28,48,40,0.05)]">
+        <button type="button" onClick={() => setStatusFilter("placed")} aria-pressed={statusFilter === "placed"} className={`border-b border-r border-[#edf1ef] px-3 py-3 text-left transition ${statusFilter === "placed" ? "bg-[#fff7f2]" : "hover:bg-[#fafcfb]"}`}><span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#687870]"><PortalIcon name="orders" className="h-3.5 w-3.5" />New</span><span className={`mt-1 block text-xl font-semibold tracking-[-0.04em] ${stats.newOrders ? "text-[#b55a36]" : "text-[#17231f]"}`}>{stats.newOrders}</span></button>
+        <button type="button" onClick={() => setStatusFilter("preparing")} aria-pressed={statusFilter === "preparing"} className={`border-b border-[#edf1ef] px-3 py-3 text-left transition ${statusFilter === "preparing" ? "bg-[#f3f8f5]" : "hover:bg-[#fafcfb]"}`}><span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#687870]"><PortalIcon name="package" className="h-3.5 w-3.5" />Preparing</span><span className="mt-1 block text-xl font-semibold tracking-[-0.04em] text-[#17231f]">{stats.preparing}</span></button>
+        <button type="button" onClick={() => setStatusFilter("out_for_delivery")} aria-pressed={statusFilter === "out_for_delivery"} className={`border-r border-[#edf1ef] px-3 py-3 text-left transition ${statusFilter === "out_for_delivery" ? "bg-[#f3f8f5]" : "hover:bg-[#fafcfb]"}`}><span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#687870]"><PortalIcon name="location" className="h-3.5 w-3.5" />On delivery</span><span className="mt-1 block text-xl font-semibold tracking-[-0.04em] text-[#17231f]">{stats.delivery}</span></button>
+        <button type="button" onClick={() => setStatusFilter("all")} aria-pressed={statusFilter === "all"} className={`px-3 py-3 text-left transition ${statusFilter === "all" ? "bg-[#f3f8f5]" : "hover:bg-[#fafcfb]"}`}><span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#687870]"><PortalIcon name="analytics" className="h-3.5 w-3.5" />Today</span><span className="mt-1 block text-lg font-semibold tracking-[-0.04em] text-[#17231f]">{formatAed(stats.today)}</span></button>
+      </div>
+    </section>
+    <div className="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4"><PortalMetric label="New orders" value={String(stats.newOrders)} detail="Need acceptance" icon="orders" tone={stats.newOrders ? "urgent" : "default"} /><PortalMetric label="Preparing" value={String(stats.preparing)} detail="Accepted or being packed" icon="package" /><PortalMetric label="On delivery" value={String(stats.delivery)} detail="With a courier" icon="location" /><PortalMetric label="Sales today" value={formatAed(stats.today)} detail="Excludes cancelled orders" icon="analytics" /></div>
     <section className="portal-card overflow-hidden"><div className="border-b border-[#edf1ef] p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold text-[#1d2925]">Order queue</h2><p className="mt-1 text-xs text-[#7b8882]">Updates arrive here as shoppers place orders.</p></div><label className="relative w-full sm:w-72"><PortalIcon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7b8882]" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="portal-input w-full pl-9" placeholder="Search order, area, item" /></label></div><div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{FILTERS.map((filter) => { const count = filter.status === "all" ? orders.length : orders.filter((order) => order.status === filter.status).length; return <button key={filter.status} type="button" onClick={() => setStatusFilter(filter.status)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition ${statusFilter === filter.status ? "bg-[#21342e] text-white" : "border border-[#dce5e0] bg-white text-[#5b6a64] hover:border-[#afc2bb]"}`}>{filter.label}{count ? <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${statusFilter === filter.status ? "bg-white/15 text-white" : "bg-[#edf3f0] text-[#52756b]"}`}>{count}</span> : null}</button>; })}</div></div>
       {message ? <p role="status" className="border-b border-[#c9e7d4] bg-[#f1faf5] px-5 py-3 text-sm text-[#277044]">{message}</p> : null}
-      {orders.length === 0 ? <div className="p-5"><PortalEmpty icon="orders" title="Your queue is clear" description="When customers order from your store, the next step will be ready right here." /></div> : <div className="grid min-h-[34rem] xl:grid-cols-[minmax(0,1fr)_24rem]"><div className="min-w-0 overflow-x-auto"><table className="portal-table min-w-[740px] w-full text-left"><thead className="bg-[#fbfdfc]"><tr><th className="px-5 py-3">Order</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Due</th><th className="px-5 py-3 text-right">Total</th></tr></thead><tbody>{visibleOrders.map((order) => <tr key={order.id} onClick={() => setSelectedId(order.id)} className={`cursor-pointer transition hover:bg-[#f8faf9] ${selectedId === order.id ? "bg-[#edf7f3]" : ""}`}><td className="px-5 py-4"><p className="text-sm font-semibold text-[#263530]">{order.order_number}</p><p className="mt-1 text-xs text-[#7b8882]">{placedText(order.placed_at)} · {(order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0)} item{(order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0) === 1 ? "" : "s"}</p></td><td className="px-4 py-4"><p className="text-sm text-[#34423d]">{order.delivery_area}</p><p className="mt-1 text-xs text-[#7b8882]">{order.delivery_emirate.replace("_", " ")}</p></td><td className="px-4 py-4"><StatusBadge status={order.status} /></td><td className={`px-4 py-4 text-xs font-semibold ${dueText(order).includes("overdue") ? "text-[#b55a36]" : "text-[#65746e]"}`}>{dueText(order)}</td><td className="px-5 py-4 text-right text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</td></tr>)}</tbody></table>{visibleOrders.length === 0 ? <div className="p-8 text-center text-sm text-[#7b8882]">No orders match these filters.</div> : null}</div><OrderDetail order={selectedOrder} onAdvance={advance} onReadyForPickup={markReadyForPickup} updatingId={updatingId} onCopyAddress={copyAddress} /></div>}</section>
+      {orders.length === 0 ? <div className="p-5"><PortalEmpty icon="orders" title="Your queue is clear" description="When customers order from your store, the next step will be ready right here." /></div> : <>
+        <div className="sm:hidden">
+          {mobileOrder ? <div><button type="button" onClick={() => setMobileOrderId(null)} className="flex w-full items-center gap-2 border-b border-[#edf1ef] px-4 py-3 text-sm font-semibold text-[#42675c]"><PortalIcon name="arrow" className="h-3.5 w-3.5 rotate-180" />All orders</button><OrderDetail order={mobileOrder} onAdvance={advance} onReadyForPickup={markReadyForPickup} updatingId={updatingId} onCopyAddress={copyAddress} /></div> : <MobileOrderList orders={visibleOrders} onSelect={(order) => { setSelectedId(order.id); setMobileOrderId(order.id); }} />}
+        </div>
+        <div className="hidden min-h-[34rem] sm:grid xl:grid-cols-[minmax(0,1fr)_24rem]"><div className="min-w-0 overflow-x-auto"><table className="portal-table min-w-[740px] w-full text-left"><thead className="bg-[#fbfdfc]"><tr><th className="px-5 py-3">Order</th><th className="px-4 py-3">Delivery</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Due</th><th className="px-5 py-3 text-right">Total</th></tr></thead><tbody>{visibleOrders.map((order) => <tr key={order.id} onClick={() => setSelectedId(order.id)} className={`cursor-pointer transition hover:bg-[#f8faf9] ${selectedId === order.id ? "bg-[#edf7f3]" : ""}`}><td className="px-5 py-4"><p className="text-sm font-semibold text-[#263530]">{order.order_number}</p><p className="mt-1 text-xs text-[#7b8882]">{placedText(order.placed_at)} · {(order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0)} item{(order.order_items ?? []).reduce((sum, item) => item.quantity + sum, 0) === 1 ? "" : "s"}</p></td><td className="px-4 py-4"><p className="text-sm text-[#34423d]">{order.delivery_area}</p><p className="mt-1 text-xs text-[#7b8882]">{order.delivery_emirate.replace("_", " ")}</p></td><td className="px-4 py-4"><StatusBadge status={order.status} /></td><td className={`px-4 py-4 text-xs font-semibold ${dueText(order).includes("overdue") ? "text-[#b55a36]" : "text-[#65746e]"}`}>{dueText(order)}</td><td className="px-5 py-4 text-right text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</td></tr>)}</tbody></table>{visibleOrders.length === 0 ? <div className="p-8 text-center text-sm text-[#7b8882]">No orders match these filters.</div> : null}</div><OrderDetail order={selectedOrder} onAdvance={advance} onReadyForPickup={markReadyForPickup} updatingId={updatingId} onCopyAddress={copyAddress} /></div>
+      </>}</section>
   </div>;
+}
+
+function MobileOrderList({ orders, onSelect }: { orders: OrderWithItems[]; onSelect: (order: OrderWithItems) => void }) {
+  if (!orders.length) return <div className="p-8 text-center text-sm text-[#7b8882]">No orders match these filters.</div>;
+
+  return <ol className="divide-y divide-[#edf1ef]">
+    {orders.map((order) => {
+      const itemCount = (order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0);
+      const due = dueText(order);
+      const overdue = due.includes("overdue");
+      return <li key={order.id}>
+        <button type="button" onClick={() => onSelect(order)} className="w-full px-4 py-4 text-left transition hover:bg-[#f8faf9] active:bg-[#f1f7f4]">
+          <span className="flex items-start justify-between gap-3"><span className="min-w-0"><span className="block text-sm font-semibold text-[#263530]">{order.order_number}</span><span className="mt-1 block truncate text-xs text-[#718078]">{order.delivery_area || "Delivery address pending"} · {itemCount} item{itemCount === 1 ? "" : "s"}</span></span><StatusBadge status={order.status} /></span>
+          <span className="mt-3 flex items-center justify-between gap-3 border-t border-[#f0f3f1] pt-3"><span className={`flex items-center gap-1.5 text-xs font-semibold ${overdue ? "text-[#b55a36]" : "text-[#527267]"}`}><PortalIcon name="clock" className="h-3.5 w-3.5" />{due}</span><span className="flex items-center gap-2 text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}<PortalIcon name="arrow" className="h-3.5 w-3.5 text-[#59786d]" /></span></span>
+        </button>
+      </li>;
+    })}
+  </ol>;
 }
 
 function OrderDetail({ order, onAdvance, onReadyForPickup, updatingId, onCopyAddress }: { order: OrderWithItems | null; onAdvance: (order: OrderWithItems) => void; onReadyForPickup: (order: OrderWithItems) => void; updatingId: string | null; onCopyAddress: (order: Order) => void }) {
