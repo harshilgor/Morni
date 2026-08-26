@@ -1,4 +1,3 @@
-import { generateText, Output } from "ai";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { mergeBrowseCategories, type BrowseCategory } from "@/lib/browse-categories";
@@ -7,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const MAX_IMAGES = 3;
 const MAX_IMAGE_DATA_LENGTH = 5_500_000;
-const MODEL = "google/gemini-3-flash";
+const MODEL = "gemini-2.5-flash";
 
 const requestSchema = z.object({
   storeId: z.string().uuid(),
@@ -38,6 +37,73 @@ const suggestionSchema = z.object({
 
 function getCategories(rows: BrowseCategory[]) {
   return mergeBrowseCategories(rows).map(({ name, slug }) => ({ name, slug }));
+}
+
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> };
+  }>;
+};
+
+async function generateWithGemini(options: {
+  priceAed: number;
+  stock: number;
+  sizes: string[];
+  categories: Array<{ name: string; slug: string }>;
+  images: string[];
+}) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+
+  const imageParts = options.images.map((image) => {
+    const [, mediaType = "image/jpeg", base64 = ""] = image.match(
+      /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i,
+    ) ?? [];
+    return { inline_data: { mime_type: mediaType, data: base64 } };
+  });
+
+  const prompt = [
+    "You create draft product listings for a UAE fashion marketplace.",
+    "Use the product photos as evidence, but never invent a brand, fabric, measurements, care instructions, origin, or designer name.",
+    "Keep the title concise and shopper-friendly. Keep the description factual, warm, and under 80 words.",
+    "Choose categorySlug only from the supplied category list. Return null when the category is genuinely unclear.",
+    "The owner must review every field, so make conservative suggestions rather than confident guesses.",
+    "Return only valid JSON with exactly these keys: title, description, categorySlug, colorName.",
+    JSON.stringify({
+      task: "Generate a draft product listing from the photos and seller inputs.",
+      priceAed: options.priceAed,
+      stock: options.stock,
+      sizes: options.sizes,
+      categories: options.categories,
+    }),
+  ].join("\n");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }, ...imageParts] }],
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: "application/json",
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gemini request failed with status ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as GeminiResponse;
+  const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Gemini returned an empty listing.");
+
+  const parsed = suggestionSchema.safeParse(JSON.parse(text));
+  if (!parsed.success) throw new Error("Gemini returned an invalid listing format.");
+  return parsed.data;
 }
 
 export async function POST(request: NextRequest) {
@@ -92,52 +158,13 @@ export async function POST(request: NextRequest) {
   const categorySlugs = new Set(categories.map((category) => category.slug));
 
   try {
-    const imageParts = images.map((image) => {
-      const [, mediaType = "image/jpeg", base64 = ""] = image.match(
-        /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i,
-      ) ?? [];
-      return {
-        type: "file" as const,
-        mediaType,
-        data: base64,
-      };
+    const output = await generateWithGemini({
+      priceAed,
+      stock,
+      sizes,
+      categories,
+      images,
     });
-
-    const { output } = await generateText({
-      model: MODEL,
-      instructions: [
-        "You create draft product listings for a UAE fashion marketplace.",
-        "Use the product photos as evidence, but never invent a brand, fabric, measurements, care instructions, origin, or designer name.",
-        "Keep the title concise and shopper-friendly. Keep the description factual, warm, and under 80 words.",
-        "Choose categorySlug only from the supplied category list. Return null when the category is genuinely unclear.",
-        "The owner must review every field, so make conservative suggestions rather than confident guesses.",
-      ].join(" "),
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                task: "Generate a draft product listing from the photos and seller inputs.",
-                priceAed,
-                stock,
-                sizes,
-                categories,
-              }),
-            },
-            ...imageParts,
-          ],
-        },
-      ],
-      output: Output.object({
-        name: "ProductListingSuggestion",
-        description: "A conservative, editable draft listing for a boutique product.",
-        schema: suggestionSchema,
-      }),
-    });
-
-    if (!output) throw new Error("The AI did not return a listing suggestion.");
 
     return NextResponse.json({
       suggestion: {
