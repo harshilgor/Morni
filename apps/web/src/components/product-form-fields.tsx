@@ -151,7 +151,7 @@ export function ProductFormFields({
         ) : null}
       </label>
 
-      <fieldset className="rounded-xl border border-line bg-background p-3">
+      {value.categorySlug !== "gifting" ? <fieldset className="rounded-xl border border-line bg-background p-3">
         <legend className="px-1 text-sm text-muted">
           Available sizes <span className="text-accent-deep">*</span>
         </legend>
@@ -188,7 +188,7 @@ export function ProductFormFields({
             Shoppers pick one of these sizes before adding to cart.
           </p>
         )}
-      </fieldset>
+      </fieldset> : null}
 
       <CustomizationEditor
         value={value.customization}

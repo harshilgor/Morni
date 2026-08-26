@@ -75,7 +75,7 @@ export function colorDraftFromProduct(product: {
   });
 }
 
-export function aggregateFromColorDrafts(drafts: ColorDraft[]) {
+export function aggregateFromColorDrafts(drafts: ColorDraft[], includeSizes = true) {
   const imageUrls = drafts.flatMap((draft) =>
     draft.images.map((image) => image.url).filter(Boolean),
   );
@@ -85,12 +85,16 @@ export function aggregateFromColorDrafts(drafts: ColorDraft[]) {
   const stock = drafts.reduce((sum, draft) => sum + (Number(draft.stock) || 0), 0);
   return {
     image_urls: imageUrls.slice(0, Math.max(imageUrls.length, 1)),
-    sizes: sizes.length ? sizes : ["S", "M", "L"],
+    sizes: includeSizes ? (sizes.length ? sizes : ["S", "M", "L"]) : [],
     stock,
   };
 }
 
-export function validateColorDrafts(drafts: ColorDraft[]) {
+export function validateColorDrafts(
+  drafts: ColorDraft[],
+  options: { requireSizes?: boolean } = {},
+) {
+  const requireSizes = options.requireSizes ?? true;
   if (drafts.length === 0) return null;
   const names = new Set<string>();
   for (const draft of drafts) {
@@ -99,7 +103,7 @@ export function validateColorDrafts(drafts: ColorDraft[]) {
     const key = name.toLowerCase();
     if (names.has(key)) return `Duplicate color name: ${name}`;
     names.add(key);
-    if (draft.sizes.length === 0) {
+    if (requireSizes && draft.sizes.length === 0) {
       return `Add at least one size for ${name}.`;
     }
     const stock = Number(draft.stock);

@@ -31,11 +31,13 @@ export function ColorVariantEditor({
   onChange,
   disabled = false,
   compact = false,
+  showSizes = true,
 }: {
   value: ColorDraft[];
   onChange: (next: ColorDraft[]) => void;
   disabled?: boolean;
   compact?: boolean;
+  showSizes?: boolean;
 }) {
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<string, string | null>>({});
@@ -149,7 +151,7 @@ export function ColorVariantEditor({
         <div>
           <p className="text-sm font-medium text-ink">Color options</p>
           <p className="text-xs text-muted">
-            Add every color in one go — each gets its own photos, sizes, and stock.
+            Add every color in one go — each gets its own photos{showSizes ? ", sizes," : ""} and stock.
           </p>
         </div>
         <button
@@ -456,8 +458,8 @@ export function ColorVariantEditor({
                   ) : null}
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
-                  <div>
+                <div className={showSizes ? "grid gap-3 sm:grid-cols-[1fr_120px]" : "grid gap-3"}>
+                  {showSizes ? <div>
                     <p className="mb-2 text-xs font-medium text-muted">Sizes</p>
                     <div className="flex flex-wrap gap-1.5">
                       {PRODUCT_SIZES.map((size) => {
@@ -486,7 +488,7 @@ export function ColorVariantEditor({
                         );
                       })}
                     </div>
-                  </div>
+                  </div> : null}
                   <label className="block space-y-1.5 text-xs text-muted">
                     Stock
                     <input

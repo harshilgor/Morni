@@ -55,6 +55,10 @@ type ProductListingSuggestion = {
   colorName: string | null;
 };
 
+function categoryHasSizes(categorySlug: string) {
+  return categorySlug !== "gifting";
+}
+
 async function compressImageForListing(file: File) {
   const sourceUrl = URL.createObjectURL(file);
   try {
@@ -298,7 +302,7 @@ export default function PortalProductsPage() {
       setMessage("Enter a valid price before generating the listing.");
       return;
     }
-    if (primary.sizes.length === 0) {
+    if (primary.sizes.length === 0 && categoryHasSizes(form.categorySlug)) {
       setMessage("Choose at least one available size.");
       return;
     }
@@ -409,7 +413,8 @@ export default function PortalProductsPage() {
       setCreateStep(2);
       return;
     }
-    const colorError = validateColorDrafts(createColors);
+    const hasSizes = categoryHasSizes(form.categorySlug);
+    const colorError = validateColorDrafts(createColors, { requireSizes: hasSizes });
     if (colorError) {
       setMessage(colorError);
       setCreateStep(2);
@@ -419,7 +424,10 @@ export default function PortalProductsPage() {
     setSaving(true);
     setMessage(null);
     const supabase = createClient();
-    const aggregate = aggregateFromColorDrafts(createColors);
+    const aggregate = aggregateFromColorDrafts(createColors, hasSizes);
+    const listingDrafts = hasSizes
+      ? createColors
+      : createColors.map((draft) => ({ ...draft, sizes: [] }));
     const category = categories.find((item) => item.slug === form.categorySlug);
 
     let categoryId: string;
@@ -468,7 +476,7 @@ export default function PortalProductsPage() {
       await replaceProductVariants({
         storeId: store.id,
         productId: created.id,
-        drafts: createColors,
+        drafts: listingDrafts,
       });
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Could not save colors.");
@@ -510,7 +518,8 @@ export default function PortalProductsPage() {
       setEditMessage("Choose at least one measurement for custom sizing.");
       return;
     }
-    const colorError = validateColorDrafts(editColors);
+    const hasSizes = categoryHasSizes(editDraft.categorySlug);
+    const colorError = validateColorDrafts(editColors, { requireSizes: hasSizes });
     if (colorError) {
       setEditMessage(colorError);
       return;
@@ -559,7 +568,9 @@ export default function PortalProductsPage() {
       await replaceProductVariants({
         storeId: store.id,
         productId: editingProduct.id,
-        drafts: editColors,
+        drafts: hasSizes
+          ? editColors
+          : editColors.map((draft) => ({ ...draft, sizes: [] })),
       });
     } catch (err) {
       setEditMessage(err instanceof Error ? err.message : "Could not update colors.");
@@ -892,9 +903,15 @@ export default function PortalProductsPage() {
                   <select
                     className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
                     value={form.categorySlug}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, categorySlug: event.target.value }))
-                    }
+                    onChange={(event) => {
+                      const categorySlug = event.target.value;
+                      setForm((current) => ({ ...current, categorySlug }));
+                      if (!categoryHasSizes(categorySlug)) {
+                        setCreateColors((current) =>
+                          current.map((draft) => ({ ...draft, sizes: [] })),
+                        );
+                      }
+                    }}
                     required
                   >
                     <option value="">Select a category</option>
@@ -921,7 +938,7 @@ export default function PortalProductsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-medium">Essentials saved</span>
                     <span className="text-xs text-muted">
-                      {createColors[0]?.stock ?? 0} in stock · {createColors[0]?.sizes.length ?? 0} sizes · {createColors[0]?.images.length ?? 0} photos
+                      {createColors[0]?.stock ?? 0} in stock · {categoryHasSizes(form.categorySlug) ? `${createColors[0]?.sizes.length ?? 0} sizes · ` : ""}{createColors[0]?.images.length ?? 0} photos
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
@@ -942,6 +959,7 @@ export default function PortalProductsPage() {
                       value={createColors}
                       onChange={setCreateColors}
                       disabled={saving}
+                      showSizes={categoryHasSizes(form.categorySlug)}
                     />
                   </div>
                 </details>
@@ -1032,11 +1050,17 @@ export default function PortalProductsPage() {
                 <select
                   className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
                   value={editDraft.categorySlug}
-                  onChange={(event) =>
-                    setEditDraft((current) =>
-                      current ? { ...current, categorySlug: event.target.value } : current,
-                    )
-                  }
+                    onChange={(event) => {
+                      const categorySlug = event.target.value;
+                      setEditDraft((current) =>
+                        current ? { ...current, categorySlug } : current,
+                      );
+                      if (!categoryHasSizes(categorySlug)) {
+                        setEditColors((current) =>
+                          current.map((draft) => ({ ...draft, sizes: [] })),
+                        );
+                      }
+                    }}
                   required
                 >
                   <option value="">Select a category</option>
@@ -1059,6 +1083,7 @@ export default function PortalProductsPage() {
                 value={editColors}
                 onChange={setEditColors}
                 disabled={savingEdits}
+                showSizes={categoryHasSizes(editDraft.categorySlug)}
               />
             </div>
 
