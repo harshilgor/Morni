@@ -777,12 +777,12 @@ function WizardNav({
   onSecondaryAction?: () => void;
 }) {
   return (
-    <div className="seller-setup-actions flex flex-wrap gap-2 pt-2">
+    <div className="seller-setup-actions flex items-center gap-2 pt-2 sm:flex-wrap">
       {canBack ? (
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex min-h-12 items-center rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-mint"
+          className="inline-flex min-h-10 shrink-0 items-center rounded-full border border-line px-3 py-2 text-xs font-semibold text-ink transition hover:border-mint sm:min-h-12 sm:px-5 sm:py-2.5 sm:text-sm"
         >
           Back
         </button>
@@ -792,7 +792,7 @@ function WizardNav({
           type="button"
           onClick={onSecondaryAction}
           disabled={busy}
-          className="inline-flex min-h-12 items-center rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-mint disabled:opacity-50"
+        className="inline-flex min-h-10 shrink-0 items-center whitespace-nowrap rounded-full border border-line px-3 py-2 text-xs font-semibold text-ink transition hover:border-mint disabled:opacity-50 sm:min-h-12 sm:px-5 sm:py-2.5 sm:text-sm"
         >
           {secondaryLabel}
         </button>
@@ -800,7 +800,7 @@ function WizardNav({
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-mint disabled:opacity-50 sm:flex-none"
+        className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white transition hover:bg-mint disabled:opacity-50 sm:min-h-12 sm:flex-none sm:px-6 sm:py-2.5 sm:text-sm"
       >
         {busy ? "Saving…" : continueLabel}
       </button>
