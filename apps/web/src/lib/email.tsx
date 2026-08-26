@@ -10,6 +10,7 @@ import { StoreNewOrderEmail } from "@/emails/store-new-order-email";
 import { DeliveryInviteEmail } from "@/emails/delivery-invite-email";
 import { LifecycleEmail } from "@/emails/lifecycle-email";
 import { deliveryPromise, formatAed, orderStatusLabel } from "@/lib/format";
+import { formatDeliverySlotWindow } from "@/lib/delivery-slots";
 import type { OrderStatus } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -42,6 +43,8 @@ type OrderEmailRecord = {
   delivery_area: string;
   delivery_phone: string | null;
   delivery_eta_minutes: number;
+  delivery_slot_start: string | null;
+  delivery_slot_end: string | null;
   stores: { name: string | null } | { name: string | null }[] | null;
   order_items: Array<{
     title: string;
@@ -157,7 +160,7 @@ async function getOrderEmailRecord(orderId: string) {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, order_number, shopper_id, store_id, status, total_aed, delivery_area, delivery_phone, delivery_eta_minutes, stores(name), order_items(title, quantity, size, color_name, customization, line_total_aed)",
+      "id, order_number, shopper_id, store_id, status, total_aed, delivery_area, delivery_phone, delivery_eta_minutes, delivery_slot_start, delivery_slot_end, stores(name), order_items(title, quantity, size, color_name, customization, line_total_aed)",
     )
     .eq("id", orderId)
     .single();
@@ -298,7 +301,9 @@ export async function sendOrderConfirmationEmail(orderId: string) {
         storeName: getStoreName(order),
         total: formatAed(order.total_aed),
         deliveryArea: order.delivery_area,
-        deliveryEta: deliveryPromise(order.delivery_eta_minutes),
+        deliveryEta:
+          formatDeliverySlotWindow(order.delivery_slot_start, order.delivery_slot_end)
+          ?? deliveryPromise(order.delivery_eta_minutes),
         items,
         orderUrl: `${siteUrl}/orders/${order.id}`,
       }),

@@ -10,6 +10,7 @@ import {
   validateCustomizationValues,
   type ProductCustomizationValues,
 } from "@/lib/product-customization";
+import { findBookableDeliverySlot } from "@/lib/delivery-slots";
 
 type CheckoutItem = {
   productId?: string;
@@ -36,6 +37,10 @@ type CheckoutBody = {
   saveAddress?: boolean;
   makeDefault?: boolean;
   paymentMethod?: "card";
+  deliverySlot?: {
+    start?: string;
+    end?: string;
+  };
 };
 
 type VerifiedProduct = {
@@ -218,6 +223,16 @@ export async function POST(request: Request) {
   }
   const paymentMethod = requestedMethod;
 
+  const slotStart = typeof body?.deliverySlot?.start === "string" ? body.deliverySlot.start : "";
+  const slotEnd = typeof body?.deliverySlot?.end === "string" ? body.deliverySlot.end : "";
+  const bookableSlot = findBookableDeliverySlot(slotStart, slotEnd);
+  if (!bookableSlot) {
+    return NextResponse.json(
+      { error: "Choose a valid delivery time slot before placing this order." },
+      { status: 400 },
+    );
+  }
+
   const { data, error } = await admin.rpc("place_order_with_items", {
     p_store_id: storeId,
     p_payment_method: paymentMethod,
@@ -234,6 +249,8 @@ export async function POST(request: Request) {
     p_delivery_eta_minutes: 0,
     p_items: rpcItems,
     p_shopper_id: user.id,
+    p_delivery_slot_start: bookableSlot.startIso,
+    p_delivery_slot_end: bookableSlot.endIso,
   });
 
   if (error || !data) {

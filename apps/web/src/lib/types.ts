@@ -126,6 +126,8 @@ export type Order = {
   delivery_apartment: string | null;
   delivery_notes: string | null;
   delivery_eta_minutes: number;
+  delivery_slot_start: string | null;
+  delivery_slot_end: string | null;
   placed_at: string;
 };
 

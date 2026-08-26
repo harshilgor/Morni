@@ -22,6 +22,11 @@ import {
   OrderFeeLines,
   SmallOrderNudge,
 } from "@/components/order-fee-summary";
+import { DeliverySlotPicker } from "@/components/delivery-slot-picker";
+import {
+  listBookableDeliverySlots,
+  type BookableDeliverySlot,
+} from "@/lib/delivery-slots";
 
 function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   return {
@@ -56,6 +61,8 @@ export default function CheckoutPage() {
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
+  const [deliverySlots, setDeliverySlots] = useState<BookableDeliverySlot[]>([]);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const paymentMethod = "card" as const;
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
@@ -70,6 +77,11 @@ export default function CheckoutPage() {
   const mobileAddressReady = Boolean(
     selectedAddressId || (form.area.trim() && form.street.trim()),
   );
+  const selectedSlot = deliverySlots.find((slot) => slot.id === selectedSlotId) ?? null;
+  const slotSummary = selectedSlot
+    ? `${selectedSlot.dateLabel} · ${selectedSlot.label}`
+    : "Select a time";
+  const checkoutReady = mobileAddressReady && Boolean(selectedSlot);
 
   function resolveAddress(): DeliveryAddressDraft | null {
     if (selectedAddress && isDeliverableEmirate(selectedAddress.emirate)) {
@@ -101,6 +113,10 @@ export default function CheckoutPage() {
       promptForAddress();
       return;
     }
+    if (!selectedSlot) {
+      setPlaceError("Choose a delivery time slot.");
+      return;
+    }
     setPlaceError(null);
     setMobileAddressOpen(false);
   }
@@ -128,6 +144,17 @@ export default function CheckoutPage() {
       promptForAddress("Add a contact number so the boutique and driver can reach you.");
       return;
     }
+    if (!selectedSlot) {
+      setPlaceError("Choose a delivery time slot before placing this order.");
+      if (isMobileCheckoutViewport()) setMobileAddressOpen(true);
+      else {
+        document.getElementById("checkout-delivery-slot-section")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+      return;
+    }
 
     setPlacing(true);
     setPlaceError(null);
@@ -148,6 +175,10 @@ export default function CheckoutPage() {
           saveAddress: Boolean(authed && saveAddress && !selectedAddressId),
           makeDefault,
           paymentMethod: method,
+          deliverySlot: {
+            start: selectedSlot.startIso,
+            end: selectedSlot.endIso,
+          },
         }),
       });
       const payload = (await response.json().catch(() => null)) as
@@ -293,6 +324,21 @@ export default function CheckoutPage() {
   }, [mobileAddressOpen]);
 
   useEffect(() => {
+    function refreshSlots() {
+      const nextSlots = listBookableDeliverySlots();
+      setDeliverySlots(nextSlots);
+      setSelectedSlotId((current) => {
+        if (current && nextSlots.some((slot) => slot.id === current)) return current;
+        return nextSlots[0]?.id ?? null;
+      });
+    }
+
+    refreshSlots();
+    const interval = window.setInterval(refreshSlots, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data }) => {
       const user = data.user;
@@ -425,6 +471,7 @@ export default function CheckoutPage() {
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-deep">Deliver to</span>
                 <span className="mt-0.5 block truncate text-sm font-semibold text-ink">{selectedAddress?.label ?? locationLabel}</span>
                 <span className="mt-0.5 block truncate text-xs text-muted">{deliverySummary}</span>
+                <span className="mt-1 block truncate text-xs font-medium text-ink">{slotSummary}</span>
               </span>
               <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
             </button>
@@ -436,9 +483,11 @@ export default function CheckoutPage() {
                   ? "Card payments unavailable"
                 : authed === false
                   ? "Sign in to place order"
-                  : mobileAddressReady
+                  : checkoutReady
                     ? "Continue to payment"
-                    : "Select address to continue"}
+                    : !mobileAddressReady
+                      ? "Select address to continue"
+                      : "Select delivery time"}
             </button>
           </div>
         </div>
@@ -461,7 +510,7 @@ export default function CheckoutPage() {
               <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-line" aria-hidden="true" />
               <header className="flex items-center justify-between border-b border-line px-5 py-4">
                 <h2 id="mobile-address-sheet-title" className="text-base font-semibold uppercase tracking-[0.08em] text-ink">
-                  Select delivery address
+                  Delivery details
                 </h2>
                 <button
                   type="button"
@@ -526,16 +575,31 @@ export default function CheckoutPage() {
                     <DeliveryAddressFields value={form} onChange={setForm} idPrefix="checkout-mobile-delivery-address" requireLabel={saveAddress} />
                   </div>
                 ) : null}
+
+                <div className="mt-6 border-t border-line pt-5">
+                  <p className="mb-1 text-sm font-semibold text-ink">Delivery time</p>
+                  <p className="mb-4 text-xs text-muted">Same-day slots until 6:30 PM. Later bookings move to tomorrow.</p>
+                  <DeliverySlotPicker
+                    slots={deliverySlots}
+                    selectedId={selectedSlotId}
+                    onSelect={(slot) => setSelectedSlotId(slot.id)}
+                    idPrefix="checkout-mobile-delivery-slot"
+                  />
+                </div>
               </div>
 
               <footer className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
                 <button
                   type="button"
-                  disabled={!mobileAddressReady}
+                  disabled={!checkoutReady}
                   onClick={confirmMobileAddress}
                   className="w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Deliver here
+                  {!mobileAddressReady
+                    ? "Select address"
+                    : !selectedSlot
+                      ? "Select delivery time"
+                      : "Deliver here"}
                 </button>
               </footer>
             </section>
@@ -707,6 +771,22 @@ export default function CheckoutPage() {
           </div>
         ) : null}
 
+        <section id="checkout-delivery-slot-section" className="space-y-3 border-t border-line pt-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">When</p>
+            <h2 className="mt-1 font-display text-3xl text-ink">Choose a delivery window</h2>
+            <p className="mt-1 text-sm text-muted">
+              Same-day booking closes at 6:30 PM. After that, tomorrow&apos;s slots open.
+            </p>
+          </div>
+          <DeliverySlotPicker
+            slots={deliverySlots}
+            selectedId={selectedSlotId}
+            onSelect={(slot) => setSelectedSlotId(slot.id)}
+            idPrefix="checkout-desktop-delivery-slot"
+          />
+        </section>
+
         <section aria-labelledby="payment-heading" className="border-t border-line pt-6">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Payment</p>
           <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Pay securely online</h2>
@@ -744,7 +824,7 @@ export default function CheckoutPage() {
         {placeError ? <p className="mt-4 text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
         <button
           type="button"
-          disabled={placing || !cardPaymentsEnabled || !legalAccepted || (!mobileAddressReady && authed !== false)}
+          disabled={placing || !cardPaymentsEnabled || !legalAccepted || (!checkoutReady && authed !== false)}
           onClick={() => void placeOrder()}
           className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -754,9 +834,11 @@ export default function CheckoutPage() {
               ? "Card payments unavailable"
             : authed === false
               ? "Sign in to place order"
-              : mobileAddressReady
+              : checkoutReady
                 ? "Continue to payment"
-                : "Select address to continue"}
+                : !mobileAddressReady
+                  ? "Select address to continue"
+                  : "Select delivery time"}
         </button>
         <p className="mt-3 text-center text-xs leading-relaxed text-muted">
           {cardPaymentsEnabled

@@ -6,6 +6,7 @@ import { PortalIcon } from "@/components/portal-icons";
 import { PortalEmpty, PortalMetric, PortalPageHeader, StatusBadge } from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { formatAed, orderStatusLabel } from "@/lib/format";
+import { formatDeliverySlotShort } from "@/lib/delivery-slots";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import type { Order, OrderItem, OrderStatus } from "@/lib/types";
 import { formatCustomizationValues } from "@/lib/product-customization";
@@ -32,11 +33,18 @@ type OrderWithItems = Order & { order_items?: OrderItem[] | null; delivery_jobs?
 type PickupHandoff = { id: string; status: "pending" | "verified" | "expired"; otp_code: string; requested_at: string };
 
 function dueText(order: Order) {
-  const due = new Date(new Date(order.placed_at).getTime() + order.delivery_eta_minutes * 60000);
+  const due = order.delivery_slot_end
+    ? new Date(order.delivery_slot_end)
+    : new Date(new Date(order.placed_at).getTime() + order.delivery_eta_minutes * 60000);
   const minutes = Math.round((due.getTime() - Date.now()) / 60000);
+  const slotLabel = formatDeliverySlotShort(order.delivery_slot_start, order.delivery_slot_end);
   const clock = due.toLocaleTimeString("en-AE", { hour: "numeric", minute: "2-digit" });
   if (order.status === "delivered") return "Delivered";
   if (order.status === "cancelled") return "Cancelled";
+  if (slotLabel) {
+    if (minutes < 0) return `${slotLabel} · overdue`;
+    return slotLabel;
+  }
   if (minutes < 0) return `${Math.abs(minutes)} min overdue`;
   if (minutes < 60) return `Due in ${minutes} min`;
   return `Due by ${clock}`;

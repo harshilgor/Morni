@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { emirateLabel, formatAed, orderStatusLabel } from "@/lib/format";
+import { formatDeliverySlotWindow } from "@/lib/delivery-slots";
 import type { Order, OrderItem, ProductReview } from "@/lib/types";
 import { formatCustomizationValues } from "@/lib/product-customization";
 import { ProductReviewForm } from "@/components/product-review-form";
@@ -279,6 +280,11 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
         ) : null}
         {order.delivery_notes ? (
           <p className="mt-2 text-muted">Notes: {order.delivery_notes}</p>
+        ) : null}
+        {formatDeliverySlotWindow(order.delivery_slot_start, order.delivery_slot_end) ? (
+          <p className="mt-3 font-medium text-ink">
+            Scheduled: {formatDeliverySlotWindow(order.delivery_slot_start, order.delivery_slot_end)}
+          </p>
         ) : null}
         {deliveryCode ? (
           <div className="mt-5 rounded-2xl border border-[#b9d9c7] bg-[#f0faf3] p-4 text-center">

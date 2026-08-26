@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatAed, orderStatusLabel } from "@/lib/format";
+import { formatDeliverySlotShort } from "@/lib/delivery-slots";
 import type { Order } from "@/lib/types";
 
 export default function OrdersPage() {
@@ -76,7 +77,8 @@ export default function OrdersPage() {
                   </p>
                 </div>
                 <span className="text-xs text-accent-deep">
-                  ETA {order.delivery_eta_minutes} min
+                  {formatDeliverySlotShort(order.delivery_slot_start, order.delivery_slot_end)
+                    ?? `ETA ${order.delivery_eta_minutes} min`}
                 </span>
               </Link>
             </li>
