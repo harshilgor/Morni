@@ -2,7 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { hostname, pathname, search } = request.nextUrl;
+  if (hostname === "morniuae.com") {
+    const canonicalUrl = request.nextUrl.clone();
+    canonicalUrl.hostname = "www.morniuae.com";
+    canonicalUrl.search = search;
+    return NextResponse.redirect(canonicalUrl, 308);
+  }
+
   const isFounderRoute = pathname === "/founder" || pathname.startsWith("/founder/");
   const isDriverRoot = pathname === "/driver";
   const hasAuthCookie = request.cookies
