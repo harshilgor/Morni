@@ -93,13 +93,17 @@ function DriverSignInForm() {
           type="button"
           onClick={() => void signInWithGoogle()}
           disabled={googleLoading}
-          className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-[#d6e1db] bg-white px-4 py-3 text-sm font-semibold text-[#19342b] disabled:opacity-50"
+          className="mt-6 hidden w-full items-center justify-center gap-3 rounded-xl border border-[#d6e1db] bg-white px-4 py-3 text-sm font-semibold text-[#19342b] disabled:opacity-50 sm:flex"
         >
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-bold text-[#4285F4]">
             G
           </span>
           {googleLoading ? "Redirecting…" : "Continue with Google"}
         </button>
+
+        <p className="mt-4 rounded-xl bg-[#f6f7f5] px-4 py-3 text-xs leading-5 text-[#65756d] sm:hidden">
+          On phones, use email and password or a sign-in link. Google sign-in can fail inside mobile in-app browsers.
+        </p>
 
         <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-wide text-[#8a9790]">
           <span className="h-px flex-1 bg-[#dce5e0]" />
