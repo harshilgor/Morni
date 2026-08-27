@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuthUser } from "@/lib/use-auth-user";
 export function SiteFooter() {
+  const pathname = usePathname();
   const { auth } = useAuthUser();
+
+  if (pathname === "/portal" || pathname.startsWith("/portal/")) return null;
 
   const accountLinks = auth
     ? [
