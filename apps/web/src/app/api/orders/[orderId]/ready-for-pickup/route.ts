@@ -39,7 +39,16 @@ export async function POST(
   const { data: delivery, error: dispatchError } = await admin
     .rpc("queue_order_for_delivery", { p_order_id: orderId })
     .single();
-  if (dispatchError) return NextResponse.json({ error: dispatchError.message }, { status: 500 });
+  if (dispatchError || !delivery) return NextResponse.json({ error: dispatchError?.message ?? "Unable to queue this order for delivery." }, { status: 500 });
+  const deliveryJob = delivery as { id: string };
 
-  return NextResponse.json({ delivery });
+  // Return the code with the successful transition so the store never has to
+  // wait for the next realtime/polling update before handing the parcel over.
+  const { data: pickupHandoff, error: handoffError } = await supabase.rpc(
+    "store_delivery_handoff",
+    { p_delivery_job_id: deliveryJob.id },
+  );
+  if (handoffError) return NextResponse.json({ error: handoffError.message }, { status: 500 });
+
+  return NextResponse.json({ delivery, pickupHandoff });
 }

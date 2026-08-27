@@ -23,6 +23,16 @@ type OrderWithStore = Order & {
   stores: OrderStore | OrderStore[] | null;
 };
 type DeliveryCode = { status: "pending"; otp_code: string };
+type DeliveryTracking = {
+  status: string | null;
+  driver_name: string | null;
+  last_lat: number | null;
+  last_lng: number | null;
+  last_location_at: string | null;
+  eta_minutes: number | null;
+  accepted_at: string | null;
+  updated_at: string | null;
+};
 
 function resolveStore(stores: OrderWithStore["stores"]): OrderStore | null {
   if (!stores) return null;
@@ -31,10 +41,19 @@ function resolveStore(stores: OrderWithStore["stores"]): OrderStore | null {
 
 export default function OrderDetailPageClient({ orderId }: { orderId: string }) {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-3xl px-4 py-14 text-muted">Loading…</div>}>
+    <Suspense fallback={<OrderDetailSkeleton />}>
       <OrderDetailPageContent orderId={orderId} />
     </Suspense>
   );
+}
+
+function OrderDetailSkeleton() {
+  return <div className="mx-auto max-w-3xl space-y-5 px-4 py-10 sm:px-6" aria-busy="true" aria-label="Loading order details">
+    <div className="h-4 w-24 animate-pulse rounded bg-line/70" />
+    <div className="h-12 w-56 animate-pulse rounded bg-line/70" />
+    <div className="h-24 animate-pulse rounded-2xl bg-line/50" />
+    <div className="h-56 animate-pulse rounded-[1.5rem] bg-line/50" />
+  </div>;
 }
 
 function OrderDetailPageContent({ orderId }: { orderId: string }) {
@@ -43,6 +62,12 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [deliveryCode, setDeliveryCode] = useState<DeliveryCode | null>(null);
+  const [deliveryTracking, setDeliveryTracking] = useState<DeliveryTracking | null>(null);
+  const [editingInstructions, setEditingInstructions] = useState(false);
+  const [instructionDraft, setInstructionDraft] = useState("");
+  const [savingInstructions, setSavingInstructions] = useState(false);
+  const [instructionError, setInstructionError] = useState<string | null>(null);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [reloadKey, setReloadKey] = useState(0);
   const paymentFlash = searchParams.get("paid") === "1"
     ? "paid"
@@ -99,7 +124,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
   }, [orderId]);
 
   useEffect(() => {
-    if (!order || order.status !== "out_for_delivery") { window.queueMicrotask(() => setDeliveryCode(null)); return; }
+    if (!order) { window.queueMicrotask(() => setDeliveryCode(null)); return; }
     let active = true;
     const checkCode = async () => {
       const { data } = await createClient().rpc("shopper_delivery_handoff_code", { p_order_id: order.id });
@@ -111,8 +136,71 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
     return () => { active = false; window.clearInterval(interval); };
   }, [order]);
 
+  useEffect(() => {
+    const onlineHandler = () => setOnline(true);
+    const offlineHandler = () => setOnline(false);
+    window.addEventListener("online", onlineHandler);
+    window.addEventListener("offline", offlineHandler);
+    return () => {
+      window.removeEventListener("online", onlineHandler);
+      window.removeEventListener("offline", offlineHandler);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!order) {
+      const timeout = window.setTimeout(() => setDeliveryTracking(null), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    if (!online) return;
+    let active = true;
+    const loadTracking = async () => {
+      const { data } = await createClient().rpc("shopper_order_delivery_tracking", { p_order_id: order.id });
+      if (active) setDeliveryTracking((data as DeliveryTracking | null) ?? null);
+    };
+    void loadTracking();
+    const interval = window.setInterval(() => void loadTracking(), 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [order, online]);
+
+  useEffect(() => {
+    if (!order) return;
+    const timeout = window.setTimeout(() => {
+      setInstructionDraft(order.delivery_notes ?? "");
+      setEditingInstructions(false);
+      setInstructionError(null);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [order]);
+
+  async function saveInstructions() {
+    setSavingInstructions(true);
+    setInstructionError(null);
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryNotes: instructionDraft }),
+      });
+      const payload = (await response.json().catch(() => null)) as { order?: { delivery_notes?: string | null }; error?: string } | null;
+      if (!response.ok) {
+        setInstructionError(payload?.error ?? "Could not save delivery instructions.");
+        return;
+      }
+      setOrder((current) => current ? { ...current, delivery_notes: payload?.order?.delivery_notes ?? null } : current);
+      setEditingInstructions(false);
+    } catch {
+      setInstructionError("Could not save delivery instructions. Check your connection and try again.");
+    } finally {
+      setSavingInstructions(false);
+    }
+  }
+
   if (!order) {
-    return <div className="mx-auto max-w-3xl px-4 py-14 text-muted">Loading…</div>;
+    return <OrderDetailSkeleton />;
   }
 
   const store = resolveStore(order.stores);
@@ -130,6 +218,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
       </Link>
       <h1 className="mt-4 font-display text-4xl text-ink">{order.order_number}</h1>
       <p className="mt-2 text-muted">{orderStatusLabel(order.status)}</p>
+      {!online ? <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">You are offline. This page will refresh delivery updates when you reconnect.</p> : null}
       {store ? (
         <p className="mt-1 text-sm text-muted">
           From{" "}
@@ -140,6 +229,30 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
             {store.name}
           </Link>
         </p>
+      ) : null}
+
+      {deliveryTracking?.status && ["accepted", "at_pickup", "collected"].includes(deliveryTracking.status) ? (
+        <section className="mt-6 rounded-[1.5rem] border border-[#cfe5dc] bg-[#f2f9f5] p-5" aria-live="polite">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#277044]">Delivery update</p>
+              <h2 className="mt-1 text-xl font-semibold text-[#19342b]">
+                {deliveryTracking.status === "collected" ? "Your rider is on the way" : "Your rider is heading to the store"}
+              </h2>
+              <p className="mt-1 text-sm text-[#5d7268]">
+                {deliveryTracking.driver_name ? `${deliveryTracking.driver_name} is handling your delivery.` : "A rider has been assigned to your delivery."}
+              </p>
+            </div>
+            {deliveryTracking.eta_minutes ? <span className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-[#155C4B]">About {deliveryTracking.eta_minutes} min</span> : null}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-[#5d7268]">
+            <span>{deliveryTracking.status === "collected" ? "Heading to your address" : "Preparing pickup"}</span>
+            {deliveryTracking.last_location_at ? <span>· Location updated {new Intl.DateTimeFormat("en-AE", { hour: "numeric", minute: "2-digit" }).format(new Date(deliveryTracking.last_location_at))}</span> : null}
+            {deliveryTracking.last_lat != null && deliveryTracking.last_lng != null ? (
+              <a className="font-semibold text-[#155C4B] underline underline-offset-2" href={`https://www.google.com/maps/search/?api=1&query=${deliveryTracking.last_lat},${deliveryTracking.last_lng}`} target="_blank" rel="noreferrer">View latest location</a>
+            ) : null}
+          </div>
+        </section>
       ) : null}
 
       {paymentFlash === "paid" ? (
@@ -281,6 +394,26 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
         {order.delivery_notes ? (
           <p className="mt-2 text-muted">Notes: {order.delivery_notes}</p>
         ) : null}
+        {["placed", "accepted"].includes(order.status) ? (
+          <div className="mt-4 border-t border-line pt-4">
+            {!editingInstructions ? (
+              <button type="button" onClick={() => setEditingInstructions(true)} className="min-h-10 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink transition hover:bg-sand" aria-label="Edit delivery instructions">
+                {order.delivery_notes ? "Edit delivery instructions" : "Add delivery instructions"}
+              </button>
+            ) : (
+              <div>
+                <label htmlFor="order-delivery-instructions" className="text-sm font-semibold text-ink">Delivery instructions</label>
+                <textarea id="order-delivery-instructions" value={instructionDraft} onChange={(event) => setInstructionDraft(event.target.value)} maxLength={1000} rows={3} className="mt-2 w-full rounded-xl border border-line bg-background px-3 py-2.5 text-sm" placeholder="Gate code, landmark, or preferred drop-off spot" />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => void saveInstructions()} disabled={savingInstructions} className="min-h-10 rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{savingInstructions ? "Saving…" : "Save instructions"}</button>
+                  <button type="button" onClick={() => { setInstructionDraft(order.delivery_notes ?? ""); setEditingInstructions(false); setInstructionError(null); }} disabled={savingInstructions} className="min-h-10 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink">Cancel</button>
+                  <span className="text-xs text-muted">{instructionDraft.length}/1000</span>
+                </div>
+                {instructionError ? <p className="mt-2 text-sm text-accent-deep" role="alert">{instructionError}</p> : null}
+              </div>
+            )}
+          </div>
+        ) : null}
         {formatDeliverySlotWindow(order.delivery_slot_start, order.delivery_slot_end) ? (
           <p className="mt-3 font-medium text-ink">
             Scheduled: {formatDeliverySlotWindow(order.delivery_slot_start, order.delivery_slot_end)}
@@ -290,10 +423,19 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
           <div className="mt-5 rounded-2xl border border-[#b9d9c7] bg-[#f0faf3] p-4 text-center">
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#277044]">Delivery verification</p>
             <h3 className="mt-1 text-lg font-semibold text-[#19342b]">Show this code to your rider</h3>
-            <p className="mt-1 text-sm text-[#5d7268]">Your order is on the way. The rider needs this code to complete delivery.</p>
+            <p className="mt-1 text-sm text-[#5d7268]">Keep this code ready. The rider needs it after taking a photo of your parcel.</p>
             <p className="mt-4 rounded-xl bg-white py-3 text-3xl font-bold tracking-[0.3em] text-[#155C4B]">{deliveryCode.otp_code}</p>
           </div>
         ) : null}
+        <div className="mt-5 border-t border-line pt-4">
+          <p className="text-sm font-semibold text-ink">Need help with this delivery?</p>
+          <a
+            href={`mailto:mymorniuae@gmail.com?subject=${encodeURIComponent(`Help with order ${order.order_number}`)}`}
+            className="mt-2 inline-flex min-h-10 items-center rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink transition hover:bg-sand"
+          >
+            Contact Morni support
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ function AuthForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [message, setMessage] = useState<string | null>(
     authError
       ? "This sign-in link is invalid or has expired. Please request a new one."
@@ -116,11 +117,17 @@ function AuthForm() {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = phone.trim();
+    if (!/^[-+0-9() ]{7,}$/.test(normalizedPhone)) {
+      setMessage("Enter a valid phone number so your store and rider can contact you.");
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName, phone: normalizedPhone },
       },
     });
 
@@ -150,7 +157,7 @@ function AuthForm() {
     <div className="mx-auto max-w-md px-4 py-14 sm:px-6">
       <h1 className="font-display text-4xl text-ink">{resetMode ? "Reset your password" : title}</h1>
       <p className="mt-2 text-sm text-muted">
-        {resetMode ? "Enter your email and we’ll send you a secure reset link." : "Sign in with Google, or use email and password."}
+        {resetMode ? "Enter your email and we’ll send you a secure reset link." : mode === "signin" ? "Sign in with Google, or use email and password." : "Create your account with email, password, and a phone number."}
       </p>
 
       {resetMode ? (
@@ -182,7 +189,7 @@ function AuthForm() {
         </form>
       ) : <>
 
-      <button
+      {mode === "signin" ? <button
         type="button"
         onClick={signInWithGoogle}
         disabled={googleLoading}
@@ -192,7 +199,7 @@ function AuthForm() {
           G
         </span>
         {googleLoading ? "Redirecting to Google…" : "Continue with Google"}
-      </button>
+      </button> : <p className="mt-6 rounded-xl bg-sand/60 px-4 py-3 text-xs leading-5 text-muted">Phone numbers are required for delivery updates and driver contact.</p>}
 
       <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted">
         <span className="h-px flex-1 bg-line" />
@@ -226,6 +233,24 @@ function AuthForm() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
+            />
+          </label>
+        ) : null}
+
+        {mode === "signup" ? (
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-muted">Phone number</span>
+            <input
+              type="tel"
+              inputMode="tel"
+              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+971 50 123 4567"
+              pattern="[-+0-9() ]{7,}"
+              title="Enter a valid phone number"
+              required
+              autoComplete="tel"
             />
           </label>
         ) : null}

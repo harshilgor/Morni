@@ -86,6 +86,7 @@ export default function AccountPage() {
   const [form, setForm] = useState<ProfileForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
@@ -144,6 +145,12 @@ export default function AccountPage() {
 
   async function handleSave() {
     if (!auth || !form) return;
+    if (!/^[-+0-9() ]{7,}$/.test(form.phone.trim())) {
+      setProfileError("Add a valid phone number so your store and rider can contact you.");
+      setSaved(false);
+      return;
+    }
+    setProfileError(null);
     setSaving(true);
     const supabase = createClient();
     await supabase
@@ -245,6 +252,9 @@ export default function AccountPage() {
             <input
               id="phone"
               type="tel"
+              required
+              pattern="[-+0-9() ]{7,}"
+              title="Enter a valid phone number"
               value={form?.phone ?? ""}
               onChange={(e) => setForm((f) => f ? { ...f, phone: e.target.value } : f)}
               className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-1 focus:ring-accent"
@@ -266,6 +276,7 @@ export default function AccountPage() {
           >
             {saving ? "Saving…" : saved ? "Saved!" : "Update profile"}
           </button>
+          {profileError ? <p className="text-sm text-red-700" role="alert">{profileError}</p> : null}
           <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium text-ink">Account access</p>

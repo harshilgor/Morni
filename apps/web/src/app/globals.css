@@ -101,6 +101,23 @@ body {
   font-family: var(--font-satoshi), system-ui, sans-serif;
 }
 
+/* Consistent keyboard focus across shopper, owner, and delivery surfaces. */
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--mint) 72%, white);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Seller mode: a calm, focused workspace separate from the shopper experience. */
 body.sell-mode {
   background: #f4f7f4 !important;

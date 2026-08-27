@@ -59,3 +59,47 @@ export async function DELETE(
   // The database trigger queues the shopper cancellation email durably.
   return NextResponse.json({ order: cancelledOrder });
 }
+
+/** Allow the shopper to adjust delivery instructions while the boutique can
+ * still act on them. Once packing begins, the address snapshot is immutable. */
+export async function PATCH(
+  request: Request,
+  context: RouteContext<"/api/orders/[orderId]">,
+) {
+  const { orderId } = await context.params;
+  const body = (await request.json().catch(() => null)) as { deliveryNotes?: unknown } | null;
+  if (typeof body?.deliveryNotes !== "string") {
+    return NextResponse.json({ error: "Delivery instructions are required." }, { status: 400 });
+  }
+  const notes = body.deliveryNotes.trim();
+  if (notes.length > 1000) {
+    return NextResponse.json({ error: "Delivery instructions must be 1,000 characters or fewer." }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const { data: order, error: orderError } = await admin
+    .from("orders")
+    .select("id, shopper_id, status")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (orderError || !order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  if (order.shopper_id !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!["placed", "accepted"].includes(order.status)) {
+    return NextResponse.json({ error: "Instructions can only be changed before preparation begins." }, { status: 409 });
+  }
+
+  const { data: updated, error: updateError } = await admin
+    .from("orders")
+    .update({ delivery_notes: notes || null })
+    .eq("id", orderId)
+    .in("status", ["placed", "accepted"])
+    .select("id, delivery_notes, status")
+    .maybeSingle();
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (!updated) return NextResponse.json({ error: "Preparation started before the update could be saved." }, { status: 409 });
+  return NextResponse.json({ order: updated });
+}

@@ -28,6 +28,21 @@ import {
   type BookableDeliverySlot,
 } from "@/lib/delivery-slots";
 
+const CHECKOUT_DRAFT_KEY = "morni.checkout.delivery.v1";
+
+function readRememberedAddress(): DeliveryAddressDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CHECKOUT_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<DeliveryAddressDraft>;
+    if (typeof parsed.area !== "string" || typeof parsed.street !== "string") return null;
+    return { ...EMPTY_DELIVERY_ADDRESS, ...parsed, emirate: DELIVERY_EMIRATE };
+  } catch {
+    return null;
+  }
+}
+
 function addressToDraft(address: DeliveryAddress): DeliveryAddressDraft {
   return {
     label: address.label,
@@ -63,6 +78,7 @@ export default function CheckoutPage() {
   const [legalAccepted, setLegalAccepted] = useState(false);
   const [deliverySlots, setDeliverySlots] = useState<BookableDeliverySlot[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const paymentMethod = "card" as const;
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
@@ -82,6 +98,24 @@ export default function CheckoutPage() {
     ? `${selectedSlot.dateLabel} · ${selectedSlot.label}`
     : "Select a time";
   const checkoutReady = mobileAddressReady && Boolean(selectedSlot);
+
+  useEffect(() => {
+    const onlineHandler = () => setOnline(true);
+    const offlineHandler = () => setOnline(false);
+    window.addEventListener("online", onlineHandler);
+    window.addEventListener("offline", offlineHandler);
+    return () => {
+      window.removeEventListener("online", onlineHandler);
+      window.removeEventListener("offline", offlineHandler);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (form.area.trim() || form.street.trim() || form.phone.trim()) {
+      window.localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ ...form, emirate: DELIVERY_EMIRATE }));
+    }
+  }, [form]);
 
   function resolveAddress(): DeliveryAddressDraft | null {
     if (selectedAddress && isDeliverableEmirate(selectedAddress.emirate)) {
@@ -122,6 +156,10 @@ export default function CheckoutPage() {
   }
 
   async function placeOrder() {
+    if (!online) {
+      setPlaceError("You are offline. Reconnect before placing your order.");
+      return;
+    }
     if (authed === false) {
       router.push("/auth?next=/checkout");
       return;
@@ -193,6 +231,7 @@ export default function CheckoutPage() {
         return;
       }
       clear();
+      if (typeof window !== "undefined") window.localStorage.removeItem(CHECKOUT_DRAFT_KEY);
       if (payload.next === "pay" || method === "card") {
         router.push(`/checkout/pay/${payload.order.id}`);
         return;
@@ -356,7 +395,11 @@ export default function CheckoutPage() {
         addresses.find((address) => address.is_default && isDeliverableEmirate(address.emirate)) ??
         addresses.find((address) => isDeliverableEmirate(address.emirate));
       if (defaultAddress) selectSavedAddress(defaultAddress);
-      else setMakeDefault(addresses.length === 0);
+      else {
+        const remembered = readRememberedAddress();
+        if (remembered) setForm(remembered);
+        setMakeDefault(addresses.length === 0);
+      }
     });
   }, []);
 
@@ -373,6 +416,11 @@ export default function CheckoutPage() {
 
   return (
     <>
+      {!online ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-medium text-amber-900" role="status">
+          You are offline. Your address is saved on this device; reconnect before placing the order.
+        </div>
+      ) : null}
       <div className="lg:hidden">
         <div className="mx-auto max-w-lg px-4 pb-6 pt-5">
           <header className="flex items-end justify-between gap-4 border-b border-line pb-5">
@@ -476,7 +524,7 @@ export default function CheckoutPage() {
               <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
             </button>
             {placeError ? <p className="text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
-            <button type="button" onClick={() => void placeOrder()} disabled={placing || !cardPaymentsEnabled} className="w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void placeOrder()} disabled={placing || !cardPaymentsEnabled || !online} className="min-h-12 w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
               {placing
                 ? "Starting payment..."
                 : !cardPaymentsEnabled
@@ -591,7 +639,7 @@ export default function CheckoutPage() {
               <footer className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
                 <button
                   type="button"
-                  disabled={!checkoutReady}
+                  disabled={!checkoutReady || !online}
                   onClick={confirmMobileAddress}
                   className="w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -824,7 +872,7 @@ export default function CheckoutPage() {
         {placeError ? <p className="mt-4 text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
         <button
           type="button"
-          disabled={placing || !cardPaymentsEnabled || !legalAccepted || (!checkoutReady && authed !== false)}
+          disabled={placing || !cardPaymentsEnabled || !legalAccepted || !online || (!checkoutReady && authed !== false)}
           onClick={() => void placeOrder()}
           className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
