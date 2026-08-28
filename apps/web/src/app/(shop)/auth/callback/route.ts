@@ -33,7 +33,16 @@ export async function GET(request: Request) {
       }
       return NextResponse.redirect(new URL(next, origin));
     }
+
+    console.error("[auth/callback] session exchange failed", {
+      flow: flow ?? "customer",
+      method: code ? "code" : "email_otp",
+      error: error.message,
+    });
   }
 
-  return NextResponse.redirect(`${origin}/auth?error=auth_callback_failed`);
+  const failureUrl = new URL(flow === "driver" ? "/driver/sign-in" : "/auth", origin);
+  failureUrl.searchParams.set("error", "auth_callback_failed");
+  if (flow === "driver") failureUrl.searchParams.set("next", next);
+  return NextResponse.redirect(failureUrl);
 }
