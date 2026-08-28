@@ -70,12 +70,12 @@ type DriverData = {
 
 const FAILURE_REASONS = ["Customer unavailable", "Wrong address", "Could not access building", "Order damaged", "Other delivery issue"] as const;
 const statusLabel: Record<DeliveryJobStatus, string> = {
-  unassigned: "New delivery offer", assigned: "Awaiting acceptance", accepted: "Heading to pickup", at_pickup: "At the store",
-  collected: "Out for delivery", delivered: "Delivered", failed: "Needs attention", cancelled: "Cancelled",
+  unassigned: "New offer", assigned: "Accept pickup", accepted: "Heading to store", at_pickup: "Pickup now",
+  collected: "Deliver now", delivered: "Completed", failed: "Needs attention", cancelled: "Cancelled",
 };
 const statusTone: Record<DeliveryJobStatus, string> = {
-  unassigned: "bg-[#FFF1C2] text-[#6B4F00]", assigned: "bg-[#DCEBFF] text-[#174A8B]", accepted: "bg-[#E8E0FF] text-[#4B3A90]",
-  at_pickup: "bg-[#DCEBFF] text-[#174A8B]", collected: "bg-[#FFE4CF] text-[#8A3E08]", delivered: "bg-[#DDF5E7] text-[#12663B]",
+  unassigned: "bg-[#FFF1C2] text-[#6B4F00]", assigned: "bg-[#DCEBFF] text-[#174A8B]", accepted: "bg-[#DCEBFF] text-[#174A8B]",
+  at_pickup: "bg-[#FFE4CF] text-[#9A420D]", collected: "bg-[#DCEBFF] text-[#174A8B]", delivered: "bg-[#DDF5E7] text-[#12663B]",
   failed: "bg-[#FFE0DC] text-[#9C2F28]", cancelled: "bg-[#E8ECEA] text-[#53625C]",
 };
 

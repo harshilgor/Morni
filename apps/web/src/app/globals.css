@@ -278,6 +278,79 @@ body.portal-mode {
   }
 }
 
+/* Driver portal: a compact, high-contrast task UI for use on the road. */
+.driver-experience .driver-app {
+  --driver-blue: #087fe5;
+  --driver-ink: #172a3a;
+  --driver-muted: #64748b;
+  --driver-canvas: #f5f7f8;
+  background: var(--driver-canvas) !important;
+  color: var(--driver-ink);
+}
+
+.driver-experience .driver-app h1,
+.driver-experience .driver-app h2,
+.driver-experience .driver-app h3 {
+  color: var(--driver-ink) !important;
+  letter-spacing: -0.025em;
+}
+
+.driver-experience .driver-job-card {
+  border-color: #d9e1e7 !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 8px 24px rgb(23 42 58 / 7%) !important;
+}
+
+.driver-experience .driver-job-card > div:first-child {
+  padding: 1rem !important;
+  background: #fff !important;
+}
+
+.driver-experience .driver-job-card > div:nth-child(2) {
+  gap: 1.25rem;
+  padding: 1rem !important;
+}
+
+.driver-experience .driver-job-card label {
+  min-height: 3rem !important;
+  border-radius: 0.75rem !important;
+  font-size: 0.9375rem !important;
+}
+
+.driver-experience .driver-job-card a[class*="bg-[#155C4B]"],
+.driver-experience .driver-job-card button[class*="bg-[#F97316]"],
+.driver-experience .driver-job-card button[class*="bg-[#16824B]"] {
+  min-height: 3.25rem;
+  background: var(--driver-blue) !important;
+  border-radius: 0.75rem !important;
+  font-size: 0.9375rem;
+}
+
+.driver-experience .driver-job-card [class*="text-[#718079]"],
+.driver-experience .driver-job-card [class*="text-[#60736a]"],
+.driver-experience .driver-job-card [class*="text-[#5b6e65]"] {
+  color: var(--driver-muted) !important;
+}
+
+.driver-experience .driver-job-card ol {
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+
+.driver-experience .driver-job-card ol > li > div > p:first-child {
+  line-height: 1.25;
+}
+
+@media (max-width: 639px) {
+  .driver-experience .driver-job-card {
+    border-radius: 0.875rem !important;
+  }
+
+  .driver-experience .driver-job-card > div:nth-child(2) {
+    padding: 0.875rem !important;
+  }
+}
+
 .portal-shell {
   --background: #ffffff;
   --surface: #ffffff;
