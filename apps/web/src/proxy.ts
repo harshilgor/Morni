@@ -3,9 +3,9 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 export async function proxy(request: NextRequest) {
   const { hostname, pathname, search } = request.nextUrl;
-  if (hostname === "morniuae.com") {
+  if (hostname === "www.morniuae.com") {
     const canonicalUrl = request.nextUrl.clone();
-    canonicalUrl.hostname = "www.morniuae.com";
+    canonicalUrl.hostname = "morniuae.com";
     canonicalUrl.search = search;
     return NextResponse.redirect(canonicalUrl, 308);
   }
