@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { emirateLabel, formatAed, orderStatusLabel } from "@/lib/format";
 import { formatDeliverySlotWindow } from "@/lib/delivery-slots";
@@ -33,6 +34,7 @@ type DeliveryTracking = {
   accepted_at: string | null;
   updated_at: string | null;
 };
+type DeliveryProof = { id: string; storage_path: string; created_at: string; url: string };
 
 function resolveStore(stores: OrderWithStore["stores"]): OrderStore | null {
   if (!stores) return null;
@@ -63,6 +65,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [deliveryCode, setDeliveryCode] = useState<DeliveryCode | null>(null);
   const [deliveryTracking, setDeliveryTracking] = useState<DeliveryTracking | null>(null);
+  const [deliveryProofs, setDeliveryProofs] = useState<DeliveryProof[]>([]);
   const [editingInstructions, setEditingInstructions] = useState(false);
   const [instructionDraft, setInstructionDraft] = useState("");
   const [savingInstructions, setSavingInstructions] = useState(false);
@@ -89,6 +92,19 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
         .select("*")
         .eq("order_id", orderId);
       setItems((itemData as OrderItem[]) ?? []);
+
+      const { data: proofData } = await supabase
+        .from("delivery_jobs")
+        .select("delivery_proofs(id, storage_path, created_at)")
+        .eq("order_id", orderId)
+        .maybeSingle();
+      const proofs = ((proofData as { delivery_proofs?: Omit<DeliveryProof, "url">[] } | null)?.delivery_proofs ?? [])
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      const signedProofs = await Promise.all(proofs.map(async (proof) => {
+        const { data: signed } = await supabase.storage.from("delivery-proofs").createSignedUrl(proof.storage_path, 3600);
+        return signed?.signedUrl ? { ...proof, url: signed.signedUrl } : null;
+      }));
+      setDeliveryProofs(signedProofs.filter((proof): proof is DeliveryProof => Boolean(proof)));
 
       const {
         data: { user },
@@ -251,6 +267,29 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
             {deliveryTracking.last_lat != null && deliveryTracking.last_lng != null ? (
               <a className="font-semibold text-[#155C4B] underline underline-offset-2" href={`https://www.google.com/maps/search/?api=1&query=${deliveryTracking.last_lat},${deliveryTracking.last_lng}`} target="_blank" rel="noreferrer">View latest location</a>
             ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {deliveryProofs.length > 0 ? (
+        <section className="mt-6 rounded-[1.5rem] border border-[#d8e6df] bg-[#f7fbf8] p-5" aria-label="Delivery photos">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#277044]">Delivery photos</p>
+            <h2 className="mt-1 font-display text-2xl text-ink">Your order along the way</h2>
+            <p className="mt-1 text-sm leading-6 text-muted">Photos shared by your rider during pickup and delivery.</p>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {deliveryProofs.map((proof, index) => (
+              <a key={proof.id} href={proof.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-xl border border-[#d8e6df] bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#277044]">
+                <div className="relative aspect-square bg-[#edf4ef]">
+                  <Image src={proof.url} alt={`${index === 0 ? "Pickup" : "Delivery update"} photo`} fill sizes="(min-width: 640px) 180px, 45vw" className="object-cover transition duration-300 group-hover:scale-105" />
+                </div>
+                <div className="px-3 py-2">
+                  <p className="text-xs font-semibold text-ink">{index === 0 ? "Picked up from store" : `Delivery update ${index}`}</p>
+                  <p className="mt-0.5 text-[11px] text-muted">{new Intl.DateTimeFormat("en-AE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(proof.created_at))}</p>
+                </div>
+              </a>
+            ))}
           </div>
         </section>
       ) : null}

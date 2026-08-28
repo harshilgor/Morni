@@ -36,7 +36,7 @@ type CheckoutBody = {
   address?: CheckoutAddress;
   saveAddress?: boolean;
   makeDefault?: boolean;
-  paymentMethod?: "card";
+  paymentMethod?: "cod" | "card";
   deliverySlot?: {
     start?: string;
     end?: string;
@@ -208,14 +208,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A product in your bag is no longer available." }, { status: 400 });
   }
 
-  const requestedMethod = body?.paymentMethod === "card" ? "card" : null;
+  const requestedMethod = body?.paymentMethod === "cod" || body?.paymentMethod === "card" ? body.paymentMethod : null;
   if (!requestedMethod) {
     return NextResponse.json(
-      { error: "Card payment is required to place an order." },
+      { error: "Choose a payment method to place an order." },
       { status: 400 },
     );
   }
-  if (!isAfsPaymentsEnabled()) {
+  if (requestedMethod === "card" && !isAfsPaymentsEnabled()) {
     return NextResponse.json(
       { error: "Card payments are not available right now. Please try again later." },
       { status: 503 },

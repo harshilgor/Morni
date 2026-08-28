@@ -79,7 +79,8 @@ export default function CheckoutPage() {
   const [deliverySlots, setDeliverySlots] = useState<BookableDeliverySlot[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
-  const paymentMethod = "card" as const;
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "card">("cod");
+  const cashOnDeliveryEnabled = true; // Temporary test option; remove when online payments are ready.
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
   const fees = calculateCheckoutFees(orderSubtotal);
@@ -164,7 +165,7 @@ export default function CheckoutPage() {
       router.push("/auth?next=/checkout");
       return;
     }
-    if (!cardPaymentsEnabled) {
+    if (paymentMethod === "card" && !cardPaymentsEnabled) {
       setPlaceError("Online card payments are temporarily unavailable. Please try again later.");
       return;
     }
@@ -523,11 +524,27 @@ export default function CheckoutPage() {
               </span>
               <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
             </button>
+            <div className="grid grid-cols-2 gap-2">
+              {cashOnDeliveryEnabled ? <label className={`rounded-lg border px-3 py-2 text-xs font-semibold ${paymentMethod === "cod" ? "border-ink bg-background text-ink" : "border-line bg-white text-muted"}`}><input type="radio" name="mobile-payment-method" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mr-1.5 accent-[#21342e]" />Cash on delivery</label> : null}
+              <label className={`rounded-lg border px-3 py-2 text-xs font-semibold ${paymentMethod === "card" ? "border-ink bg-background text-ink" : "border-line bg-white text-muted"}`}><input type="radio" name="mobile-payment-method" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} disabled={!cardPaymentsEnabled} className="mr-1.5 accent-[#21342e]" />Card {cardPaymentsEnabled ? "payment" : "(unavailable)"}</label>
+            </div>
+            <label className="flex items-start gap-3 rounded-lg border border-[#c8d1cc] bg-white px-3 py-3 text-xs leading-5 text-[#4d5c56] shadow-sm">
+              <input
+                type="checkbox"
+                checked={legalAccepted}
+                onChange={(event) => setLegalAccepted(event.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 appearance-auto accent-[#21342e]"
+                aria-label="Agree to the Customer Terms and Conditions and Privacy Policy"
+              />
+              <span>
+                I agree to the <Link href="/terms" className="font-semibold text-ink underline underline-offset-2">Customer Terms &amp; Conditions</Link> and acknowledge the <Link href="/privacy" className="font-semibold text-ink underline underline-offset-2">Privacy Policy</Link>.
+              </span>
+            </label>
             {placeError ? <p className="text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
-            <button type="button" onClick={() => void placeOrder()} disabled={placing || !cardPaymentsEnabled || !online} className="min-h-12 w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void placeOrder()} disabled={placing || (paymentMethod === "card" && !cardPaymentsEnabled) || !legalAccepted || !online} className="min-h-12 w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
               {placing
                 ? "Starting payment..."
-                : !cardPaymentsEnabled
+                : paymentMethod === "card" && !cardPaymentsEnabled
                   ? "Card payments unavailable"
                 : authed === false
                   ? "Sign in to place order"
@@ -837,19 +854,11 @@ export default function CheckoutPage() {
 
         <section aria-labelledby="payment-heading" className="border-t border-line pt-6">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Payment</p>
-          <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Pay securely online</h2>
-          {cardPaymentsEnabled ? (
-            <div className="mt-4 rounded-xl border border-ink bg-background px-4 py-3">
-              <span className="block text-sm font-semibold text-ink">Card payment</span>
-              <span className="mt-1 block text-xs text-muted">
-                Pay now with Visa or Mastercard via AFS secure checkout.
-              </span>
-            </div>
-          ) : (
-            <p className="mt-2 max-w-xl rounded-xl bg-surface px-4 py-3 text-sm leading-relaxed text-muted">
-              Online card payments are temporarily unavailable. Please try again later to complete checkout.
-            </p>
-          )}
+          <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Choose payment method</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {cashOnDeliveryEnabled ? <label className={`cursor-pointer rounded-xl border px-4 py-3 ${paymentMethod === "cod" ? "border-ink bg-background" : "border-line bg-surface"}`}><input type="radio" name="payment-method" value="cod" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mr-2 accent-[#21342e]" /> <span className="text-sm font-semibold text-ink">Cash on delivery</span><span className="mt-1 block pl-6 text-xs text-muted">Pay the driver when your order arrives.</span></label> : null}
+            <label className={`cursor-pointer rounded-xl border px-4 py-3 ${paymentMethod === "card" ? "border-ink bg-background" : "border-line bg-surface"}`}><input type="radio" name="payment-method" value="card" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} disabled={!cardPaymentsEnabled} className="mr-2 accent-[#21342e]" /> <span className="text-sm font-semibold text-ink">Card payment</span><span className="mt-1 block pl-6 text-xs text-muted">{cardPaymentsEnabled ? "Pay securely online." : "Temporarily unavailable."}</span></label>
+          </div>
         </section>
         </section>
 
@@ -865,20 +874,20 @@ export default function CheckoutPage() {
           <span>Total</span>
           <span>{formatAed(orderTotal)}</span>
         </div>
-        <label className="mt-5 flex items-start gap-2 text-xs leading-5 text-muted">
-          <input type="checkbox" checked={legalAccepted} onChange={(event) => setLegalAccepted(event.target.checked)} className="mt-1" />
+        <label className="mt-5 flex items-start gap-3 text-xs leading-5 text-muted">
+          <input type="checkbox" checked={legalAccepted} onChange={(event) => setLegalAccepted(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 appearance-auto accent-[#21342e]" aria-label="Agree to the Customer Terms and Conditions and Privacy Policy" />
           <span>I have read and agree to the <Link href="/terms" className="font-semibold text-ink underline underline-offset-2">Customer Terms &amp; Conditions</Link> and acknowledge the <Link href="/privacy" className="font-semibold text-ink underline underline-offset-2">Privacy Policy</Link>.</span>
         </label>
         {placeError ? <p className="mt-4 text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
         <button
           type="button"
-          disabled={placing || !cardPaymentsEnabled || !legalAccepted || !online || (!checkoutReady && authed !== false)}
+          disabled={placing || (paymentMethod === "card" && !cardPaymentsEnabled) || !legalAccepted || !online || (!checkoutReady && authed !== false)}
           onClick={() => void placeOrder()}
           className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
           {placing
             ? "Starting payment..."
-            : !cardPaymentsEnabled
+            : paymentMethod === "card" && !cardPaymentsEnabled
               ? "Card payments unavailable"
             : authed === false
               ? "Sign in to place order"
@@ -889,9 +898,7 @@ export default function CheckoutPage() {
                   : "Select delivery time"}
         </button>
         <p className="mt-3 text-center text-xs leading-relaxed text-muted">
-          {cardPaymentsEnabled
-            ? "You will enter card details on AFS’s secure form next."
-            : "Checkout is temporarily unavailable while online card payments are offline."}
+          {paymentMethod === "cod" ? "Pay the driver in cash when your order arrives." : "You will enter card details on AFS’s secure form next."}
         </p>
       </aside>
       </div>

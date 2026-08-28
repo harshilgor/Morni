@@ -101,6 +101,13 @@ body {
   font-family: var(--font-satoshi), system-ui, sans-serif;
 }
 
+/* Keep legal consent controls visible across mobile browser checkbox styles. */
+input[type="checkbox"] {
+  appearance: auto;
+  accent-color: #21342e;
+  cursor: pointer;
+}
+
 /* Consistent keyboard focus across shopper, owner, and delivery surfaces. */
 :where(a, button, input, select, textarea):focus-visible {
   outline: 3px solid color-mix(in srgb, var(--mint) 72%, white);

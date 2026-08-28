@@ -200,20 +200,22 @@ export default function PortalOrdersPage() {
   async function deleteOrder(order: OrderWithItems) {
     setUpdatingId(order.id);
     setMessage(null);
+    // Remove it from the active queue immediately. The server remains the
+    // source of truth, and the previous row is restored if deletion fails.
+    const previousOrders = orders;
+    setOrders((current) => current.filter((candidate) => candidate.id !== order.id));
+    setSelectedId((current) => current === order.id ? null : current);
+    setMobileOrderId((current) => current === order.id ? null : current);
+    setDeleteCandidate(null);
     const response = await fetch(`/api/orders/${order.id}`, { method: "DELETE" });
     const payload = (await response.json().catch(() => null)) as { error?: string } | null;
     if (!response.ok) {
+      setOrders(previousOrders);
       setMessage(payload?.error ?? "Unable to remove this order.");
       setUpdatingId(null);
       return;
     }
 
-    setOrders((current) => current.map((candidate) =>
-      candidate.id === order.id ? { ...candidate, status: "cancelled" } : candidate,
-    ));
-    setSelectedId((current) => current === order.id ? null : current);
-    setMobileOrderId((current) => current === order.id ? null : current);
-    setDeleteCandidate(null);
     setMessage(`${order.order_number} was removed from the active queue and the shopper was notified.`);
     setUpdatingId(null);
   }
