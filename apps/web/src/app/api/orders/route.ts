@@ -36,7 +36,7 @@ type CheckoutBody = {
   address?: CheckoutAddress;
   saveAddress?: boolean;
   makeDefault?: boolean;
-  paymentMethod?: "cod" | "card";
+  paymentMethod?: "card";
   deliverySlot?: {
     start?: string;
     end?: string;
@@ -96,12 +96,36 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const idempotencyKey = (request.headers.get("idempotency-key") ?? "").trim().slice(0, 128);
+  if (!idempotencyKey) {
+    return NextResponse.json({ error: "A checkout request key is required. Please retry." }, { status: 400 });
+  }
+
   // Auth providers can create the auth row before a database trigger has
   // finished (or when an older project was missing the trigger entirely).
   // Ensure the FK target exists before the order RPC runs. The database
   // trigger remains the primary path; this is a server-side last line of
   // defense and never trusts profile data from the browser.
   const admin = createAdminClient();
+  const { data: existingRequest } = await admin
+    .from("checkout_requests")
+    .select("order_id")
+    .eq("shopper_id", user.id)
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+  if (existingRequest?.order_id) {
+    return NextResponse.json({ order: { id: existingRequest.order_id }, next: "pay" }, { status: 200 });
+  }
+  const { error: requestClaimError } = await admin.from("checkout_requests").insert({
+    shopper_id: user.id,
+    idempotency_key: idempotencyKey,
+  });
+  if (requestClaimError && requestClaimError.code === "23505") {
+    const { data: claimed } = await admin.from("checkout_requests").select("order_id").eq("shopper_id", user.id).eq("idempotency_key", idempotencyKey).maybeSingle();
+    if (claimed?.order_id) return NextResponse.json({ order: { id: claimed.order_id }, next: "pay" }, { status: 200 });
+    return NextResponse.json({ error: "This checkout is already being processed. Please retry shortly." }, { status: 409 });
+  }
+  if (requestClaimError) return NextResponse.json({ error: "Unable to start checkout." }, { status: 500 });
   const profileName =
     user.user_metadata?.full_name ||
     user.user_metadata?.name ||
@@ -208,7 +232,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A product in your bag is no longer available." }, { status: 400 });
   }
 
-  const requestedMethod = body?.paymentMethod === "cod" || body?.paymentMethod === "card" ? body.paymentMethod : null;
+  const requestedMethod = body?.paymentMethod === "card" ? body.paymentMethod : null;
   if (!requestedMethod) {
     return NextResponse.json(
       { error: "Choose a payment method to place an order." },
@@ -254,6 +278,7 @@ export async function POST(request: Request) {
   });
 
   if (error || !data) {
+    await admin.from("checkout_requests").delete().eq("shopper_id", user.id).eq("idempotency_key", idempotencyKey);
     return NextResponse.json(
       { error: error?.message || "Unable to place this order." },
       { status: 400 },
@@ -267,6 +292,7 @@ export async function POST(request: Request) {
   if (!order?.id) {
     return NextResponse.json({ error: "Unable to place this order." }, { status: 500 });
   }
+  await admin.from("checkout_requests").update({ order_id: order.id }).eq("shopper_id", user.id).eq("idempotency_key", idempotencyKey);
 
   // The checkout RPC owns pricing and stock. Attach the already-validated
   // measurements immediately afterwards so the same order item context is

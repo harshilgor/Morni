@@ -79,8 +79,7 @@ export default function CheckoutPage() {
   const [deliverySlots, setDeliverySlots] = useState<BookableDeliverySlot[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "card">("cod");
-  const cashOnDeliveryEnabled = true; // Temporary test option; remove when online payments are ready.
+  const [paymentMethod, setPaymentMethod] = useState<"card">("card");
   const locationLabel = useLocation((state) => state.label());
   const orderSubtotal = subtotal();
   const fees = calculateCheckoutFees(orderSubtotal);
@@ -201,7 +200,11 @@ export default function CheckoutPage() {
       const method = paymentMethod;
       const response = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // Stable for this browser attempt; prevents double orders on retries.
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": window.crypto.randomUUID(),
+        },
         body: JSON.stringify({
           items: items.map((item) => ({
             productId: item.productId,
@@ -525,7 +528,6 @@ export default function CheckoutPage() {
               <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
             </button>
             <div className="grid grid-cols-2 gap-2">
-              {cashOnDeliveryEnabled ? <label className={`rounded-lg border px-3 py-2 text-xs font-semibold ${paymentMethod === "cod" ? "border-ink bg-background text-ink" : "border-line bg-white text-muted"}`}><input type="radio" name="mobile-payment-method" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mr-1.5 accent-[#21342e]" />Cash on delivery</label> : null}
               <label className={`rounded-lg border px-3 py-2 text-xs font-semibold ${paymentMethod === "card" ? "border-ink bg-background text-ink" : "border-line bg-white text-muted"}`}><input type="radio" name="mobile-payment-method" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} disabled={!cardPaymentsEnabled} className="mr-1.5 accent-[#21342e]" />Card {cardPaymentsEnabled ? "payment" : "(unavailable)"}</label>
             </div>
             <label className="flex items-start gap-3 rounded-lg border border-[#c8d1cc] bg-white px-3 py-3 text-xs leading-5 text-[#4d5c56] shadow-sm">
@@ -856,7 +858,6 @@ export default function CheckoutPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Payment</p>
           <h2 id="payment-heading" className="mt-1 font-display text-3xl text-ink">Choose payment method</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {cashOnDeliveryEnabled ? <label className={`cursor-pointer rounded-xl border px-4 py-3 ${paymentMethod === "cod" ? "border-ink bg-background" : "border-line bg-surface"}`}><input type="radio" name="payment-method" value="cod" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mr-2 accent-[#21342e]" /> <span className="text-sm font-semibold text-ink">Cash on delivery</span><span className="mt-1 block pl-6 text-xs text-muted">Pay the driver when your order arrives.</span></label> : null}
             <label className={`cursor-pointer rounded-xl border px-4 py-3 ${paymentMethod === "card" ? "border-ink bg-background" : "border-line bg-surface"}`}><input type="radio" name="payment-method" value="card" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} disabled={!cardPaymentsEnabled} className="mr-2 accent-[#21342e]" /> <span className="text-sm font-semibold text-ink">Card payment</span><span className="mt-1 block pl-6 text-xs text-muted">{cardPaymentsEnabled ? "Pay securely online." : "Temporarily unavailable."}</span></label>
           </div>
         </section>
@@ -898,7 +899,7 @@ export default function CheckoutPage() {
                   : "Select delivery time"}
         </button>
         <p className="mt-3 text-center text-xs leading-relaxed text-muted">
-          {paymentMethod === "cod" ? "Pay the driver in cash when your order arrives." : "You will enter card details on AFS’s secure form next."}
+          You will enter card details on AFS’s secure form next.
         </p>
       </aside>
       </div>

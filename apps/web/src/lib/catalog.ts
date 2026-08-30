@@ -361,7 +361,7 @@ export async function getCachedProductPage(
 
   const supabase = createPublicClient();
   const [{ data: storeData }, { data: productData }, { data: customizationData }] = await Promise.all([
-    supabase.from("stores").select("*").eq("slug", slug).maybeSingle(),
+    supabase.from("stores").select("*").eq("slug", slug).eq("is_active", true).maybeSingle(),
     supabase
       .from("storefront_products")
       .select("*, product_variants(*)")

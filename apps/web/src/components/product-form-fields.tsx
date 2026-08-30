@@ -91,7 +91,7 @@ export function ProductFormFields({
             const categorySlug = e.target.value;
             patch({
               categorySlug,
-              ...(categorySlug === "gifting"
+              ...(["gifting", "hamper", "hampers"].includes(categorySlug)
                 ? { sizes: [], customization: defaultCustomizationConfig() }
                 : {}),
             });
@@ -159,7 +159,7 @@ export function ProductFormFields({
         ) : null}
       </label>
 
-      {value.categorySlug !== "gifting" ? <fieldset className="rounded-xl border border-line bg-background p-3">
+      {!(["gifting", "hamper", "hampers"].includes(value.categorySlug)) ? <fieldset className="rounded-xl border border-line bg-background p-3">
         <legend className="px-1 text-sm text-muted">
           Available sizes <span className="text-accent-deep">*</span>
         </legend>
@@ -198,7 +198,7 @@ export function ProductFormFields({
         )}
       </fieldset> : null}
 
-      {value.categorySlug !== "gifting" ? (
+      {!(["gifting", "hamper", "hampers"].includes(value.categorySlug)) ? (
         <CustomizationEditor
           value={value.customization}
           onChange={(customization) => patch({ customization })}

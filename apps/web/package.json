@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "load-test": "node ../../scripts/load-test.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest"

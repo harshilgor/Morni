@@ -122,15 +122,14 @@ export const DELIVERY_BUCKETS: {
 ];
 
 const SIZE_ORDER = [
-  "xxs",
-  "xs",
+  "free size",
   "s",
   "m",
   "l",
   "xl",
-  "xxl",
-  "xxxl",
-  "free size",
+  "2xl",
+  "3xl",
+  "4xl",
   "one size",
 ];
 

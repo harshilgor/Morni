@@ -1,14 +1,12 @@
 export const PRODUCT_SIZES = [
-  "XXS",
-  "XS",
+  "Free Size",
   "S",
   "M",
   "L",
   "XL",
-  "XXL",
+  "2XL",
   "3XL",
-  "Free Size",
+  "4XL",
 ] as const;
 
 export type ProductSize = (typeof PRODUCT_SIZES)[number];
-
