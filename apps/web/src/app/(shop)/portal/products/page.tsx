@@ -42,6 +42,7 @@ type ProductWithVariants = Product & {
 
 type ProductDraft = {
   title: string;
+  product_tag: string;
   price_aed: string;
   categorySlug: string;
   customization: ProductCustomizationConfig;
@@ -160,6 +161,7 @@ export default function PortalProductsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: "",
+    product_tag: "",
     description: "",
     price_aed: "",
     categorySlug: "",
@@ -264,6 +266,7 @@ export default function PortalProductsPage() {
     setMessage(null);
     setForm({
       title: "",
+      product_tag: "",
       description: "",
       price_aed: "",
       categorySlug: "",
@@ -379,6 +382,7 @@ export default function PortalProductsPage() {
     setEditingProductId(product.id);
     setEditDraft({
       title: product.title,
+      product_tag: product.product_tag ?? "",
       price_aed: String(product.price_aed),
       categorySlug: product.categories?.slug ?? "",
       customization:
@@ -456,6 +460,7 @@ export default function PortalProductsPage() {
         store_id: store.id,
         category_id: categoryId,
         title: form.title,
+        product_tag: form.product_tag.trim().toUpperCase() || null,
         description: form.description || null,
         price_aed: Number(form.price_aed),
         stock: aggregate.stock,
@@ -493,6 +498,7 @@ export default function PortalProductsPage() {
 
     setForm({
       title: "",
+      product_tag: "",
       description: "",
       price_aed: "",
       categorySlug: "",
@@ -553,6 +559,7 @@ export default function PortalProductsPage() {
       .update({
         category_id: categoryId,
         title: editDraft.title.trim(),
+        product_tag: editDraft.product_tag.trim().toUpperCase() || null,
         price_aed: price,
         customization_enabled: categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled,
         customization_instructions: categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled
@@ -948,6 +955,7 @@ export default function PortalProductsPage() {
                     autoFocus
                   />
                 </label>
+                <label className="block space-y-1.5 text-sm"><span className="font-medium text-[#40534d]">Product tag</span><input maxLength={40} pattern="[A-Za-z][A-Za-z0-9-]*" className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm uppercase" placeholder="e.g. VH102" value={form.product_tag} onChange={(e) => setForm((current) => ({ ...current, product_tag: e.target.value.toUpperCase() }))} /><span className="text-xs text-muted">Internal inventory reference. Shoppers will not see this.</span></label>
                 <label className="block space-y-1.5 text-sm">
                   <span className="font-medium text-[#40534d]">Category *</span>
                   <select
@@ -1073,8 +1081,8 @@ export default function PortalProductsPage() {
         >
           <div className="mx-auto flex min-h-full max-w-2xl flex-col">
             <div className="space-y-3">
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-[#40534d]">Title</span>
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">Title</span>
                 <input
                   type="text"
                   value={editDraft.title}
@@ -1086,6 +1094,7 @@ export default function PortalProductsPage() {
                   className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm outline-none focus:border-accent"
                 />
               </label>
+              <label className="block space-y-1.5 text-sm"><span className="font-medium text-[#40534d]">Product tag</span><input maxLength={40} pattern="[A-Za-z][A-Za-z0-9-]*" className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm uppercase" placeholder="e.g. VH102" value={editDraft.product_tag} onChange={(e) => setEditDraft((current) => current ? { ...current, product_tag: e.target.value.toUpperCase() } : current)} /><span className="text-xs text-muted">Internal inventory reference. Shoppers will not see this.</span></label>
               <label className="block space-y-1.5 text-sm">
                 <span className="font-medium text-[#40534d]">Price (AED)</span>
                 <input

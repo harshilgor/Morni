@@ -69,6 +69,7 @@ export type Product = {
   category_id: string | null;
   category?: { name?: string | null; slug?: string | null } | null;
   title: string;
+  product_tag?: string | null;
   description: string | null;
   price_aed: number;
   compare_at_price_aed: number | null;
