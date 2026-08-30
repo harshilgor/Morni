@@ -11,7 +11,7 @@ export default async function FounderPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth?next=%2Ffounder");
+  if (!user) redirect("/founder/auth?next=%2Ffounder");
 
   return (
     <PortalWorkspace>

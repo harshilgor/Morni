@@ -41,8 +41,13 @@ export async function GET(request: Request) {
     });
   }
 
-  const failureUrl = new URL(flow === "driver" ? "/driver/sign-in" : "/auth", origin);
+  const failureDestination = flow === "driver"
+    ? "/driver/sign-in"
+    : next === "/founder" || next.startsWith("/founder/")
+      ? "/founder/auth"
+      : "/auth";
+  const failureUrl = new URL(failureDestination, origin);
   failureUrl.searchParams.set("error", "auth_callback_failed");
-  if (flow === "driver") failureUrl.searchParams.set("next", next);
+  if (flow === "driver" || failureDestination === "/founder/auth") failureUrl.searchParams.set("next", next);
   return NextResponse.redirect(failureUrl);
 }

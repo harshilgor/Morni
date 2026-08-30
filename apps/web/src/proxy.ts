@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
     !hasAuthCookie
   ) {
     const authUrl = request.nextUrl.clone();
-    authUrl.pathname = "/auth";
+    authUrl.pathname = "/founder/auth";
     authUrl.search = `?next=${encodeURIComponent(`${pathname}${request.nextUrl.search}`)}`;
     return NextResponse.redirect(authUrl);
   }

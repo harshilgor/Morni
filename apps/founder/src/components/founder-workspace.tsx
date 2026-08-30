@@ -8,7 +8,7 @@ import { formatAed, orderStatusLabel } from "@/lib/format";
 import { PortalIcon, type PortalIconName } from "@/components/portal-icons";
 import type { OrderStatus } from "@/lib/types";
 
-type FounderView = "overview" | "operations" | "delivery" | "stores" | "customers" | "catalogue" | "finance" | "alerts";
+type FounderView = "overview" | "operations" | "delivery" | "stores" | "customers" | "catalogue" | "finance" | "settlements" | "alerts";
 type FounderTone = "urgent" | "warning" | "default";
 type DeliveryJobStatus = "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled";
 
@@ -33,6 +33,8 @@ type FounderData = {
   finance: { gross_sales: number; product_sales: number; delivery_fees: number; service_fees: number; small_order_fees: number; paid_orders: number; pending_orders: number };
   alerts: Array<{ tone: FounderTone; title: string; detail: string; href: string }>;
 };
+type SettlementStore = { store_id: string; store_name: string; order_count: number; gross_sales: number; commission: number; net_payout: number; paid_amount: number };
+type SettlementData = { period_start: string; period_end: string; commission_rate: number; stores: SettlementStore[]; history: Array<{ id: string; store_name: string; period_start: string; period_end: string; order_count: number; net_payout: number; payment_method: string; payment_reference: string | null; paid_at: string }> };
 
 const operateNav: Array<{ id: FounderView; label: string; icon: PortalIconName }> = [
   { id: "overview", label: "Today", icon: "overview" },
@@ -46,6 +48,7 @@ const growNav: Array<{ id: FounderView; label: string; icon: PortalIconName }> =
   { id: "customers", label: "Customers", icon: "reviews" },
   { id: "catalogue", label: "Catalogue", icon: "products" },
   { id: "finance", label: "Finance", icon: "analytics" },
+  { id: "settlements", label: "Settlements", icon: "analytics" },
 ];
 
 const statusOrder: OrderStatus[] = ["placed", "accepted", "picking", "out_for_delivery", "delivered"];
@@ -1016,6 +1019,27 @@ function FinanceView({ data }: { data: FounderData }) {
   );
 }
 
+function SettlementsView() {
+  const [settlement, setSettlement] = useState<SettlementData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const load = async () => { setLoading(true); const { data, error } = await createClient().rpc("founder_settlement_data", { p_range_days: 7 }); if (error) setMessage(error.message); else setSettlement(data as SettlementData); setLoading(false); };
+  useEffect(() => { void load(); }, []);
+  const outstanding = settlement?.stores.reduce((sum, store) => sum + Math.max(0, Number(store.net_payout) - Number(store.paid_amount)), 0) ?? 0;
+  async function markPaid(store: SettlementStore) {
+    setBusyId(store.store_id); setMessage(null);
+    const { error } = await createClient().rpc("record_merchant_payout", { p_store_id: store.store_id, p_period_start: settlement?.period_start, p_period_end: settlement?.period_end, p_payment_method: "bank_transfer", p_payment_reference: window.prompt("Payment reference (optional):") ?? "", p_note: null });
+    if (error) setMessage(error.message); else { setMessage(`${store.store_name} payout recorded.`); await load(); }
+    setBusyId(null);
+  }
+  return <div className="space-y-5">
+    <div className="grid gap-3 sm:grid-cols-3"><MetricCard label="Ready to pay" value={formatAed(outstanding)} detail="Delivered orders · last 7 days" tone={outstanding ? "attention" : "default"} icon="analytics" /><MetricCard label="Stores" value={number(settlement?.stores.length)} detail="With settlement activity" icon="store" /><MetricCard label="Commission" value={`${Math.round((settlement?.commission_rate ?? 0.15) * 100)}%`} detail="Current marketplace rate" icon="analytics" /></div>
+    <Panel className="p-5 sm:p-6"><SectionTitle title="Store settlements" detail="Review delivered-order balances, then record each bank transfer." /><div className="mt-5 overflow-x-auto"><table className="w-full min-w-[720px] text-left"><thead className="border-y border-[#e2e7e4] bg-[#f7faf8]"><tr>{["Store", "Orders", "Gross sales", "Commission", "Net payout", "Action"].map((heading) => <th key={heading} className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">{heading}</th>)}</tr></thead><tbody className="divide-y divide-[#eef2f0]">{loading ? <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-[#687770]">Loading settlements…</td></tr> : settlement?.stores.map((store) => { const due = Math.max(0, Number(store.net_payout) - Number(store.paid_amount)); return <tr key={store.store_id}><td className="px-4 py-4 text-sm font-semibold text-[#17231f]">{store.store_name}</td><td className="px-4 py-4 text-sm text-[#52615b]">{number(store.order_count)}</td><td className="px-4 py-4 text-sm tabular-nums text-[#52615b]">{formatAed(store.gross_sales)}</td><td className="px-4 py-4 text-sm tabular-nums text-[#52615b]">{formatAed(store.commission)}</td><td className="px-4 py-4 text-sm font-bold tabular-nums text-[#17231f]">{formatAed(due)}</td><td className="px-4 py-4">{due > 0 ? <button type="button" onClick={() => void markPaid(store)} disabled={busyId === store.store_id} className="rounded-lg bg-[#21342e] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busyId === store.store_id ? "Saving…" : "Mark paid"}</button> : <span className="text-xs font-semibold text-[#277044]">Paid</span>}</td></tr>; })}{!loading && !settlement?.stores.length ? <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-[#687770]">No delivered orders are ready for settlement.</td></tr> : null}</tbody></table></div>{message ? <p role="status" className="mt-4 rounded-lg bg-[#fff1dc] px-3 py-2.5 text-sm text-[#805313]">{message}</p> : null}</Panel>
+    <Panel className="p-5 sm:p-6"><SectionTitle title="Payout history" detail="Recorded settlement payments and their audit trail." /><div className="mt-4 divide-y divide-[#eef2f0]">{settlement?.history.map((entry) => <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><p className="font-semibold text-[#17231f]">{entry.store_name}</p><p className="mt-1 text-xs text-[#687770]">{dateTime(entry.paid_at)} · {entry.payment_reference || "No reference added"}</p></div><span className="font-bold tabular-nums text-[#277044]">{formatAed(entry.net_payout)}</span></div>)}{!settlement?.history.length ? <p className="py-8 text-center text-sm text-[#687770]">No payouts recorded yet.</p> : null}</div></Panel>
+  </div>;
+}
+
 function WorkspaceContent({ data, deliveryData, activeView, ownerName, onViewChange, onRefresh }: { data: FounderData; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void }) {
   if (activeView === "operations") return <Panel><OrderTable orders={data.recent_orders} /></Panel>;
   if (activeView === "delivery") return <DeliveryView data={deliveryData} onRefresh={onRefresh} />;
@@ -1023,6 +1047,7 @@ function WorkspaceContent({ data, deliveryData, activeView, ownerName, onViewCha
   if (activeView === "customers") return <CustomersView customers={data.customers} />;
   if (activeView === "catalogue") return <CatalogueView products={data.top_products} />;
   if (activeView === "finance") return <FinanceView data={data} />;
+  if (activeView === "settlements") return <SettlementsView />;
   if (activeView === "alerts") return <ActionCentre alerts={data.alerts} onViewChange={onViewChange} />;
   return <Overview data={data} ownerName={ownerName} onViewChange={onViewChange} />;
 }
@@ -1084,6 +1109,7 @@ export function FounderWorkspace() {
           customers: ["Customers", "Shopper relationships growing Morni."],
           catalogue: ["Catalogue", "Demand and inventory signals."],
           finance: ["Finance", "Sales, fees, and payment readiness."],
+          settlements: ["Settlements", "Store payouts, balances, and payment history."],
           alerts: ["Action centre", "Exceptions that deserve attention first."],
         }) satisfies Record<FounderView, [string, string]>
       )[activeView],

@@ -9,7 +9,7 @@ function safeNextPath(value: string | null) {
   return value && /^\/(?!\/)/.test(value) ? value : "/";
 }
 
-function AuthForm() {
+export function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));

@@ -59,11 +59,11 @@ const nextConfig: NextConfig = {
       "form-action 'self' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com",
       // Inline $RS polyfill + Next/Vercel runtime; AFS payment widget from OPPWA.
       "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://mpshare.iesnare.com https://mpshare.iesnap.com https://maps.googleapis.com https://maps.gstatic.com",
-      "script-src-elem 'self' 'unsafe-inline' https://va.vercel-scripts.com https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://mpshare.iesnare.com https://mpshare.iesnap.com https://maps.googleapis.com https://maps.gstatic.com",
+      "script-src-elem 'self' 'unsafe-inline' https://va.vercel-scripts.com https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://*.iesnare.com https://*.iesnap.com https://maps.googleapis.com https://maps.gstatic.com",
       "style-src 'self' 'unsafe-inline' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://mpshare.iesnare.com https://mpshare.iesnap.com https://maps.googleapis.com",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      `connect-src 'self' ${supabaseHost} wss://api.morniuae.com https://*.supabase.co wss://*.supabase.co https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://mpshare.iesnare.com https://mpshare.iesnap.com https://vitals.vercel-insights.com https://va.vercel-scripts.com https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com`,
+      `connect-src 'self' ${supabaseHost} wss://api.morniuae.com https://*.supabase.co wss://*.supabase.co https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://*.iesnare.com https://*.iesnap.com https://vitals.vercel-insights.com https://va.vercel-scripts.com https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com`,
       "frame-src 'self' https://*.oppwa.com https://eu-test.oppwa.com https://eu-prod.oppwa.com https://mpshare.iesnare.com https://mpshare.iesnap.com https://www.openstreetmap.org",
       "worker-src 'self' blob:",
       "upgrade-insecure-requests",
