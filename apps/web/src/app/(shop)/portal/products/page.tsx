@@ -4,6 +4,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { ColorVariantEditor } from "@/components/color-variant-editor";
 import { CustomizationEditor } from "@/components/customization-editor";
 import { QuickProductFields } from "@/components/quick-product-fields";
@@ -678,6 +679,9 @@ export default function PortalProductsPage() {
         title="Products"
         description={`Manage the live catalog, stock levels, options, and availability for ${store.name}.`}
       >
+        <Link href="/portal/products/bulk-upload" className="portal-button-secondary">
+          Bulk upload
+        </Link>
         <button type="button" onClick={openCreate} className="portal-button-primary">
           <PortalIcon name="plus" className="h-4 w-4" />
           Add product

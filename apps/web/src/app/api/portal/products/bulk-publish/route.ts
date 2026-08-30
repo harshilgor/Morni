@@ -1,0 +1,44 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+
+const itemSchema = z.object({ title: z.string().trim().min(3).max(120), description: z.string().trim().max(2000).default(""), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)).max(20), images: z.array(z.string().url()).min(1).max(5) });
+const schema = z.object({ storeId: z.string().uuid(), items: z.array(itemSchema).min(1).max(100).optional(), importId: z.string().uuid().optional() });
+
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const parsed = schema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Review the product fields and try again." }, { status: 400 });
+  const { storeId } = parsed.data;
+  const admin = createAdminClient();
+  const [{ data: member }, { data: profile }] = await Promise.all([admin.from("store_members").select("store_id").eq("store_id", storeId).eq("user_id", user.id).maybeSingle(), admin.from("profiles").select("role").eq("id", user.id).maybeSingle()]);
+  if (!member && profile?.role !== "admin") return NextResponse.json({ error: "You do not have access to this store." }, { status: 403 });
+  let importId = parsed.data.importId;
+  let items = parsed.data.items ?? [];
+  if (importId) {
+    const { data: existing } = await admin.from("bulk_imports").select("id,store_id,status").eq("id", importId).maybeSingle();
+    if (!existing || existing.store_id !== storeId || !["needs_review", "failed", "completed_with_errors"].includes(existing.status)) return NextResponse.json({ error: "This import is not available for publishing." }, { status: 409 });
+    if (!items.length) {
+      const { data: pending } = await admin.from("bulk_import_items").select("title,description,category_slug,price_aed,stock,sizes,image_urls").eq("import_id", importId).eq("status", "failed");
+      items = (pending ?? []).map((item) => ({ title: item.title, description: item.description ?? "", categorySlug: item.category_slug, priceAed: Number(item.price_aed), stock: item.stock, sizes: item.sizes ?? [], images: item.image_urls ?? [] }));
+    }
+  } else {
+    const { data: createdImport, error: importError } = await admin.from("bulk_imports").insert({ store_id: storeId, created_by: user.id, status: "publishing", total_items: items.length }).select("id").single();
+    if (importError || !createdImport) return NextResponse.json({ error: "Could not start the product import." }, { status: 500 });
+    importId = createdImport.id;
+  }
+  await admin.from("bulk_imports").update({ status: "publishing", total_items: items.length }).eq("id", importId);
+  if (!items.length) return NextResponse.json({ error: "No products are ready to publish." }, { status: 400 });
+  await admin.from("bulk_import_items").delete().eq("import_id", importId).eq("status", "failed");
+  const { data: importRows, error: importItemsError } = await admin.from("bulk_import_items").insert(items.map((item) => ({ import_id: importId, title: item.title, description: item.description || null, category_slug: item.categorySlug, price_aed: item.priceAed, stock: item.stock, sizes: item.sizes, image_urls: item.images }))).select("id,title");
+  if (importItemsError) return NextResponse.json({ error: "Could not prepare import items." }, { status: 500 });
+  const { data: published, error: publishError } = await admin.rpc("publish_bulk_import", { p_import_id: importId });
+  if (publishError) return NextResponse.json({ error: "Could not publish this import." }, { status: 500 });
+  const titleByItem = new Map((importRows ?? []).map((row) => [row.id, row.title]));
+  const results = ((published ?? []) as Array<{ item_id: string; product_id: string | null; ok: boolean; error_message: string | null }>).map((row) => ({ title: titleByItem.get(row.item_id) ?? "Product", ok: row.ok, id: row.product_id ?? undefined, error: row.error_message ?? undefined }));
+  const created = results.filter((result) => result.ok).length;
+  return NextResponse.json({ importId, results, created, failed: results.length - created });
+}
