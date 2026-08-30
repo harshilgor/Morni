@@ -139,7 +139,14 @@ body.portal-mode {
 .driver-experience {
   background: #f5f7fa;
   color: #111827;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 .driver-experience .driver-app,
@@ -208,7 +215,10 @@ body.portal-mode {
   display: none !important;
 }
 
-.driver-experience .driver-app > header button[aria-label="Refresh deliveries"] {
+.driver-experience
+  .driver-app
+  > header
+  button[aria-label="Refresh deliveries"] {
   display: none !important;
 }
 
@@ -246,7 +256,9 @@ body.portal-mode {
   background: rgb(255 255 255 / 96%) !important;
 }
 
-.driver-experience nav[aria-label="Rider sections"] button[aria-current="page"] {
+.driver-experience
+  nav[aria-label="Rider sections"]
+  button[aria-current="page"] {
   background: #0a84e5 !important;
   color: #fff !important;
 }
@@ -373,7 +385,11 @@ body.portal-mode {
   --portal-green: #2f6f66;
   min-height: 100vh;
   background:
-    radial-gradient(900px 480px at 8% -14%, rgba(184, 220, 207, 0.28), transparent 58%),
+    radial-gradient(
+      900px 480px at 8% -14%,
+      rgba(184, 220, 207, 0.28),
+      transparent 58%
+    ),
     var(--portal-canvas);
   color: var(--portal-ink);
 }
@@ -476,7 +492,9 @@ body.portal-mode {
   font-size: 0.8125rem;
   outline: none;
   padding: 0.62rem 0.75rem;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .portal-input:focus,
@@ -499,7 +517,9 @@ body.portal-mode {
 }
 
 .portal-table tbody tr {
-  transition: background-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    background-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .portal-table tbody tr:hover {
@@ -520,7 +540,11 @@ body.portal-mode {
   --founder-accent-soft: #e3f0eb;
   color: var(--founder-ink);
   background:
-    radial-gradient(760px 420px at 94% -12%, rgba(187, 222, 210, 0.34), transparent 62%),
+    radial-gradient(
+      760px 420px at 94% -12%,
+      rgba(187, 222, 210, 0.34),
+      transparent 62%
+    ),
     var(--founder-canvas);
 }
 
@@ -625,7 +649,10 @@ body.portal-mode {
   min-height: 4.25rem;
   border-color: var(--founder-line);
   background: var(--founder-surface-soft);
-  transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
 }
 
 .founder-workspace .founder-finance-row:hover {
@@ -882,7 +909,9 @@ body.portal-mode {
 }
 
 .seller-setup-form {
-  box-shadow: 0 1px 2px rgba(24, 49, 42, 0.04), 0 16px 34px -28px rgba(24, 49, 42, 0.3);
+  box-shadow:
+    0 1px 2px rgba(24, 49, 42, 0.04),
+    0 16px 34px -28px rgba(24, 49, 42, 0.3);
 }
 
 .seller-setup-form input,
@@ -1033,23 +1062,40 @@ h3,
 }
 
 @keyframes scaleIn {
-  0% { opacity: 0; transform: scale(0.5); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
-.bulk-upload-ai-button {
+.bulk-upload-button {
   box-shadow: 0 0 0 0 rgba(190, 72, 111, 0.32);
   animation: bulk-upload-glow 2.4s ease-in-out infinite;
 }
 
 @keyframes bulk-upload-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(190, 72, 111, 0.28); }
-  50% { box-shadow: 0 0 0 7px rgba(190, 72, 111, 0.08), 0 10px 28px -12px rgba(190, 72, 111, 0.7); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(190, 72, 111, 0.28);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px rgba(190, 72, 111, 0.08),
+      0 10px 28px -12px rgba(190, 72, 111, 0.7);
+  }
 }
 
 .morni-announcement-bar {
@@ -1084,8 +1130,12 @@ h3,
 }
 
 @keyframes morni-announcement-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 .skeleton {

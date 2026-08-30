@@ -14,7 +14,12 @@ import {
   type PreviewImage,
 } from "@/components/image-preview-dialog";
 import { PortalIcon } from "@/components/portal-icons";
-import { PortalEmpty, PortalMetric, PortalPageHeader, StatusBadge } from "@/components/portal-ui";
+import {
+  PortalEmpty,
+  PortalMetric,
+  PortalPageHeader,
+  StatusBadge,
+} from "@/components/portal-ui";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { formatAed } from "@/lib/format";
@@ -27,7 +32,10 @@ import {
 } from "@/lib/product-variants";
 import { replaceProductVariants } from "@/lib/save-product-variants";
 import { revalidatePublicCatalog } from "@/lib/revalidate-catalog";
-import { ensureStoreCategory, loadBrowseCategoryOptions } from "@/lib/store-category";
+import {
+  ensureStoreCategory,
+  loadBrowseCategoryOptions,
+} from "@/lib/store-category";
 import type { Product, ProductVariant } from "@/lib/types";
 import {
   customizationConfigFromProduct,
@@ -69,7 +77,10 @@ async function compressImageForListing(file: File) {
     await image.decode();
 
     const maxDimension = 1400;
-    const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+    const scale = Math.min(
+      1,
+      maxDimension / Math.max(image.width, image.height),
+    );
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(image.width * scale));
     canvas.height = Math.max(1, Math.round(image.height * scale));
@@ -145,11 +156,17 @@ function SheetShell({
           <PortalIcon name="close" className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold text-[#17231f]">{title}</p>
-          {subtitle ? <p className="truncate text-xs text-[#7b8882]">{subtitle}</p> : null}
+          <p className="truncate text-base font-semibold text-[#17231f]">
+            {title}
+          </p>
+          {subtitle ? (
+            <p className="truncate text-xs text-[#7b8882]">{subtitle}</p>
+          ) : null}
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+        {children}
+      </div>
     </div>
   );
 }
@@ -177,9 +194,9 @@ export default function PortalProductsPage() {
   const [query, setQuery] = useState("");
   const [showLowStock, setShowLowStock] = useState(false);
   const [showHiddenOnly, setShowHiddenOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<"newest" | "price_desc" | "price_asc" | "stock_asc">(
-    "newest",
-  );
+  const [sortBy, setSortBy] = useState<
+    "newest" | "price_desc" | "price_asc" | "stock_asc"
+  >("newest");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStock, setBulkStock] = useState("");
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -259,7 +276,8 @@ export default function PortalProductsPage() {
       return 0;
     });
 
-  const editingProduct = products.find((product) => product.id === editingProductId) ?? null;
+  const editingProduct =
+    products.find((product) => product.id === editingProductId) ?? null;
 
   function openCreate() {
     setCreateStep(1);
@@ -326,7 +344,9 @@ export default function PortalProductsPage() {
         .slice(0, 3);
       const images = await Promise.all(files.map(compressImageForListing));
       if (images.length === 0) {
-        throw new Error("Please choose a new product photo to generate a listing.");
+        throw new Error(
+          "Please choose a new product photo to generate a listing.",
+        );
       }
 
       const response = await fetch("/api/portal/products/generate", {
@@ -363,7 +383,9 @@ export default function PortalProductsPage() {
         ...(gifting ? { sizes: [] } : {}),
       });
       setAiGenerated(true);
-      setMessage("Review the suggested listing, then publish when it looks right.");
+      setMessage(
+        "Review the suggested listing, then publish when it looks right.",
+      );
       setCreateStep(2);
     } catch (error) {
       setAiGenerated(false);
@@ -419,13 +441,19 @@ export default function PortalProductsPage() {
       setCreateStep(1);
       return;
     }
-    if (categoryHasSizes(form.categorySlug) && form.customization.enabled && form.customization.fields.length === 0) {
+    if (
+      categoryHasSizes(form.categorySlug) &&
+      form.customization.enabled &&
+      form.customization.fields.length === 0
+    ) {
       setMessage("Choose at least one measurement for custom sizing.");
       setCreateStep(2);
       return;
     }
     const hasSizes = categoryHasSizes(form.categorySlug);
-    const colorError = validateColorDrafts(createColors, { requireSizes: hasSizes });
+    const colorError = validateColorDrafts(createColors, {
+      requireSizes: hasSizes,
+    });
     if (colorError) {
       setMessage(colorError);
       setCreateStep(2);
@@ -449,7 +477,9 @@ export default function PortalProductsPage() {
         categoryName: category?.name,
       });
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Could not save the category.");
+      setMessage(
+        err instanceof Error ? err.message : "Could not save the category.",
+      );
       setSaving(false);
       return;
     }
@@ -465,13 +495,16 @@ export default function PortalProductsPage() {
         price_aed: Number(form.price_aed),
         stock: aggregate.stock,
         sizes: aggregate.sizes,
-        customization_enabled: categoryHasSizes(form.categorySlug) && form.customization.enabled,
-        customization_instructions: categoryHasSizes(form.categorySlug) && form.customization.enabled
-          ? form.customization.instructions.trim()
-          : null,
-        customization_fields: categoryHasSizes(form.categorySlug) && form.customization.enabled
-          ? form.customization.fields
-          : [],
+        customization_enabled:
+          categoryHasSizes(form.categorySlug) && form.customization.enabled,
+        customization_instructions:
+          categoryHasSizes(form.categorySlug) && form.customization.enabled
+            ? form.customization.instructions.trim()
+            : null,
+        customization_fields:
+          categoryHasSizes(form.categorySlug) && form.customization.enabled
+            ? form.customization.fields
+            : [],
         is_available: true,
         image_urls: [],
       })
@@ -527,12 +560,18 @@ export default function PortalProductsPage() {
       setEditMessage("Choose a category for this product.");
       return;
     }
-    if (categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled && editDraft.customization.fields.length === 0) {
+    if (
+      categoryHasSizes(editDraft.categorySlug) &&
+      editDraft.customization.enabled &&
+      editDraft.customization.fields.length === 0
+    ) {
       setEditMessage("Choose at least one measurement for custom sizing.");
       return;
     }
     const hasSizes = categoryHasSizes(editDraft.categorySlug);
-    const colorError = validateColorDrafts(editColors, { requireSizes: hasSizes });
+    const colorError = validateColorDrafts(editColors, {
+      requireSizes: hasSizes,
+    });
     if (colorError) {
       setEditMessage(colorError);
       return;
@@ -541,7 +580,9 @@ export default function PortalProductsPage() {
     setSavingEdits(true);
     setEditMessage(null);
     const supabase = createClient();
-    const category = categories.find((item) => item.slug === editDraft.categorySlug);
+    const category = categories.find(
+      (item) => item.slug === editDraft.categorySlug,
+    );
     let categoryId: string;
     try {
       categoryId = await ensureStoreCategory({
@@ -550,7 +591,9 @@ export default function PortalProductsPage() {
         categoryName: category?.name,
       });
     } catch (err) {
-      setEditMessage(err instanceof Error ? err.message : "Could not save the category.");
+      setEditMessage(
+        err instanceof Error ? err.message : "Could not save the category.",
+      );
       setSavingEdits(false);
       return;
     }
@@ -561,13 +604,19 @@ export default function PortalProductsPage() {
         title: editDraft.title.trim(),
         product_tag: editDraft.product_tag.trim().toUpperCase() || null,
         price_aed: price,
-        customization_enabled: categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled,
-        customization_instructions: categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled
-          ? editDraft.customization.instructions.trim()
-          : null,
-        customization_fields: categoryHasSizes(editDraft.categorySlug) && editDraft.customization.enabled
-          ? editDraft.customization.fields
-          : [],
+        customization_enabled:
+          categoryHasSizes(editDraft.categorySlug) &&
+          editDraft.customization.enabled,
+        customization_instructions:
+          categoryHasSizes(editDraft.categorySlug) &&
+          editDraft.customization.enabled
+            ? editDraft.customization.instructions.trim()
+            : null,
+        customization_fields:
+          categoryHasSizes(editDraft.categorySlug) &&
+          editDraft.customization.enabled
+            ? editDraft.customization.fields
+            : [],
       })
       .eq("id", editingProduct.id)
       .eq("store_id", store.id);
@@ -587,7 +636,9 @@ export default function PortalProductsPage() {
           : editColors.map((draft) => ({ ...draft, sizes: [] })),
       });
     } catch (err) {
-      setEditMessage(err instanceof Error ? err.message : "Could not update colors.");
+      setEditMessage(
+        err instanceof Error ? err.message : "Could not update colors.",
+      );
       setSavingEdits(false);
       return;
     }
@@ -610,7 +661,8 @@ export default function PortalProductsPage() {
   }
 
   async function removeProduct(product: Product) {
-    if (!window.confirm(`Delete “${product.title}”? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete “${product.title}”? This cannot be undone.`))
+      return;
     const supabase = createClient();
     await supabase.from("products").delete().eq("id", product.id);
     void revalidatePublicCatalog();
@@ -620,14 +672,19 @@ export default function PortalProductsPage() {
 
   function toggleSelected(productId: string) {
     setSelectedIds((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId],
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId],
     );
   }
 
   async function bulkSetAvailability(isAvailable: boolean) {
     if (!selectedIds.length) return;
     const supabase = createClient();
-    await supabase.from("products").update({ is_available: isAvailable }).in("id", selectedIds);
+    await supabase
+      .from("products")
+      .update({ is_available: isAvailable })
+      .in("id", selectedIds);
     setSelectedIds([]);
     void revalidatePublicCatalog();
     if (store) await loadProducts(store.id);
@@ -644,7 +701,10 @@ export default function PortalProductsPage() {
       if (!product) continue;
       const variants = product.product_variants ?? [];
       if (variants.length > 0) {
-        await supabase.from("product_variants").update({ stock }).eq("product_id", productId);
+        await supabase
+          .from("product_variants")
+          .update({ stock })
+          .eq("product_id", productId);
       } else {
         await supabase.from("products").update({ stock }).eq("id", productId);
       }
@@ -686,10 +746,17 @@ export default function PortalProductsPage() {
         title="Products"
         description={`Manage the live catalog, stock levels, options, and availability for ${store.name}.`}
       >
-        <Link href="/portal/products/bulk-upload" className="portal-button-secondary">
+        <Link
+          href="/portal/products/bulk-upload"
+          className="portal-button-secondary bulk-upload-button"
+        >
           Bulk upload
         </Link>
-        <button type="button" onClick={openCreate} className="portal-button-primary">
+        <button
+          type="button"
+          onClick={openCreate}
+          className="portal-button-primary"
+        >
           <PortalIcon name="plus" className="h-4 w-4" />
           Add product
         </button>
@@ -706,8 +773,13 @@ export default function PortalProductsPage() {
             aria-pressed={!showLowStock && !showHiddenOnly}
             className={`min-w-0 px-2.5 py-3 text-left transition ${!showLowStock && !showHiddenOnly ? "bg-[#f3f8f5]" : "hover:bg-[#f8faf9]"}`}
           >
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]"><PortalIcon name="products" className="h-3.5 w-3.5" />Live</span>
-            <span className="mt-1 block text-xl font-semibold tracking-[-0.04em] text-[#17231f]">{products.filter((product) => product.is_available).length}</span>
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]">
+              <PortalIcon name="products" className="h-3.5 w-3.5" />
+              Live
+            </span>
+            <span className="mt-1 block text-xl font-semibold tracking-[-0.04em] text-[#17231f]">
+              {products.filter((product) => product.is_available).length}
+            </span>
           </button>
           <button
             type="button"
@@ -718,8 +790,15 @@ export default function PortalProductsPage() {
             aria-pressed={showLowStock && !showHiddenOnly}
             className={`min-w-0 border-x border-[#edf1ef] px-2.5 py-3 text-left transition ${showLowStock && !showHiddenOnly ? "bg-[#fff8f1]" : "hover:bg-[#f8faf9]"}`}
           >
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]"><PortalIcon name="warning" className="h-3.5 w-3.5" />Low stock</span>
-            <span className={`mt-1 block text-xl font-semibold tracking-[-0.04em] ${products.some((product) => product.stock <= 5) ? "text-[#b55a36]" : "text-[#17231f]"}`}>{products.filter((product) => product.stock <= 5).length}</span>
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]">
+              <PortalIcon name="warning" className="h-3.5 w-3.5" />
+              Low stock
+            </span>
+            <span
+              className={`mt-1 block text-xl font-semibold tracking-[-0.04em] ${products.some((product) => product.stock <= 5) ? "text-[#b55a36]" : "text-[#17231f]"}`}
+            >
+              {products.filter((product) => product.stock <= 5).length}
+            </span>
           </button>
           <button
             type="button"
@@ -730,8 +809,13 @@ export default function PortalProductsPage() {
             aria-pressed={showHiddenOnly && !showLowStock}
             className={`min-w-0 px-2.5 py-3 text-left transition ${showHiddenOnly && !showLowStock ? "bg-[#f3f8f5]" : "hover:bg-[#f8faf9]"}`}
           >
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]"><PortalIcon name="eye" className="h-3.5 w-3.5" />Hidden</span>
-            <span className="mt-1 block text-xl font-semibold tracking-[-0.04em] text-[#17231f]">{products.filter((product) => !product.is_available).length}</span>
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#60706a]">
+              <PortalIcon name="eye" className="h-3.5 w-3.5" />
+              Hidden
+            </span>
+            <span className="mt-1 block text-xl font-semibold tracking-[-0.04em] text-[#17231f]">
+              {products.filter((product) => !product.is_available).length}
+            </span>
           </button>
         </div>
       </section>
@@ -739,27 +823,39 @@ export default function PortalProductsPage() {
       <div className="hidden gap-3 sm:grid sm:grid-cols-3">
         <PortalMetric
           label="Live products"
-          value={String(products.filter((product) => product.is_available).length)}
+          value={String(
+            products.filter((product) => product.is_available).length,
+          )}
           detail={`${products.length} in catalog`}
           icon="products"
         />
         <PortalMetric
           label="Low stock"
-          value={String(products.filter((product) => product.stock <= 5).length)}
+          value={String(
+            products.filter((product) => product.stock <= 5).length,
+          )}
           detail="Items with 5 units or fewer"
           icon="warning"
-          tone={products.some((product) => product.stock <= 5) ? "urgent" : "default"}
+          tone={
+            products.some((product) => product.stock <= 5)
+              ? "urgent"
+              : "default"
+          }
         />
         <PortalMetric
           label="Hidden products"
-          value={String(products.filter((product) => !product.is_available).length)}
+          value={String(
+            products.filter((product) => !product.is_available).length,
+          )}
           detail="Not visible to shoppers"
           icon="eye"
         />
       </div>
 
       {message ? (
-        <p className="rounded-xl bg-[#edf7f3] px-4 py-3 text-sm text-[#1f594f]">{message}</p>
+        <p className="rounded-xl bg-[#edf7f3] px-4 py-3 text-sm text-[#1f594f]">
+          {message}
+        </p>
       ) : null}
 
       <div className="portal-card p-4">
@@ -898,7 +994,11 @@ export default function PortalProductsPage() {
       {addProductOpen ? (
         <SheetShell
           title="Add product"
-          subtitle={createStep === 1 ? "Step 1 of 2 · Photos & stock" : "Step 2 of 2 · Review listing"}
+          subtitle={
+            createStep === 1
+              ? "Step 1 of 2 · Photos & stock"
+              : "Step 2 of 2 · Review listing"
+          }
           onClose={closeCreate}
         >
           <form
@@ -925,9 +1025,13 @@ export default function PortalProductsPage() {
 
             {createStep === 1 ? (
               <QuickProductFields
-                draft={createColors[0] ?? createColorDraft({ color_name: "Default" })}
+                draft={
+                  createColors[0] ?? createColorDraft({ color_name: "Default" })
+                }
                 priceAed={form.price_aed}
-                onPriceChange={(price_aed) => setForm((current) => ({ ...current, price_aed }))}
+                onPriceChange={(price_aed) =>
+                  setForm((current) => ({ ...current, price_aed }))
+                }
                 onChange={updatePrimaryColorDraft}
                 disabled={generating || saving}
               />
@@ -939,7 +1043,8 @@ export default function PortalProductsPage() {
                       AI draft ready for review
                     </p>
                     <p className="mt-1 text-xs leading-5 text-[#54756b]">
-                      Check every suggestion before publishing. You can edit anything below.
+                      Check every suggestion before publishing. You can edit
+                      anything below.
                     </p>
                   </div>
                 ) : null}
@@ -950,12 +1055,37 @@ export default function PortalProductsPage() {
                     className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
                     placeholder="Product name"
                     value={form.title}
-                    onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((current) => ({
+                        ...current,
+                        title: e.target.value,
+                      }))
+                    }
                     required
                     autoFocus
                   />
                 </label>
-                <label className="block space-y-1.5 text-sm"><span className="font-medium text-[#40534d]">Product tag</span><input maxLength={40} pattern="[A-Za-z][A-Za-z0-9-]*" className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm uppercase" placeholder="e.g. VH102" value={form.product_tag} onChange={(e) => setForm((current) => ({ ...current, product_tag: e.target.value.toUpperCase() }))} /><span className="text-xs text-muted">Internal inventory reference. Shoppers will not see this.</span></label>
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">
+                    Product tag
+                  </span>
+                  <input
+                    maxLength={40}
+                    pattern="[A-Za-z][A-Za-z0-9-]*"
+                    className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm uppercase"
+                    placeholder="e.g. VH102"
+                    value={form.product_tag}
+                    onChange={(e) =>
+                      setForm((current) => ({
+                        ...current,
+                        product_tag: e.target.value.toUpperCase(),
+                      }))
+                    }
+                  />
+                  <span className="text-xs text-muted">
+                    Internal inventory reference. Shoppers will not see this.
+                  </span>
+                </label>
                 <label className="block space-y-1.5 text-sm">
                   <span className="font-medium text-[#40534d]">Category *</span>
                   <select
@@ -987,13 +1117,20 @@ export default function PortalProductsPage() {
                   </select>
                 </label>
                 <label className="block space-y-1.5 text-sm">
-                  <span className="font-medium text-[#40534d]">Description *</span>
+                  <span className="font-medium text-[#40534d]">
+                    Description *
+                  </span>
                   <textarea
                     className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
                     placeholder="Describe what shoppers should know"
                     rows={5}
                     value={form.description}
-                    onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((current) => ({
+                        ...current,
+                        description: e.target.value,
+                      }))
+                    }
                     required
                   />
                 </label>
@@ -1002,11 +1139,16 @@ export default function PortalProductsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-medium">Essentials saved</span>
                     <span className="text-xs text-muted">
-                      {createColors[0]?.stock ?? 0} in stock · {categoryHasSizes(form.categorySlug) ? `${createColors[0]?.sizes.length ?? 0} sizes · ` : ""}{createColors[0]?.images.length ?? 0} photos
+                      {createColors[0]?.stock ?? 0} in stock ·{" "}
+                      {categoryHasSizes(form.categorySlug)
+                        ? `${createColors[0]?.sizes.length ?? 0} sizes · `
+                        : ""}
+                      {createColors[0]?.images.length ?? 0} photos
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
-                    Need colors, custom sizing, or other advanced options? Expand below.
+                    Need colors, custom sizing, or other advanced options?
+                    Expand below.
                   </p>
                 </div>
 
@@ -1018,7 +1160,9 @@ export default function PortalProductsPage() {
                     {categoryHasSizes(form.categorySlug) ? (
                       <CustomizationEditor
                         value={form.customization}
-                        onChange={(customization) => setForm((current) => ({ ...current, customization }))}
+                        onChange={(customization) =>
+                          setForm((current) => ({ ...current, customization }))
+                        }
                       />
                     ) : null}
                     <ColorVariantEditor
@@ -1032,7 +1176,9 @@ export default function PortalProductsPage() {
               </div>
             )}
 
-            {message ? <p className="mt-3 text-sm text-accent-deep">{message}</p> : null}
+            {message ? (
+              <p className="mt-3 text-sm text-accent-deep">{message}</p>
+            ) : null}
 
             <StickyActionBar>
               <div className="flex gap-2">
@@ -1081,20 +1227,44 @@ export default function PortalProductsPage() {
         >
           <div className="mx-auto flex min-h-full max-w-2xl flex-col">
             <div className="space-y-3">
-                <label className="block space-y-1.5 text-sm">
-                  <span className="font-medium text-[#40534d]">Title</span>
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-[#40534d]">Title</span>
                 <input
                   type="text"
                   value={editDraft.title}
                   onChange={(event) =>
                     setEditDraft((current) =>
-                      current ? { ...current, title: event.target.value } : current,
+                      current
+                        ? { ...current, title: event.target.value }
+                        : current,
                     )
                   }
                   className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm outline-none focus:border-accent"
                 />
               </label>
-              <label className="block space-y-1.5 text-sm"><span className="font-medium text-[#40534d]">Product tag</span><input maxLength={40} pattern="[A-Za-z][A-Za-z0-9-]*" className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm uppercase" placeholder="e.g. VH102" value={editDraft.product_tag} onChange={(e) => setEditDraft((current) => current ? { ...current, product_tag: e.target.value.toUpperCase() } : current)} /><span className="text-xs text-muted">Internal inventory reference. Shoppers will not see this.</span></label>
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-[#40534d]">Product tag</span>
+                <input
+                  maxLength={40}
+                  pattern="[A-Za-z][A-Za-z0-9-]*"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm uppercase"
+                  placeholder="e.g. VH102"
+                  value={editDraft.product_tag}
+                  onChange={(e) =>
+                    setEditDraft((current) =>
+                      current
+                        ? {
+                            ...current,
+                            product_tag: e.target.value.toUpperCase(),
+                          }
+                        : current,
+                    )
+                  }
+                />
+                <span className="text-xs text-muted">
+                  Internal inventory reference. Shoppers will not see this.
+                </span>
+              </label>
               <label className="block space-y-1.5 text-sm">
                 <span className="font-medium text-[#40534d]">Price (AED)</span>
                 <input
@@ -1104,7 +1274,9 @@ export default function PortalProductsPage() {
                   value={editDraft.price_aed}
                   onChange={(event) =>
                     setEditDraft((current) =>
-                      current ? { ...current, price_aed: event.target.value } : current,
+                      current
+                        ? { ...current, price_aed: event.target.value }
+                        : current,
                     )
                   }
                   className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm outline-none focus:border-accent"
@@ -1117,25 +1289,25 @@ export default function PortalProductsPage() {
                 <select
                   className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
                   value={editDraft.categorySlug}
-                    onChange={(event) => {
-                      const categorySlug = event.target.value;
-                      setEditDraft((current) =>
-                        current
-                          ? {
-                              ...current,
-                              categorySlug,
-                              ...(categorySlug === "gifting"
-                                ? { customization: defaultCustomizationConfig() }
-                                : {}),
-                            }
-                          : current,
+                  onChange={(event) => {
+                    const categorySlug = event.target.value;
+                    setEditDraft((current) =>
+                      current
+                        ? {
+                            ...current,
+                            categorySlug,
+                            ...(categorySlug === "gifting"
+                              ? { customization: defaultCustomizationConfig() }
+                              : {}),
+                          }
+                        : current,
+                    );
+                    if (!categoryHasSizes(categorySlug)) {
+                      setEditColors((current) =>
+                        current.map((draft) => ({ ...draft, sizes: [] })),
                       );
-                      if (!categoryHasSizes(categorySlug)) {
-                        setEditColors((current) =>
-                          current.map((draft) => ({ ...draft, sizes: [] })),
-                        );
-                      }
-                    }}
+                    }
+                  }}
                   required
                 >
                   <option value="">Select a category</option>
@@ -1151,7 +1323,9 @@ export default function PortalProductsPage() {
                   compact
                   value={editDraft.customization}
                   onChange={(customization) =>
-                    setEditDraft((current) => (current ? { ...current, customization } : current))
+                    setEditDraft((current) =>
+                      current ? { ...current, customization } : current,
+                    )
                   }
                 />
               ) : null}
@@ -1274,7 +1448,9 @@ function CatalogCards({
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[#263530]">{product.title}</p>
+                    <p className="truncate text-sm font-semibold text-[#263530]">
+                      {product.title}
+                    </p>
                     <p className="mt-1 text-sm text-[#5b6a64]">
                       {formatAed(product.price_aed)} · {product.stock} in stock
                     </p>
@@ -1282,7 +1458,11 @@ function CatalogCards({
                       {product.categories?.name ?? "Needs category"}
                     </p>
                   </div>
-                  {product.is_available ? <StatusBadge status="live" /> : <StatusBadge status="paused" />}
+                  {product.is_available ? (
+                    <StatusBadge status="live" />
+                  ) : (
+                    <StatusBadge status="paused" />
+                  )}
                 </div>
                 {variants.length ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1299,13 +1479,16 @@ function CatalogCards({
                       </span>
                     ))}
                     {variants.length > 4 ? (
-                      <span className="text-[11px] text-muted">+{variants.length - 4}</span>
+                      <span className="text-[11px] text-muted">
+                        +{variants.length - 4}
+                      </span>
                     ) : null}
                   </div>
                 ) : null}
                 {product.customization_enabled ? (
                   <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#edf7f3] px-2 py-1 text-[11px] font-semibold text-[#2f6f66]">
-                    <PortalIcon name="sparkle" className="h-3 w-3" /> Custom sizing
+                    <PortalIcon name="sparkle" className="h-3 w-3" /> Custom
+                    sizing
                   </span>
                 ) : null}
               </div>
@@ -1372,12 +1555,17 @@ function CatalogTable({
     <div className="portal-card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf1ef] px-5 py-4">
         <div>
-          <p className="text-sm font-semibold text-[#263530]">Catalog inventory</p>
+          <p className="text-sm font-semibold text-[#263530]">
+            Catalog inventory
+          </p>
           <p className="mt-1 text-xs text-[#7b8882]">
-            {products.length} product{products.length === 1 ? "" : "s"} in this view
+            {products.length} product{products.length === 1 ? "" : "s"} in this
+            view
           </p>
         </div>
-        <p className="text-xs text-[#7b8882]">Select products above to make bulk changes.</p>
+        <p className="text-xs text-[#7b8882]">
+          Select products above to make bulk changes.
+        </p>
       </div>
       <div className="overflow-x-auto">
         <table className="portal-table w-full min-w-[860px] text-left">
@@ -1424,7 +1612,9 @@ function CatalogTable({
                             <span className="sr-only">Preview photos</span>
                           </>
                         ) : (
-                          <span className="text-[10px] text-[#7b8882]">No photo</span>
+                          <span className="text-[10px] text-[#7b8882]">
+                            No photo
+                          </span>
                         )}
                       </button>
                       <span className="min-w-0">
@@ -1434,12 +1624,16 @@ function CatalogTable({
                         <span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">
                           {variants.length
                             ? variants
-                                .map((variant) => `${variant.color_name} (${variant.stock})`)
+                                .map(
+                                  (variant) =>
+                                    `${variant.color_name} (${variant.stock})`,
+                                )
                                 .join(" / ")
                             : "No colour variants"}
                         </span>
                         <span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">
-                          Category: {product.categories?.name ?? "Needs category"}
+                          Category:{" "}
+                          {product.categories?.name ?? "Needs category"}
                         </span>
                       </span>
                     </div>

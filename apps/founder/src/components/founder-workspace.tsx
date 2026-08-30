@@ -228,23 +228,63 @@ function ActionCentre({ alerts, onViewChange, limit }: { alerts: FounderData["al
 }
 
 function RevenueChart({ days }: { days: FounderData["daily_sales"] }) {
-  const maximumRevenue = Math.max(...days.map((day) => Number(day.revenue)), 1);
+  const chartDays = days.length ? days : [{ day: "empty", label: "No data", revenue: 0, orders: 0, shoppers: 0 }];
+  const maximumRevenue = Math.max(...chartDays.map((day) => Number(day.revenue)), 1);
+  const width = 720;
+  const height = 230;
+  const padding = { top: 18, right: 12, bottom: 32, left: 12 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+  const points = chartDays.map((day, index) => ({
+    x: padding.left + (chartDays.length === 1 ? innerWidth / 2 : (index / (chartDays.length - 1)) * innerWidth),
+    y: padding.top + innerHeight - (Number(day.revenue) / maximumRevenue) * innerHeight,
+  }));
+  const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+  const areaPath = `${linePath} L${points.at(-1)?.x.toFixed(2)},${(padding.top + innerHeight).toFixed(2)} L${points[0]?.x.toFixed(2)},${(padding.top + innerHeight).toFixed(2)} Z`;
+  const gridLines = [0, 0.33, 0.66, 1];
   return (
-    <div className="mt-6 flex h-48 items-end gap-1.5 sm:gap-2">
-      {days.map((day) => {
-        const height = Math.max((Number(day.revenue) / maximumRevenue) * 100, 4);
-        return (
-          <div key={day.day} className="group flex min-w-0 flex-1 flex-col items-center gap-2">
-            <div className="relative flex h-36 w-full items-end rounded-md bg-[#eef3f0]">
-              <div className="absolute -top-8 left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-[#21342e] px-2 py-1 text-[10px] font-semibold text-white shadow-lg group-hover:block">
-                {formatAed(day.revenue)}
-              </div>
-              <div className="w-full rounded-md bg-[#5b9183] transition-[height] duration-500" style={{ height: `${height}%` }} />
-            </div>
-            <span className="truncate text-[10px] font-semibold text-[#7b8882]">{day.label}</span>
-          </div>
-        );
-      })}
+    <div className="mt-5 rounded-xl border border-[#d9e4df] bg-[#f9fcfb] p-3 sm:p-4">
+      <div className="mb-2 flex items-center justify-between px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">
+        <span>Revenue trend</span>
+        <span className="inline-flex items-center gap-1.5 normal-case tracking-normal text-[#2f6f66]"><span className="h-1.5 w-1.5 rounded-full bg-[#3278ff] shadow-[0_0_8px_#3278ff]" /> Gross sales</span>
+      </div>
+      <div className="relative h-56 w-full">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible" role="img" aria-label="Revenue trend chart">
+          <defs>
+            <linearGradient id="founder-revenue-fill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#3278ff" stopOpacity="0.27" />
+              <stop offset="100%" stopColor="#3278ff" stopOpacity="0.015" />
+            </linearGradient>
+            <filter id="founder-revenue-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3.2" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          {gridLines.map((ratio) => {
+            const y = padding.top + innerHeight - ratio * innerHeight;
+            return <line key={ratio} x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#dce7e2" strokeDasharray="4 5" />;
+          })}
+          <path d={areaPath} fill="url(#founder-revenue-fill)" />
+          <path d={linePath} fill="none" stroke="#3278ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" filter="url(#founder-revenue-glow)" />
+          {points.map((point, index) => (
+            <g key={chartDays[index].day} className="group">
+              <circle cx={point.x} cy={point.y} r="13" fill="transparent" />
+              <circle cx={point.x} cy={point.y} r="4" fill="#fff" stroke="#3278ff" strokeWidth="2" className="opacity-0 transition-opacity group-hover:opacity-100" />
+              <g className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100">
+                <rect x={Math.max(2, point.x - 38)} y={Math.max(0, point.y - 34)} width="76" height="22" rx="6" fill="#16253c" />
+                <text x={point.x} y={Math.max(15, point.y - 19)} textAnchor="middle" fill="#fff" fontSize="10" fontWeight="700">{formatAed(chartDays[index].revenue)}</text>
+              </g>
+            </g>
+          ))}
+          {chartDays.map((day, index) => index % Math.max(1, Math.ceil(chartDays.length / 7)) === 0 ? (
+            <text key={`label-${day.day}`} x={points[index].x} y={height - 8} textAnchor="middle" fill="#82908a" fontSize="10" fontWeight="600">{day.label}</text>
+          ) : null)}
+        </svg>
+      </div>
+      <div className="mt-1 flex items-center justify-between border-t border-[#e4ece8] px-1 pt-3 text-xs text-[#687770]">
+        <span>{chartDays[0]?.label}</span>
+        <span>{chartDays.at(-1)?.label}</span>
+      </div>
     </div>
   );
 }

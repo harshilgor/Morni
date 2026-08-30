@@ -36,17 +36,20 @@ const productKey = (name: string) =>
 async function imageDataForAnalysis(file: File) {
   try {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    // Keep each data URL comfortably below the server validation limit.
+    const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    canvas
+      .getContext("2d")
+      ?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    return canvas.toDataURL("image/jpeg", 0.86);
+    return canvas.toDataURL("image/jpeg", 0.72);
   } catch {
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
+      reader.onload = () => resolve(String(reader.result).replace(/^data:image\/jpg;/i, "data:image/jpeg;"));
       reader.onerror = () => reject(new Error("Could not read image."));
       reader.readAsDataURL(file);
     });
@@ -82,7 +85,8 @@ export default function BulkUploadPage() {
   }, []);
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (!window.localStorage.getItem("morni.bulk-upload-coach-dismissed")) setShowCoach(true);
+      if (!window.localStorage.getItem("morni.bulk-upload-coach-dismissed"))
+        setShowCoach(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -102,15 +106,24 @@ export default function BulkUploadPage() {
     );
   }, [store]);
   function addFiles(list: FileList | File[]) {
-    const valid = Array.from(list).filter((file) => !validateImageFile(file));
+    const valid = Array.from(list).filter((file) => {
+      if (!validateImageFile(file)) return true;
+      // Some mobile browsers leave File.type empty or report image/jpg.
+      const extension = file.name.split(".").pop()?.toLowerCase();
+      return Boolean(extension && ["jpg", "jpeg", "png", "webp"].includes(extension) && file.size <= 8 * 1024 * 1024);
+    });
+    if (!valid.length) {
+      setMessage("Upload up to 30 valid JPG, PNG, or WebP images.");
+      return;
+    }
     const grouped = new Map<string, Photo[]>();
     valid.forEach((file) => {
       const photo = { id: uid(), file, preview: URL.createObjectURL(file) };
       const key = productKey(file.name) || file.name;
       grouped.set(key, [...(grouped.get(key) ?? []), photo]);
     });
-    setDrafts((current) => [
-      ...current,
+    const nextDrafts = [
+      ...drafts,
       ...Array.from(grouped, ([key, photos]) => ({
         id: uid(),
         photos,
@@ -122,7 +135,10 @@ export default function BulkUploadPage() {
         stock: "",
         sizes: ["S", "M", "L"],
       })),
-    ]);
+    ];
+    setDrafts(nextDrafts);
+    setMessage("AI is grouping these photos by product…");
+    void analyze(nextDrafts);
   }
   function patch(draftId: string, changes: Partial<Draft>) {
     setDrafts((current) =>
@@ -220,18 +236,18 @@ export default function BulkUploadPage() {
       },
     ]);
   }
-  async function analyze() {
-    if (!store || !drafts.length) return;
+  async function analyze(draftsToAnalyze: Draft[] = drafts) {
+    if (!store || !draftsToAnalyze.length || busy) return;
     setBusy(true);
     setBusyPhase("reading");
     setMessage("Preparing photos securely…");
     try {
       const images = await Promise.all(
-        drafts.flatMap((draft) =>
+        draftsToAnalyze.flatMap((draft) =>
           draft.photos.map(async (photo) => ({
             id: photo.id,
             name: photo.file.name,
-              data: await imageDataForAnalysis(photo.file),
+            data: await imageDataForAnalysis(photo.file),
           })),
         ),
       );
@@ -245,9 +261,9 @@ export default function BulkUploadPage() {
         body: JSON.stringify({ storeId: store.id, images }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "AI analysis failed.");
+      if (!response.ok) throw new Error(result.error ?? "AI grouping failed. You can continue manually.");
       const photoMap = new Map(
-        drafts.flatMap((draft) =>
+        draftsToAnalyze.flatMap((draft) =>
           draft.photos.map((photo) => [photo.id, photo]),
         ),
       );
@@ -463,15 +479,6 @@ export default function BulkUploadPage() {
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
-          onClick={() => void analyze()}
-          disabled={busy || !drafts.length}
-          className="bulk-upload-ai-button inline-flex items-center gap-2 bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          <PortalIcon name="sparkle" className="h-4 w-4" />
-          {busy ? busyLabel : "Analyze and group with AI"}
-        </button>
-        <button
-          type="button"
           onClick={addRow}
           className="border border-line px-4 py-2 text-sm font-semibold"
         >
@@ -503,8 +510,24 @@ export default function BulkUploadPage() {
       ) : null}
       {showCoach && drafts.length ? (
         <div className="mt-5 flex items-start justify-between gap-4 rounded-xl border border-[#e7c7d4] bg-[#fff7fa] px-4 py-3 text-sm text-[#7b3e55] shadow-[0_12px_30px_-22px_rgba(123,62,85,0.7)] animate-[rise_0.6s_ease_both]">
-          <p><span className="font-semibold">Tip:</span> drag a photo onto another product to regroup it. Use Split when an image belongs to a different product.</p>
-          <button type="button" onClick={() => { window.localStorage.setItem("morni.bulk-upload-coach-dismissed", "1"); setShowCoach(false); }} className="shrink-0 text-xs font-semibold underline underline-offset-4">Got it</button>
+          <p>
+            <span className="font-semibold">Tip:</span> drag a photo onto
+            another product to regroup it. Use Split when an image belongs to a
+            different product.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              window.localStorage.setItem(
+                "morni.bulk-upload-coach-dismissed",
+                "1",
+              );
+              setShowCoach(false);
+            }}
+            className="shrink-0 text-xs font-semibold underline underline-offset-4"
+          >
+            Got it
+          </button>
         </div>
       ) : null}
       <div className="mt-8 grid gap-5 lg:grid-cols-2">
@@ -635,7 +658,7 @@ export default function BulkUploadPage() {
                   aria-hidden="true"
                 />
               </label>
-              <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
                 Product tag
                 <input
                   value={draft.productTag}
@@ -689,8 +712,7 @@ export default function BulkUploadPage() {
                   className="rounded-lg border border-line bg-background px-2 py-2 text-sm"
                   placeholder="Price"
                 />
-                <label className="text-xs font-semibold text-muted">
-                  Stock
+                <label className="text-[10px] font-semibold text-muted">
                   <input
                     type="number"
                     min="0"

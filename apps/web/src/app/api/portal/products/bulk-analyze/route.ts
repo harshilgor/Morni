@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   if (!member && profile?.role !== "admin") return NextResponse.json({ error: "You do not have access to this store." }, { status: 403 });
   const key = process.env.OPENAI_API_KEY;
   if (!key) return NextResponse.json({ error: "AI analysis is not configured. You can still review products manually." }, { status: 503 });
-  const prompt = `You are the visual identity engine for a fashion marketplace. Group uploaded photos by product identity, not by model, pose, background, or filename. Photos showing the same garment or item from different angles, distances, close-ups, or on different models belong in one group. Do not merge items merely because they are similar in color, category, or style. When uncertain, keep photos in separate groups and set needsReview true. Use the supplied image IDs exactly. Every image ID must appear exactly once across all groups, with no missing or extra IDs. Suggest a conservative title, description, categorySlug from the supplied list, and colorName. Use an empty string for categorySlug or colorName when unclear. Do not invent brand, fabric, measurements, price, stock, or sizes. Categories: ${JSON.stringify(mergeBrowseCategories((categories ?? []) as BrowseCategory[]).map(({ name, slug }) => ({ name, slug })))}. Image IDs and filenames: ${JSON.stringify(images.map(({ id, name }) => ({ id, name })))}.`;
+  const prompt = `You are matching product photos for a fashion marketplace. Compare EVERY uploaded image against every other uploaded image before creating groups. Group by the physical product identity, not by model, pose, background, crop, lighting, filename, or image order. Different views of the same garment or item—including front/back views, close-ups, different poses, and the same item worn by different models—MUST be placed in one group. Only separate photos when they clearly show different physical products. Do not create one-photo groups just because the angle or model changes. Use the supplied image IDs exactly. Every image ID must appear exactly once across all groups, with no missing or extra IDs. Suggest a conservative title, description, categorySlug from the supplied list, and colorName. Use an empty string for categorySlug or colorName when unclear. Do not invent brand, fabric, measurements, price, stock, or sizes. Categories: ${JSON.stringify(mergeBrowseCategories((categories ?? []) as BrowseCategory[]).map(({ name, slug }) => ({ name, slug })))}. The image IDs are: ${JSON.stringify(images.map(({ id, name }) => ({ id, name })))}.`;
   let response: Response;
   try {
     response = await fetch("https://api.openai.com/v1/responses", {
@@ -32,14 +32,26 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: process.env.OPENAI_VISION_MODEL || "gpt-5.1",
         store: false,
-        input: [{ role: "user", content: [{ type: "input_text", text: prompt }, ...images.map((image) => ({ type: "input_image", image_url: image.data, detail: "high" }))] }],
+        input: [{ role: "user", content: [
+          { type: "input_text", text: prompt },
+          ...images.flatMap((image) => [
+            { type: "input_text", text: `PHOTO ID: ${image.id}\nFILENAME: ${image.name}` },
+            { type: "input_image", image_url: image.data, detail: "high" },
+          ]),
+        ] }],
         text: { format: { type: "json_schema", name: "product_photo_groups", strict: true, schema: { type: "object", additionalProperties: false, properties: { groups: { type: "array", minItems: 1, maxItems: 30, items: { type: "object", additionalProperties: false, properties: { imageIds: { type: "array", minItems: 1, items: { type: "string" } }, title: { type: "string" }, description: { type: "string" }, categorySlug: { type: "string" }, colorName: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 }, needsReview: { type: "boolean" } }, required: ["imageIds", "title", "description", "categorySlug", "colorName", "confidence", "needsReview"] } } }, required: ["groups"] } } },
       }),
     });
   } catch {
     return NextResponse.json({ error: "AI analysis timed out or is temporarily unavailable. You can continue manually." }, { status: 503 });
   }
-  if (!response.ok) return NextResponse.json({ error: "AI analysis is temporarily unavailable. You can continue manually." }, { status: 503 });
+  if (!response.ok) {
+    console.error("Bulk photo grouping provider rejected request", {
+      status: response.status,
+      statusText: response.statusText,
+    });
+    return NextResponse.json({ error: "AI analysis is temporarily unavailable. You can continue manually." }, { status: 503 });
+  }
   const payload = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
   const outputText = payload.output_text ?? payload.output?.flatMap((item) => item.content ?? []).map((part) => part.text ?? "").join("");
   let parsedOutput: unknown;
@@ -49,10 +61,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "AI returned an invalid grouping. Review manually." }, { status: 503 });
   }
   const output = suggestionSchema.safeParse(parsedOutput);
-  if (!output.success) return NextResponse.json({ error: "AI returned an invalid grouping. Review manually." }, { status: 503 });
+  if (!output.success) {
+    console.error("Bulk photo grouping returned an invalid schema");
+    return NextResponse.json({ error: "AI returned an invalid grouping. Review manually." }, { status: 503 });
+  }
   const expected = new Set(images.map((image) => image.id));
   const seen = new Set<string>();
   const valid = output.data.groups.every((group) => group.imageIds.every((id) => expected.has(id) && !seen.has(id) && seen.add(id)));
-  if (!valid || seen.size !== expected.size) return NextResponse.json({ error: "AI grouping failed validation. Review the photos manually." }, { status: 503 });
+  if (!valid || seen.size !== expected.size) {
+    console.error("Bulk photo grouping failed image coverage validation", { expected: expected.size, seen: seen.size });
+    return NextResponse.json({ error: "AI grouping failed validation. Review the photos manually." }, { status: 503 });
+  }
   return NextResponse.json({ groups: output.data.groups });
 }
