@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 const SIZE_OPTIONS = [
-  { label: "XS", tone: "bg-[#f3dfe6]", accent: "text-[#9d5369]" },
+  { label: "Free Size", tone: "bg-[#e7e1ee]", accent: "text-[#705b82]" },
   { label: "S", tone: "bg-[#e4e9f5]", accent: "text-[#52688f]" },
   { label: "M", tone: "bg-[#f2e6c9]", accent: "text-[#9a7431]" },
   { label: "L", tone: "bg-[#dbeae5]", accent: "text-[#2f6f66]" },
   { label: "XL", tone: "bg-[#f4ddd1]", accent: "text-[#a6583d]" },
-  { label: "Free size", tone: "bg-[#e7e1ee]", accent: "text-[#705b82]" },
+  { label: "2XL", tone: "bg-[#f1e0d7]", accent: "text-[#a35b43]" },
+  { label: "3XL", tone: "bg-[#e4e0f1]", accent: "text-[#675786]" },
+  { label: "4XL", tone: "bg-[#dce9ed]", accent: "text-[#3d7180]" },
 ] as const;
 
 export function ShopBySize() {
@@ -25,7 +27,7 @@ export function ShopBySize() {
           </Link>
         </div>
 
-        <div className="mt-5 flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
+        <div className="mt-5 flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-4 sm:gap-3 lg:grid-cols-8">
           {SIZE_OPTIONS.map((size) => (
             <Link
               key={size.label}
