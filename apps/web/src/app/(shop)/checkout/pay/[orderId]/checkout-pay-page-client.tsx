@@ -162,7 +162,7 @@ export default function CheckoutPayPageClient({ orderId }: { orderId: string }) 
             action={session.shopperResultUrl}
             className="paymentWidgets"
             data-brands={brands}
-          />
+          ></form>
           <Script
             id={`afs-payment-widget-${session.checkoutId}`}
             src={session.scriptUrl}
