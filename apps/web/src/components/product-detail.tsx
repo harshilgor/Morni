@@ -450,7 +450,7 @@ export function ProductDetail({
           <div className="hidden justify-end lg:flex">
             <WishlistToggle productId={product.id} tone="inline" />
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">{store.name}</p>
+          <Link href={`/stores/${store.slug}`} className="inline-block text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep underline-offset-4 transition hover:underline" aria-label={`Visit ${store.name} store`}>{store.name}</Link>
           <h1 className="mt-2 font-display text-[2.45rem] leading-[0.97] text-ink sm:text-5xl lg:text-[1.95rem] lg:leading-[1.02] xl:text-[2.15rem]">{product.title}</h1>
           <div className="mt-4 flex items-end justify-between gap-4 lg:mt-3">
             <div className="flex items-baseline gap-2.5">
