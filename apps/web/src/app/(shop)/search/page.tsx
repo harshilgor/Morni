@@ -143,13 +143,13 @@ export default async function SearchPage({
         ? `From AED ${minPrice}`
         : sizeFilter
           ? `Size ${sizeFilter}`
-        : sort === "rated"
+          : sort === "rated"
           ? "Best rated"
           : sort === "new"
             ? "New in"
             : instock === "1"
               ? "In stock"
-              : "Search Morni";
+              : "All products";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -178,17 +178,7 @@ export default async function SearchPage({
         ))}
       </div>
 
-      {!query &&
-      maxPrice == null &&
-      minPrice == null &&
-      !sizeFilter &&
-      !sort &&
-      instock !== "1" ? (
-        <p className="mt-10 rounded-2xl border border-dashed border-line bg-surface/70 p-8 text-center text-muted">
-          Type a store or product name in the search bar above, or use a filter chip.
-        </p>
-      ) : (
-        <div className="mt-10 space-y-12">
+      <div className="mt-10 space-y-12">
           {query ? (
             <section>
               <h2 className="mb-5 font-display text-2xl text-ink">
@@ -225,8 +215,7 @@ export default async function SearchPage({
               </div>
             )}
           </section>
-        </div>
-      )}
+      </div>
 
       <Link href="/" className="mt-10 inline-block text-sm text-accent-deep underline">
         Back to all stores
