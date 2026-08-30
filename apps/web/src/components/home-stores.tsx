@@ -51,7 +51,7 @@ export function HomeStores({
   layout = "rail",
 }: {
   stores: Store[];
-  initialEmirate?: UaeEmirate;
+  initialEmirate?: UaeEmirate | "all";
   layout?: "rail" | "grid";
 }) {
   const deliveryEmirate = useLocation((s) => s.emirate);

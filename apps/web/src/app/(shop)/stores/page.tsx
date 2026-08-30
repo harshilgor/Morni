@@ -3,5 +3,5 @@ import { getCachedActiveStores } from "@/lib/catalog";
 
 export default async function StoresPage() {
   const stores = await getCachedActiveStores();
-  return <HomeStores stores={stores} layout="grid" />;
+  return <HomeStores stores={stores} layout="grid" initialEmirate="all" />;
 }
