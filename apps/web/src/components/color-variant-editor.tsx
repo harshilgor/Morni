@@ -40,7 +40,9 @@ export function ColorVariantEditor({
   showSizes?: boolean;
 }) {
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
-  const [imageErrors, setImageErrors] = useState<Record<string, string | null>>({});
+  const [imageErrors, setImageErrors] = useState<Record<string, string | null>>(
+    {},
+  );
   const [preview, setPreview] = useState<{
     images: PreviewImage[];
     startIndex: number;
@@ -50,7 +52,11 @@ export function ColorVariantEditor({
   const cameraInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   function updateDraft(key: string, patch: Partial<ColorDraft>) {
-    onChange(value.map((draft) => (draft.key === key ? { ...draft, ...patch } : draft)));
+    onChange(
+      value.map((draft) =>
+        draft.key === key ? { ...draft, ...patch } : draft,
+      ),
+    );
   }
 
   function addImages(key: string, files: FileList | File[] | null) {
@@ -102,7 +108,9 @@ export function ColorVariantEditor({
 
     onChange(
       value.map((item) =>
-        item.key === key ? { ...item, images: [...item.images, ...accepted] } : item,
+        item.key === key
+          ? { ...item, images: [...item.images, ...accepted] }
+          : item,
       ),
     );
   }
@@ -115,7 +123,10 @@ export function ColorVariantEditor({
         if (!target) return draft;
         return {
           ...draft,
-          images: [target, ...draft.images.filter((image) => image.id !== imageId)],
+          images: [
+            target,
+            ...draft.images.filter((image) => image.id !== imageId),
+          ],
         };
       }),
     );
@@ -136,6 +147,23 @@ export function ColorVariantEditor({
     );
   }
 
+  function moveImage(key: string, imageId: string, direction: -1 | 1) {
+    if (disabled) return;
+    onChange(
+      value.map((draft) => {
+        if (draft.key !== key) return draft;
+        const index = draft.images.findIndex((image) => image.id === imageId);
+        const target = index + direction;
+        if (index < 0 || target < 0 || target >= draft.images.length)
+          return draft;
+        const images = [...draft.images];
+        const [picked] = images.splice(index, 1);
+        images.splice(target, 0, picked);
+        return { ...draft, images };
+      }),
+    );
+  }
+
   function moveDraft(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= value.length) return;
@@ -151,7 +179,8 @@ export function ColorVariantEditor({
         <div>
           <p className="text-sm font-medium text-ink">Color options</p>
           <p className="text-xs text-muted">
-            Add every color in one go — each gets its own photos{showSizes ? ", sizes," : ""} and stock.
+            Add every color in one go — each gets its own photos
+            {showSizes ? ", sizes," : ""} and stock.
           </p>
         </div>
         <button
@@ -168,7 +197,9 @@ export function ColorVariantEditor({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => onChange([createColorDraft({ color_name: "Default" })])}
+          onClick={() =>
+            onChange([createColorDraft({ color_name: "Default" })])
+          }
           className="w-full rounded-2xl border border-dashed border-line bg-background/60 px-4 py-8 text-center text-sm text-muted transition hover:border-accent/50 hover:bg-[#fff0f4]/60 disabled:opacity-50"
         >
           Add the first color for this product
@@ -196,7 +227,9 @@ export function ColorVariantEditor({
                         value={draft.color_hex || "#c45b7a"}
                         disabled={disabled}
                         onChange={(event) =>
-                          updateDraft(draft.key, { color_hex: event.target.value })
+                          updateDraft(draft.key, {
+                            color_hex: event.target.value,
+                          })
                         }
                         className="absolute inset-0 cursor-pointer opacity-0"
                         aria-label={`Swatch for ${draft.color_name || "color"}`}
@@ -207,7 +240,9 @@ export function ColorVariantEditor({
                       value={draft.color_name}
                       disabled={disabled}
                       onChange={(event) =>
-                        updateDraft(draft.key, { color_name: event.target.value })
+                        updateDraft(draft.key, {
+                          color_name: event.target.value,
+                        })
                       }
                       placeholder="Color name (e.g. Emerald)"
                       className="min-w-[160px] flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent"
@@ -283,7 +318,9 @@ export function ColorVariantEditor({
                         draft.images.forEach((image) => {
                           if (image.file) URL.revokeObjectURL(image.url);
                         });
-                        onChange(value.filter((item) => item.key !== draft.key));
+                        onChange(
+                          value.filter((item) => item.key !== draft.key),
+                        );
                       }}
                       className="rounded-lg border border-line px-2 py-1 text-xs text-accent-deep disabled:opacity-40"
                     >
@@ -303,7 +340,9 @@ export function ColorVariantEditor({
                   }}
                   onDragLeave={(event) => {
                     event.preventDefault();
-                    setDraggingKey((current) => (current === draft.key ? null : current));
+                    setDraggingKey((current) =>
+                      current === draft.key ? null : current,
+                    );
                   }}
                   onDrop={(event) => {
                     event.preventDefault();
@@ -340,7 +379,8 @@ export function ColorVariantEditor({
                                   } · photo ${itemIndex + 1}`,
                                 })),
                                 startIndex: imageIndex,
-                                title: draft.color_name.trim() || "Product photos",
+                                title:
+                                  draft.color_name.trim() || "Product photos",
                               })
                             }
                             className="block aspect-[3/4] w-full overflow-hidden"
@@ -360,12 +400,35 @@ export function ColorVariantEditor({
                               Main
                             </span>
                           ) : null}
-                          <div className="absolute inset-x-1.5 bottom-1.5 flex gap-1">
+                          <div className="flex flex-wrap gap-1 border-t border-line bg-white p-1.5">
+                            <button
+                              type="button"
+                              disabled={disabled || imageIndex === 0}
+                              onClick={() => moveImage(draft.key, image.id, -1)}
+                              className="rounded-full bg-white/95 px-2 py-1 text-[10px] font-semibold text-ink shadow-sm disabled:opacity-40"
+                              aria-label={`Move photo ${imageIndex + 1} left`}
+                            >
+                              ←
+                            </button>
+                            <button
+                              type="button"
+                              disabled={
+                                disabled ||
+                                imageIndex === draft.images.length - 1
+                              }
+                              onClick={() => moveImage(draft.key, image.id, 1)}
+                              className="rounded-full bg-white/95 px-2 py-1 text-[10px] font-semibold text-ink shadow-sm disabled:opacity-40"
+                              aria-label={`Move photo ${imageIndex + 1} right`}
+                            >
+                              →
+                            </button>
                             {imageIndex !== 0 ? (
                               <button
                                 type="button"
                                 disabled={disabled}
-                                onClick={() => makeMainImage(draft.key, image.id)}
+                                onClick={() =>
+                                  makeMainImage(draft.key, image.id)
+                                }
                                 className="flex-1 rounded-full bg-white/95 px-1.5 py-1 text-[10px] font-semibold text-ink shadow-sm disabled:opacity-50"
                               >
                                 Main
@@ -397,7 +460,9 @@ export function ColorVariantEditor({
                         <button
                           type="button"
                           disabled={disabled}
-                          onClick={() => cameraInputs.current[draft.key]?.click()}
+                          onClick={() =>
+                            cameraInputs.current[draft.key]?.click()
+                          }
                           className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50"
                         >
                           <PortalIcon name="camera" className="h-4 w-4" />
@@ -406,7 +471,9 @@ export function ColorVariantEditor({
                         <button
                           type="button"
                           disabled={disabled}
-                          onClick={() => libraryInputs.current[draft.key]?.click()}
+                          onClick={() =>
+                            libraryInputs.current[draft.key]?.click()
+                          }
                           className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50"
                         >
                           <PortalIcon name="image" className="h-4 w-4" />
@@ -414,13 +481,18 @@ export function ColorVariantEditor({
                         </button>
                       </div>
                       <p className="mt-2 text-center text-[11px] text-muted">
-                        Up to {PRODUCT_IMAGE_LIMIT} photos · {MEDIA_ACCEPT_LABEL}
-                        <span className="hidden sm:inline"> · or drag and drop</span>
+                        Up to {PRODUCT_IMAGE_LIMIT} photos ·{" "}
+                        {MEDIA_ACCEPT_LABEL}
+                        <span className="hidden sm:inline">
+                          {" "}
+                          · or drag and drop
+                        </span>
                       </p>
                     </div>
                   ) : (
                     <p className="rounded-xl bg-[#edf3f0] px-3 py-2 text-center text-xs text-[#466058]">
-                      Photo limit reached for this color ({PRODUCT_IMAGE_LIMIT}).
+                      Photo limit reached for this color ({PRODUCT_IMAGE_LIMIT}
+                      ).
                     </p>
                   )}
 
@@ -454,41 +526,55 @@ export function ColorVariantEditor({
                   />
 
                   {imageErrors[draft.key] ? (
-                    <p className="text-xs text-accent-deep">{imageErrors[draft.key]}</p>
+                    <p className="text-xs text-accent-deep">
+                      {imageErrors[draft.key]}
+                    </p>
                   ) : null}
                 </div>
 
-                <div className={showSizes ? "grid gap-3 sm:grid-cols-[1fr_120px]" : "grid gap-3"}>
-                  {showSizes ? <div>
-                    <p className="mb-2 text-xs font-medium text-muted">Sizes</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {PRODUCT_SIZES.map((size) => {
-                        const selected = draft.sizes.includes(size);
-                        return (
-                          <button
-                            key={size}
-                            type="button"
-                            disabled={disabled}
-                            aria-pressed={selected}
-                            onClick={() =>
-                              updateDraft(draft.key, {
-                                sizes: selected
-                                  ? draft.sizes.filter((item) => item !== size)
-                                  : [...draft.sizes, size],
-                              })
-                            }
-                            className={`min-h-10 min-w-10 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                              selected
-                                ? "border-ink bg-ink text-white"
-                                : "border-line bg-white text-muted hover:border-ink/40"
-                            }`}
-                          >
-                            {size}
-                          </button>
-                        );
-                      })}
+                <div
+                  className={
+                    showSizes
+                      ? "grid gap-3 sm:grid-cols-[1fr_120px]"
+                      : "grid gap-3"
+                  }
+                >
+                  {showSizes ? (
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-muted">
+                        Sizes
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PRODUCT_SIZES.map((size) => {
+                          const selected = draft.sizes.includes(size);
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              disabled={disabled}
+                              aria-pressed={selected}
+                              onClick={() =>
+                                updateDraft(draft.key, {
+                                  sizes: selected
+                                    ? draft.sizes.filter(
+                                        (item) => item !== size,
+                                      )
+                                    : [...draft.sizes, size],
+                                })
+                              }
+                              className={`min-h-10 min-w-10 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                                selected
+                                  ? "border-ink bg-ink text-white"
+                                  : "border-line bg-white text-muted hover:border-ink/40"
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div> : null}
+                  ) : null}
                   <label className="block space-y-1.5 text-xs text-muted">
                     Stock
                     <input

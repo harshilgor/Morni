@@ -5,6 +5,8 @@ import { StoreCard } from "@/components/cards";
 import { EMIRATES, emirateLabel } from "@/lib/format";
 import { useLocation } from "@/lib/location";
 import type { Store, UaeEmirate } from "@/lib/types";
+import type { StoreRecommendationStats } from "@/lib/catalog";
+import { readStoredForYouTaste } from "@/lib/for-you-storage";
 
 function EmirateFilters({
   activeSelection,
@@ -47,10 +49,12 @@ function EmirateFilters({
 
 export function HomeStores({
   stores,
+  storeRecommendationStats = {},
   initialEmirate,
   layout = "rail",
 }: {
   stores: Store[];
+  storeRecommendationStats?: Record<string, StoreRecommendationStats>;
   initialEmirate?: UaeEmirate | "all";
   layout?: "rail" | "grid";
 }) {
@@ -58,6 +62,7 @@ export function HomeStores({
   const [selected, setSelected] = useState<UaeEmirate | "all">(
     initialEmirate ?? deliveryEmirate ?? "all",
   );
+  const [taste, setTaste] = useState(() => readStoredForYouTaste().profile);
   const skipSync = useRef(true);
 
   // Keep the store rail in sync when the header delivery location changes —
@@ -70,6 +75,12 @@ export function HomeStores({
     setSelected(deliveryEmirate);
   }, [deliveryEmirate]);
 
+  useEffect(() => {
+    const syncTaste = () => setTaste(readStoredForYouTaste().profile);
+    window.addEventListener("morni:taste-updated", syncTaste);
+    return () => window.removeEventListener("morni:taste-updated", syncTaste);
+  }, []);
+
   const registeredEmirates = new Set(stores.map((store) => store.emirate));
   const availableEmirates = EMIRATES.filter((emirate) =>
     registeredEmirates.has(emirate.value),
@@ -81,6 +92,25 @@ export function HomeStores({
     activeSelection === "all"
       ? stores
       : stores.filter((store) => store.emirate === activeSelection);
+
+  const preferredCategories = Object.entries(taste.categories)
+    .filter(([, evidence]) => evidence.likes > evidence.passes)
+    .sort(([, a], [, b]) => b.likes - b.passes - (a.likes - a.passes))
+    .map(([slug]) => slug);
+  const ranked = preferredCategories.length
+    ? [...filtered].sort((a, b) => {
+        const score = (store: Store) => {
+          const signals = storeRecommendationStats[store.id];
+          if (!signals) return 0;
+          return preferredCategories.reduce(
+            (total, category, index) =>
+              total + (signals.categoryCounts[category] ?? 0) * Math.max(1, 4 - index),
+            0,
+          );
+        };
+        return score(b) - score(a);
+      })
+    : filtered;
 
   return (
     <section id="stores" className="scroll-mt-28 border-y border-[#e2dfd8] bg-[#f8f7f4]">
@@ -123,13 +153,13 @@ export function HomeStores({
           </p>
         ) : layout === "grid" ? (
           <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3">
-            {filtered.map((store) => (
+            {ranked.map((store) => (
               <StoreCard key={store.id} store={store} />
             ))}
           </div>
         ) : (
           <div className="shop-rail">
-            {filtered.map((store) => (
+            {ranked.map((store) => (
               <div key={store.id} className="shop-rail-item-wide">
                 <StoreCard store={store} compact />
               </div>

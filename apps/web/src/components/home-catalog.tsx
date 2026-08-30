@@ -15,7 +15,7 @@ export async function HomeCatalog({
 }: {
   initialEmirate?: UaeEmirate;
 }) {
-  const { stores, featured, products, under99, under199, luxuryPicks, ratings } =
+  const { stores, storeRecommendationStats, featured, products, under99, under199, luxuryPicks, ratings } =
     await getCachedHomeCatalog();
   const ratingRecord = ratings as Record<string, ProductRatingSummary>;
 
@@ -128,7 +128,11 @@ export async function HomeCatalog({
       <FeaturedCategories categories={featured} />
       <ShopBySize />
       <HomeDiscovery intents={intentRails} />
-      <HomeStores stores={stores} initialEmirate={initialEmirate} />
+      <HomeStores
+        stores={stores}
+        storeRecommendationStats={storeRecommendationStats}
+        initialEmirate={initialEmirate}
+      />
       {topRated.length > 0 ? (
         <ProductRail
           id="top-rated"

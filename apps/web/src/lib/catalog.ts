@@ -14,10 +14,17 @@ import {
 import { fetchProductRatingMap, type ProductRatingSummary } from "@/lib/product-ratings";
 import { createPublicClient } from "@/lib/supabase/public";
 import type { Product, ProductReview, ProductVariant, RelatedProduct, Store, StoreCampaign } from "@/lib/types";
+import { categoryForProduct } from "@/lib/for-you";
 
 export type ProductWithStore = Product & {
   stores: { slug: string; name: string };
   created_at?: string | null;
+};
+
+export type StoreRecommendationStats = {
+  productCount: number;
+  availableProductCount: number;
+  categoryCounts: Record<string, number>;
 };
 
 export type { RelatedProduct, StoreCampaign };
@@ -48,6 +55,50 @@ export async function getCachedActiveStores() {
     .order("created_at", { ascending: false });
 
   return (data ?? []) as Store[];
+}
+
+/**
+ * Small, cacheable store signals used for fast personalization on the client.
+ * This is deliberately precomputed with the public catalog cache; the request
+ * path never scans products or runs recommendation math.
+ */
+export async function getCachedStoreRecommendationStats(
+  categories: BrowseCategory[],
+) {
+  "use cache";
+  cacheLife("minutes");
+  tagCatalog("stores", "store-recommendation-stats", "products");
+
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("storefront_products")
+    .select("store_id, title, description, is_available, stock, stores!inner(is_active)")
+    .eq("stores.is_active", true)
+    .limit(5000);
+
+  if (error) {
+    console.error("Store recommendation signals query failed", error.message);
+    return {} as Record<string, StoreRecommendationStats>;
+  }
+
+  const stats: Record<string, StoreRecommendationStats> = {};
+  for (const row of data ?? []) {
+    const storeId = String(row.store_id);
+    const current =
+      stats[storeId] ??
+      ({ productCount: 0, availableProductCount: 0, categoryCounts: {} } satisfies StoreRecommendationStats);
+    current.productCount += 1;
+    if (row.is_available && Number(row.stock ?? 0) > 0) current.availableProductCount += 1;
+
+    const category = categoryForProduct(
+      { title: String(row.title ?? ""), description: row.description },
+      categories,
+    );
+    if (category) current.categoryCounts[category.slug] = (current.categoryCounts[category.slug] ?? 0) + 1;
+    stats[storeId] = current;
+  }
+
+  return stats;
 }
 
 export async function getCachedFeaturedCategories() {
@@ -159,8 +210,11 @@ export async function getCachedHomeCatalog() {
       getCachedHomePriceBand({ minPrice: 500, limit: 12, tag: "home-luxury" }),
     ]);
 
+  const storeRecommendationStats = await getCachedStoreRecommendationStats(featured);
+
   return {
     stores,
+    storeRecommendationStats,
     featured,
     products: homeProducts.products,
     under99,

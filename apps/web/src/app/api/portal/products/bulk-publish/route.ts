@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-const itemSchema = z.object({ title: z.string().trim().min(3).max(120), productTag: z.string().trim().regex(/^[A-Za-z][A-Za-z0-9-]{0,39}$/).optional().or(z.literal("")), description: z.string().trim().max(2000).default(""), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)).max(20), images: z.array(z.string().url()).min(1).max(5) });
+const itemSchema = z.object({ title: z.string().trim().min(3).max(120), productTag: z.string().trim().regex(/^[A-Za-z][A-Za-z0-9-]{0,39}$/), description: z.string().trim().max(2000).default(""), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)).max(20), images: z.array(z.string().url()).min(1).max(5) });
 const schema = z.object({ storeId: z.string().uuid(), items: z.array(itemSchema).min(1).max(100).optional(), importId: z.string().uuid().optional() });
 
 export async function POST(request: Request) {
@@ -22,8 +22,8 @@ export async function POST(request: Request) {
     const { data: existing } = await admin.from("bulk_imports").select("id,store_id,status").eq("id", importId).maybeSingle();
     if (!existing || existing.store_id !== storeId || !["needs_review", "failed", "completed_with_errors"].includes(existing.status)) return NextResponse.json({ error: "This import is not available for publishing." }, { status: 409 });
     if (!items.length) {
-      const { data: pending } = await admin.from("bulk_import_items").select("title,description,category_slug,price_aed,stock,sizes,image_urls").eq("import_id", importId).eq("status", "failed");
-      items = (pending ?? []).map((item) => ({ title: item.title, productTag: "", description: item.description ?? "", categorySlug: item.category_slug, priceAed: Number(item.price_aed), stock: item.stock, sizes: item.sizes ?? [], images: item.image_urls ?? [] }));
+      const { data: pending } = await admin.from("bulk_import_items").select("title,product_tag,description,category_slug,price_aed,stock,sizes,image_urls").eq("import_id", importId).eq("status", "failed");
+      items = (pending ?? []).map((item) => ({ title: item.title, productTag: item.product_tag ?? "", description: item.description ?? "", categorySlug: item.category_slug, priceAed: Number(item.price_aed), stock: item.stock, sizes: item.sizes ?? [], images: item.image_urls ?? [] }));
     }
   } else {
     const { data: createdImport, error: importError } = await admin.from("bulk_imports").insert({ store_id: storeId, created_by: user.id, status: "publishing", total_items: items.length }).select("id").single();

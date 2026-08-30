@@ -320,6 +320,7 @@ export function ForYouExperience({
     (swipe: TasteSwipe, nextProfile: TasteProfile) => {
       if (!shopperId) {
         storeForYouTaste({ profile: nextProfile, dismissedProductIds });
+        window.dispatchEvent(new Event("morni:taste-updated"));
         return;
       }
       void ensureSession().then((sessionId) => {
@@ -371,6 +372,7 @@ export function ForYouExperience({
       setDismissedProductIds(nextDismissed);
       if (!shopperId) {
         storeForYouTaste({ profile, dismissedProductIds: nextDismissed });
+        window.dispatchEvent(new Event("morni:taste-updated"));
         return;
       }
       void supabase.from("product_feedback").upsert(
