@@ -471,7 +471,7 @@ export default function CheckoutPage() {
                       <div className="mt-auto flex items-end justify-between gap-3 pt-3">
                         <div className="inline-flex items-center rounded-lg border border-line bg-surface">
                           <button type="button" aria-label={`Decrease quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity - 1)} className="flex h-8 w-8 items-center justify-center text-lg">−</button>
-                          <span className="flex h-8 min-w-8 items-center justify-center border-x border-line text-xs font-semibold">{item.quantity}</span>
+                          <input aria-label={`Quantity of ${item.title}`} inputMode="numeric" type="number" min="1" max="99" value={item.quantity} onChange={(event) => setQuantity(lineId, Math.max(1, Math.min(99, Number(event.target.value) || 1)))} className="h-8 w-10 border-x border-line bg-transparent text-center text-xs font-semibold outline-none" />
                           <button type="button" aria-label={`Increase quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity + 1)} className="flex h-8 w-8 items-center justify-center text-lg">+</button>
                         </div>
                         <p className="text-sm font-semibold text-ink">{formatAed(item.priceAed * item.quantity)}</p>
@@ -723,7 +723,7 @@ export default function CheckoutPage() {
                     <div className="flex items-end justify-between gap-3">
                       <div className="inline-flex items-center border border-line">
                         <button type="button" aria-label={`Decrease quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity - 1)} className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-background">−</button>
-                        <span className="flex h-9 min-w-9 items-center justify-center border-x border-line text-sm">{item.quantity}</span>
+                        <input aria-label={`Quantity of ${item.title}`} inputMode="numeric" type="number" min="1" max="99" value={item.quantity} onChange={(event) => setQuantity(lineId, Math.max(1, Math.min(99, Number(event.target.value) || 1)))} className="h-9 w-11 border-x border-line bg-transparent text-center text-sm outline-none" />
                         <button type="button" aria-label={`Increase quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity + 1)} className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-background">+</button>
                       </div>
                       <div className="text-right">
