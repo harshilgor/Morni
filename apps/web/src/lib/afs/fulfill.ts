@@ -1,7 +1,10 @@
 import "server-only";
 import { amountsMatchAed, type AfsPaymentStatus } from "@/lib/afs/client";
 import { redactAfsPayload } from "@/lib/afs/money";
-import { isAfsPaymentSuccess } from "@/lib/afs/result-codes";
+import {
+  isAfsCheckoutPending,
+  isAfsPaymentSuccess,
+} from "@/lib/afs/result-codes";
 import {
   sendOrderConfirmationEmail,
   sendStoreNewOrderEmails,
@@ -26,6 +29,7 @@ export type FulfillAfsPaymentInput = {
 export type FulfillAfsPaymentResult =
   | { outcome: "paid"; firstPaid: boolean }
   | { outcome: "already_paid" }
+  | { outcome: "pending" }
   | { outcome: "failed"; reason: string }
   | { outcome: "ignored"; reason: string };
 
@@ -61,6 +65,12 @@ export async function fulfillAfsPayment(
   }
   if (typed.status === "cancelled") {
     return { outcome: "ignored", reason: "cancelled" };
+  }
+
+  // Checkout-prepared/pending responses do not contain the final payment
+  // amount yet. They are not declines and must never move an order to failed.
+  if (isAfsCheckoutPending(input.status.resultCode)) {
+    return { outcome: "pending" };
   }
 
   const merchantOk = input.status.merchantTransactionId === typed.id;

@@ -57,6 +57,7 @@ export function ProductCard({
   onWishlistChange,
   sharp = false,
   priority = false,
+  unoptimized = false,
 }: {
   product: {
     id: string;
@@ -71,6 +72,8 @@ export function ProductCard({
   /** Squared edges to match featured-category aesthetic */
   sharp?: boolean;
   priority?: boolean;
+  /** Preserve the uploaded source instead of routing it through Next image optimization. */
+  unoptimized?: boolean;
 }) {
   const image = product.image_urls?.[0];
   const showRating = rating && rating.reviewCount > 0;
@@ -91,7 +94,7 @@ export function ProductCard({
             : "relative aspect-[4/5] overflow-hidden rounded-md bg-sand sm:rounded-xl"
         }
       >
-        <ProductCardImage src={image} alt={product.title} priority={priority} />
+        <ProductCardImage src={image} alt={product.title} priority={priority} unoptimized={unoptimized} />
         {!sharp ? (
           <div className="absolute right-1.5 top-1.5 z-10 sm:right-2.5 sm:top-2.5">
             <WishlistToggle

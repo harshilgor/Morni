@@ -9,6 +9,7 @@ import {
 
 const COLLECTIONS = {
   "under-99": "Under AED 99",
+  "under-55": "Mega Sale · Under AED 55",
   "under-199": "Under AED 199",
   luxury: "Luxury picks",
   "new-in": "New in",
@@ -30,8 +31,8 @@ export default async function CollectionPage({
   if (!title) notFound();
 
   const home = await getCachedHomeCatalog();
-  const priceBand = slug === "under-99" || slug === "under-199"
-    ? await getCachedPriceRailProducts(slug === "under-99" ? 99 : 199)
+  const priceBand = slug === "under-55" || slug === "under-99" || slug === "under-199"
+    ? await getCachedPriceRailProducts(slug === "under-55" ? 55 : slug === "under-99" ? 99 : 199)
     : null;
   let products = priceBand?.products ?? home.products;
   if (slug === "luxury") products = home.luxuryPicks;

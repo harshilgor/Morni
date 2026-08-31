@@ -21,6 +21,7 @@ describe("AFS result codes", () => {
     expect(isAfsPaymentSuccess("800.100.152")).toBe(false);
     expect(isAfsPaymentSuccess("000.200.000")).toBe(false);
     expect(isAfsPaymentSuccess(null)).toBe(false);
+    expect(isAfsCheckoutPending("000.200.000")).toBe(true);
     expect(isAfsCheckoutPending("000.200.100")).toBe(true);
   });
 });

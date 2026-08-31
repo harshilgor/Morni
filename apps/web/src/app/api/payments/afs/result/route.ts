@@ -97,6 +97,10 @@ export async function GET(request: Request) {
       return redirectToOrder(request, order.id, "paid=1");
     }
 
+    if (result.outcome === "pending") {
+      return redirectToOrder(request, order.id, "payment=pending");
+    }
+
     console.error("AFS payment not successful", {
       orderId: order.id,
       resultCode: status.resultCode,

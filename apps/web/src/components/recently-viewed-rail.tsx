@@ -33,6 +33,7 @@ export function RecentlyViewedRail() {
                 }}
                 href={item.href}
                 sharp
+                unoptimized
               />
             </div>
           ))}

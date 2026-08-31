@@ -200,11 +200,12 @@ export async function getCachedHomePriceBand(options: {
 }
 
 export async function getCachedHomeCatalog() {
-  const [stores, featured, homeProducts, under99, under199, luxuryPicks] =
+  const [stores, featured, homeProducts, megaSale, under99, under199, luxuryPicks] =
     await Promise.all([
       getCachedActiveStores(),
       getCachedFeaturedCategories(),
       getCachedHomeProducts(48),
+      getCachedHomePriceBand({ maxPrice: 55, limit: 12, tag: "home-price-max:55" }),
       getCachedHomePriceBand({ maxPrice: 99, limit: 12, tag: "home-price-max:99" }),
       getCachedHomePriceBand({ maxPrice: 199, limit: 12, tag: "home-price-max:199" }),
       getCachedHomePriceBand({ minPrice: 500, limit: 12, tag: "home-luxury" }),
@@ -217,6 +218,7 @@ export async function getCachedHomeCatalog() {
     storeRecommendationStats,
     featured,
     products: homeProducts.products,
+    megaSale,
     under99,
     under199,
     luxuryPicks,

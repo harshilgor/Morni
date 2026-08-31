@@ -86,7 +86,7 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
             className="group relative flex flex-col bg-white"
           >
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-sand">
-              <ProductCardImage src={product.image_urls?.[0]} alt={product.title} />
+              <ProductCardImage src={product.image_urls?.[0]} alt={product.title} unoptimized />
             </div>
             <div className="space-y-0 p-1.5 sm:p-3">
               <div className="flex items-start gap-0.5">

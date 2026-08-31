@@ -158,6 +158,13 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
     ],
     17,
   ),
+  featuredCategory(
+    "Kaftan",
+    "kaftan",
+    "/categories/kaftan.jpg",
+    ["kaftan", "kaftans", "abaya", "modest dress", "flowy dress"],
+    18,
+  ),
 ];
 
 export function mergeFeaturedCategories(

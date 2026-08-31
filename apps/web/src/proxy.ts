@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { contentSecurityPolicy } from "@/lib/content-security-policy";
 import { updateSession } from "@/lib/supabase/middleware";
+
+function withContentSecurityPolicy(response: NextResponse, pathname: string) {
+  response.headers.set("Content-Security-Policy", contentSecurityPolicy(pathname));
+  return response;
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -31,13 +37,15 @@ export async function proxy(request: NextRequest) {
     const authUrl = request.nextUrl.clone();
     authUrl.pathname = "/founder/auth";
     authUrl.search = `?next=${encodeURIComponent(`${pathname}${request.nextUrl.search}`)}`;
-    return NextResponse.redirect(authUrl);
+    return withContentSecurityPolicy(NextResponse.redirect(authUrl), pathname);
   }
 
   // Storefront pages use public data. Avoid an auth-network round trip before
   // every browse/product navigation; protected areas still refresh sessions.
-  if (!needsSessionRefresh) return NextResponse.next({ request });
-  return updateSession(request);
+  if (!needsSessionRefresh) {
+    return withContentSecurityPolicy(NextResponse.next({ request }), pathname);
+  }
+  return withContentSecurityPolicy(await updateSession(request), pathname);
 }
 
 export const config = {

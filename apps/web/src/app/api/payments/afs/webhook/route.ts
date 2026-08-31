@@ -62,5 +62,12 @@ export async function POST(request: Request) {
     status: parsed.status,
   });
 
+  console.info("AFS webhook processed", {
+    orderId: parsed.orderId,
+    resultCode: parsed.status.resultCode,
+    outcome: result.outcome,
+    reason: "reason" in result ? result.reason : null,
+  });
+
   return NextResponse.json({ ok: true, ...result });
 }

@@ -43,6 +43,7 @@ import {
   type ProductCustomizationConfig,
 } from "@/lib/product-customization";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
+import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 
 type ProductWithVariants = Product & {
   product_variants?: ProductVariant[] | null;
@@ -213,6 +214,7 @@ export default function PortalProductsPage() {
     title: string;
   } | null>(null);
   const [addProductOpen, setAddProductOpen] = useState(false);
+  const [uploadCelebrationKey, setUploadCelebrationKey] = useState(0);
 
   async function loadProducts(storeId: string) {
     const supabase = createClient();
@@ -548,6 +550,7 @@ export default function PortalProductsPage() {
     setCreateColors([createColorDraft({ color_name: "Default" })]);
     setSaving(false);
     setMessage("Product added with color options.");
+    setUploadCelebrationKey(Date.now());
     closeCreate();
     void revalidatePublicCatalog();
     await loadProducts(store.id);
@@ -750,6 +753,7 @@ export default function PortalProductsPage() {
 
   return (
     <div className="space-y-6">
+      <UploadSuccessConfetti celebrationKey={uploadCelebrationKey} />
       <PortalPageHeader
         eyebrow="Catalog"
         title="Products"

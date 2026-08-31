@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const WIDGET_TIMEOUT_MS = 15_000;
+const WIDGET_TIMEOUT_MS = 45_000;
 
 type WpwlOptions = {
   onReady?: (...args: unknown[]) => void;

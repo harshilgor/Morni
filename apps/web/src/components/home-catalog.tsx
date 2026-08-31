@@ -1,6 +1,7 @@
 import { FeaturedCategories } from "@/components/featured-categories";
 import { HomeDiscovery, type IntentRail } from "@/components/home-discovery";
 import { HomeStores } from "@/components/home-stores";
+import { MegaSaleRail } from "@/components/mega-sale-rail";
 import { NewAndPopular, type PopularTab } from "@/components/new-and-popular";
 import { ProductRail } from "@/components/product-rail";
 import { RecentlyViewedRail } from "@/components/recently-viewed-rail";
@@ -15,7 +16,7 @@ export async function HomeCatalog({
 }: {
   initialEmirate?: UaeEmirate;
 }) {
-  const { stores, storeRecommendationStats, featured, products, under99, under199, luxuryPicks, ratings } =
+  const { stores, storeRecommendationStats, featured, products, megaSale, under99, under199, luxuryPicks, ratings } =
     await getCachedHomeCatalog();
   const ratingRecord = ratings as Record<string, ProductRatingSummary>;
 
@@ -30,6 +31,8 @@ export async function HomeCatalog({
   });
 
   const under99Rail = under99.slice(0, 10).map((product) => toRailProduct(product));
+
+  const megaSaleRail = megaSale.slice(0, 10).map((product) => toRailProduct(product));
 
   const under199Rail = under199.slice(0, 10).map((product) => toRailProduct(product));
 
@@ -127,6 +130,7 @@ export async function HomeCatalog({
     <>
       <FeaturedCategories categories={featured} />
       <ShopBySize />
+      <MegaSaleRail products={megaSaleRail} />
       <HomeDiscovery intents={intentRails} />
       <HomeStores
         stores={stores}
@@ -140,9 +144,10 @@ export async function HomeCatalog({
           subtitle="Looks shoppers love — sorted by verified ratings."
           products={topRated}
           href="/search?sort=rated"
+          unoptimized
         />
       ) : null}
-      <ProductRail title="New in" products={newIn} href="/search?sort=new" sharp />
+      <ProductRail title="New in" products={newIn} href="/search?sort=new" sharp unoptimized />
       <RecentlyViewedRail />
       <NewAndPopular tabs={popularTabs} />
     </>

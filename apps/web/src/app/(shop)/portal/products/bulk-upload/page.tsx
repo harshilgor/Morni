@@ -9,6 +9,7 @@ import { useOwnerStore } from "@/lib/use-owner-store";
 import { PortalIcon } from "@/components/portal-icons";
 import { colorDistance, fingerprintImage } from "@/lib/image-similarity";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
+import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 
 type Photo = { id: string; file: File; preview: string };
 type Draft = {
@@ -264,6 +265,7 @@ export default function BulkUploadPage() {
   >("idle");
   const [showCoach, setShowCoach] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [uploadCelebrationKey, setUploadCelebrationKey] = useState(0);
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   useEffect(() => {
     void loadBrowseCategoryOptions().then(setCategories);
@@ -615,6 +617,7 @@ export default function BulkUploadPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Bulk publish failed.");
       if (result.failed) {
+        if (result.created > 0) setUploadCelebrationKey(Date.now());
         const failures = (result.results ?? [])
           .filter((item: { ok: boolean }) => !item.ok)
           .map((item: { title: string; error?: string }) => `${item.title}: ${item.error ?? "could not be published"}`)
@@ -625,6 +628,7 @@ export default function BulkUploadPage() {
       setMessage(
         `${result.created} products published${result.failed ? `, ${result.failed} failed` : ""}.`,
       );
+      if (result.created > 0) setUploadCelebrationKey(Date.now());
       setDrafts([]);
       router.replace("/portal/products");
     } catch (error) {
@@ -690,6 +694,7 @@ export default function BulkUploadPage() {
           : "Analyze and group with AI";
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+      <UploadSuccessConfetti celebrationKey={uploadCelebrationKey} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">

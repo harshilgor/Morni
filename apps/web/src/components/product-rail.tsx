@@ -19,6 +19,7 @@ export function ProductRail({
   products,
   href,
   sharp = false,
+  unoptimized = false,
 }: {
   id?: string;
   title: string;
@@ -27,6 +28,7 @@ export function ProductRail({
   href?: string;
   /** Match Shop by intent: bare photo + name + price, larger cards */
   sharp?: boolean;
+  unoptimized?: boolean;
 }) {
   if (products.length === 0) return null;
 
@@ -57,6 +59,7 @@ export function ProductRail({
               href={product.href}
               rating={product.rating}
               sharp={sharp}
+              unoptimized={unoptimized}
             />
           </div>
         ))}
