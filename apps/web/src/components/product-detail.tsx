@@ -324,7 +324,8 @@ export function ProductDetail({
     () => (selectedVariant?.sizes?.length ? selectedVariant.sizes : product.sizes ?? []),
     [product, selectedVariant],
   );
-  const availableStock = selectedVariant?.stock ?? product.stock ?? 0;
+  const hasSizeInventory = Object.keys(product.size_stock ?? {}).length > 0;
+  const availableStock = selectedVariant?.stock ?? (selectedSize && hasSizeInventory ? product.size_stock?.[selectedSize] ?? 0 : product.stock ?? 0);
   const customizationConfig = useMemo(() => customizationConfigFromProduct(product), [product]);
   const ratingSummary = useMemo(() => {
     if (!reviews.length) return null;
@@ -502,11 +503,12 @@ export function ProductDetail({
                   <SizeGuide />
                 </div>
                 <div className="mt-3 grid grid-cols-4 gap-2">
-                  {availableSizes.map((size) => (
-                    <button key={size} type="button" onClick={() => { setSelectedSize(size); setAdded(false); }} aria-pressed={selectedSize === size} className={`min-h-10 rounded-md border px-2 text-sm font-semibold transition lg:min-h-9 lg:text-[13px] ${selectedSize === size ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"}`}>
-                      {size}
-                    </button>
-                  ))}
+                  {availableSizes.map((size) => {
+                    const sizeAvailable = selectedVariant ? selectedVariant.stock > 0 : hasSizeInventory ? (product.size_stock?.[size] ?? 0) > 0 : product.stock > 0;
+                    return <button key={size} type="button" onClick={() => { setSelectedSize(size); setAdded(false); }} disabled={!sizeAvailable} aria-pressed={selectedSize === size} className={`min-h-10 rounded-md border px-2 text-sm font-semibold transition lg:min-h-9 lg:text-[13px] ${selectedSize === size ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"} disabled:cursor-not-allowed disabled:opacity-35`}>
+                      {sizeAvailable ? size : <span aria-label="Not available">{size} ×</span>}
+                    </button>;
+                  })}
                 </div>
                 {!selectedSize ? <p className="mt-2 text-xs text-accent-deep">Select a size to add this piece to your bag.</p> : null}
               </div>
@@ -529,7 +531,7 @@ export function ProductDetail({
           </div>
 
           <p className={`mt-4 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>
-            {availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}` : ""}` : "This piece is currently out of stock"}
+            {availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}` : hasSizeInventory && selectedSize ? ` in size ${selectedSize}` : product.sizes?.length ? " total across sizes · size quantities pending" : ""}` : "This piece is currently out of stock"}
           </p>
           <div className="mt-4 hidden gap-3 sm:flex">
             <div className="relative min-w-0 flex-1">

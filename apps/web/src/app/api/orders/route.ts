@@ -294,35 +294,6 @@ export async function POST(request: Request) {
   }
   await admin.from("checkout_requests").update({ order_id: order.id }).eq("shopper_id", user.id).eq("idempotency_key", idempotencyKey);
 
-  // The checkout RPC owns pricing and stock. Attach the already-validated
-  // measurements immediately afterwards so the same order item context is
-  // available to the boutique team and shopper order history.
-  if (rpcItems.some((item) => Object.keys(item.customization ?? {}).length > 0)) {
-    const { data: createdItems } = await admin
-      .from("order_items")
-      .select("id, product_id, variant_id, size")
-      .eq("order_id", order.id)
-      .order("id", { ascending: true });
-    const remaining = [...rpcItems];
-    for (const createdItem of createdItems ?? []) {
-      const matchIndex = remaining.findIndex(
-        (item) =>
-          item.product_id === createdItem.product_id &&
-          item.variant_id === createdItem.variant_id &&
-          item.size === createdItem.size,
-      );
-      if (matchIndex < 0) continue;
-      const [match] = remaining.splice(matchIndex, 1);
-      if (Object.keys(match.customization ?? {}).length > 0) {
-        const { error: customizationError } = await admin
-          .from("order_items")
-          .update({ customization: match.customization })
-          .eq("id", createdItem.id);
-        if (customizationError) console.error("Order placed but customization was not saved", customizationError);
-      }
-    }
-  }
-
   if (body?.saveAddress) {
     const label = trimTo(address?.label, 80) || "Delivery";
     const { error: addressError } = await supabase.from("addresses").insert({

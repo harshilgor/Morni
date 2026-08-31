@@ -33,8 +33,18 @@ type DeliveryTracking = {
   eta_minutes: number | null;
   accepted_at: string | null;
   updated_at: string | null;
+  return_window_ends_at: string | null;
+  can_request_return: boolean;
 };
 type DeliveryProof = { id: string; storage_path: string; created_at: string; url: string };
+type ReturnRequestSummary = {
+  id: string;
+  status: string;
+  reason: string;
+  quoted_refund_aed: number;
+  refund_method: "wallet" | "original_payment_method";
+  created_at: string;
+};
 
 function resolveStore(stores: OrderWithStore["stores"]): OrderStore | null {
   if (!stores) return null;
@@ -66,6 +76,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
   const [deliveryCode, setDeliveryCode] = useState<DeliveryCode | null>(null);
   const [deliveryTracking, setDeliveryTracking] = useState<DeliveryTracking | null>(null);
   const [deliveryProofs, setDeliveryProofs] = useState<DeliveryProof[]>([]);
+  const [returnRequests, setReturnRequests] = useState<ReturnRequestSummary[]>([]);
   const [editingInstructions, setEditingInstructions] = useState(false);
   const [instructionDraft, setInstructionDraft] = useState("");
   const [savingInstructions, setSavingInstructions] = useState(false);
@@ -105,6 +116,12 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
         return signed?.signedUrl ? { ...proof, url: signed.signedUrl } : null;
       }));
       setDeliveryProofs(signedProofs.filter((proof): proof is DeliveryProof => Boolean(proof)));
+      const { data: returnData } = await supabase
+        .from("return_requests")
+        .select("id,status,reason,quoted_refund_aed,refund_method,created_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: false });
+      setReturnRequests((returnData as ReturnRequestSummary[]) ?? []);
 
       const {
         data: { user },
@@ -135,6 +152,8 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
       .channel(`order-tracking-${orderId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` }, () => setReloadKey((value) => value + 1))
       .on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" }, () => setReloadKey((value) => value + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "return_requests", filter: `order_id=eq.${orderId}` }, () => setReloadKey((value) => value + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "return_jobs" }, () => setReloadKey((value) => value + 1))
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [orderId]);
@@ -226,6 +245,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
   const reviewableItems = order.status === "delivered"
     ? items.filter((item) => item.product_id)
     : [];
+  const activeReturn = returnRequests.find((request) => !["rejected", "cancelled"].includes(request.status)) ?? null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -413,8 +433,8 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
         </div>
       ) : null}
 
-      {order.status === "delivered" && items.length > 0 ? (
-        <ReturnRefundPanel order={order} items={items} />
+      {(activeReturn || deliveryTracking?.can_request_return) && items.length > 0 ? (
+        <ReturnRefundPanel order={order} items={items} existingReturn={activeReturn} returnWindowEndsAt={deliveryTracking?.return_window_ends_at ?? null} onSubmitted={() => setReloadKey((value) => value + 1)} />
       ) : null}
 
       <div className="mt-4 rounded-[1.5rem] border border-line bg-surface p-6 text-sm">

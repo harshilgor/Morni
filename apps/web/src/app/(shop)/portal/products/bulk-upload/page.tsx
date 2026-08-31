@@ -10,6 +10,7 @@ import { PortalIcon } from "@/components/portal-icons";
 import { colorDistance, fingerprintImage } from "@/lib/image-similarity";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
+import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 
 type Photo = { id: string; file: File; preview: string };
 type Draft = {
@@ -24,6 +25,7 @@ type Draft = {
   priceAed: string;
   stock: string;
   sizes: string[];
+  sizeStock: Record<string, number>;
   confidence?: number;
   needsReview?: boolean;
 };
@@ -327,6 +329,7 @@ export default function BulkUploadPage() {
         priceAed: "",
         stock: "",
         sizes: ["S", "M", "L"],
+        sizeStock: { S: 0, M: 0, L: 0 },
       })),
     ];
     setDrafts(nextDrafts);
@@ -415,6 +418,7 @@ export default function BulkUploadPage() {
         priceAed: "",
         stock: "",
         sizes: ["S", "M", "L"],
+        sizeStock: { S: 0, M: 0, L: 0 },
       },
     ]);
   }
@@ -488,6 +492,7 @@ export default function BulkUploadPage() {
             priceAed: "",
             stock: "",
             sizes: ["S", "M", "L"],
+            sizeStock: { S: 0, M: 0, L: 0 },
             confidence: group.confidence,
             needsReview: group.needsReview,
           }),
@@ -544,7 +549,7 @@ export default function BulkUploadPage() {
             !draft.title.trim() ? "product name" : null,
             !draft.categorySlug ? "category" : null,
             !draft.priceAed ? "price" : null,
-            draft.stock === "" ? "stock" : null,
+            draft.stock === "" && Object.values(draft.sizeStock).every((quantity) => !quantity) ? "stock" : null,
           ].filter((field): field is string => Boolean(field));
           return [draft.id, missing] as const;
         })
@@ -603,6 +608,7 @@ export default function BulkUploadPage() {
           priceAed: Number(draft.priceAed),
           stock: Number(draft.stock),
           sizes: noSizes(draft.categorySlug) ? [] : draft.sizes,
+          sizeStock: noSizes(draft.categorySlug) ? {} : draft.sizeStock,
           images,
         });
       }
@@ -945,7 +951,14 @@ export default function BulkUploadPage() {
                 </select>
               </label>
               {!noSizes(draft.categorySlug) ? (
-                <div className="flex flex-wrap gap-2">
+                <>
+                <SizeInventoryEditor
+                  sizes={draft.sizes}
+                  sizeStock={draft.sizeStock}
+                  onChange={(sizes, sizeStock) => patch(draft.id, { sizes, sizeStock, stock: String(Object.values(sizeStock).reduce((sum, quantity) => sum + quantity, 0)) })}
+                  disabled={busy}
+                />
+                <div className="hidden flex-wrap gap-2">
                   {PRODUCT_SIZES.map((size) => (
                     <button
                       type="button"
@@ -963,6 +976,7 @@ export default function BulkUploadPage() {
                     </button>
                   ))}
                 </div>
+                </>
               ) : (
                 <p className="text-xs text-muted">
                   No clothing sizes for this category.

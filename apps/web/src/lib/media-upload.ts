@@ -151,3 +151,35 @@ export async function uploadDeliveryProof(options: { deliveryJobId: string; file
   }
   return path;
 }
+
+export async function uploadReturnProof(options: { returnJobId: string; file: File }) {
+  const error = validateImageFile(options.file);
+  if (error) throw new Error(error);
+
+  const supabase = createClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) throw new Error(`Could not verify your session: ${userError.message}`);
+  if (!user) throw new Error("Sign in before uploading return proof.");
+
+  const safeName = sanitizeFileName(options.file.name);
+  const uploadId = typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const path = `${options.returnJobId}/${uploadId}-${safeName}`;
+  const { error: uploadError } = await supabase.storage
+    .from("return-proofs")
+    .upload(path, options.file, { upsert: false, contentType: options.file.type });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { error: proofError } = await supabase.from("return_proofs").insert({
+    return_job_id: options.returnJobId,
+    storage_path: path,
+    content_type: options.file.type,
+    captured_by: user.id,
+  });
+  if (proofError) {
+    await supabase.storage.from("return-proofs").remove([path]);
+    throw new Error(proofError.message);
+  }
+  return path;
+}

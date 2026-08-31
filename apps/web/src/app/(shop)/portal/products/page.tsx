@@ -5,7 +5,7 @@
 
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ColorVariantEditor } from "@/components/color-variant-editor";
+import { useSearchParams } from "next/navigation";
 import { CustomizationEditor } from "@/components/customization-editor";
 import { QuickProductFields } from "@/components/quick-product-fields";
 import type { CategoryOption } from "@/components/product-form-fields";
@@ -44,6 +44,7 @@ import {
 } from "@/lib/product-customization";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
+import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 
 type ProductWithVariants = Product & {
   product_variants?: ProductVariant[] | null;
@@ -98,27 +99,7 @@ async function compressImageForListing(file: File) {
 }
 
 function draftsFromVariants(product: ProductWithVariants): ColorDraft[] {
-  const variants = [...(product.product_variants ?? [])].sort(
-    (a, b) => a.sort_order - b.sort_order,
-  );
-  if (variants.length === 0) {
-    return [colorDraftFromProduct(product)];
-  }
-  return variants.map((variant) =>
-    createColorDraft({
-      id: variant.id,
-      key: variant.id,
-      color_name: variant.color_name,
-      color_hex: variant.color_hex ?? "#c45b7a",
-      sizes: variant.sizes?.length ? [...variant.sizes] : ["S", "M", "L"],
-      stock: String(variant.stock ?? 0),
-      images: (variant.image_urls ?? []).map((url, index) => ({
-        id: `${variant.id}-${index}`,
-        url,
-        existing: true,
-      })),
-    }),
-  );
+  return [colorDraftFromProduct(product)];
 }
 
 function StickyActionBar({ children }: { children: ReactNode }) {
@@ -176,6 +157,8 @@ function SheetShell({
 }
 
 export default function PortalProductsPage() {
+  const searchParams = useSearchParams();
+  const requestedEditId = searchParams.get("edit");
   const { store, loading, error } = useOwnerStore();
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -231,6 +214,12 @@ export default function PortalProductsPage() {
   }, []);
 
   useEffect(() => {
+    if (!requestedEditId || editingProductId || !products.length) return;
+    const product = products.find((item) => item.id === requestedEditId);
+    if (product) openEdit(product);
+  }, [requestedEditId, products, editingProductId]);
+
+  useEffect(() => {
     if (!store) return;
     const run = () => {
       void loadProducts(store.id);
@@ -269,10 +258,7 @@ export default function PortalProductsPage() {
       const q = query.toLowerCase();
       return (
         product.title.toLowerCase().includes(q) ||
-        (product.description ?? "").toLowerCase().includes(q) ||
-        (product.product_variants ?? []).some((variant) =>
-          variant.color_name.toLowerCase().includes(q),
-        )
+        (product.description ?? "").toLowerCase().includes(q)
       );
     })
     .sort((a, b) => {
@@ -504,6 +490,7 @@ export default function PortalProductsPage() {
         price_aed: Number(form.price_aed),
         stock: aggregate.stock,
         sizes: aggregate.sizes,
+        size_stock: hasSizes ? createColors[0]?.size_stock ?? {} : {},
         customization_enabled:
           categoryHasSizes(form.categorySlug) && form.customization.enabled,
         customization_instructions:
@@ -533,7 +520,7 @@ export default function PortalProductsPage() {
         drafts: listingDrafts,
       });
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Could not save colors.");
+      setMessage(err instanceof Error ? err.message : "Could not save product inventory.");
       setSaving(false);
       return;
     }
@@ -549,7 +536,7 @@ export default function PortalProductsPage() {
     });
     setCreateColors([createColorDraft({ color_name: "Default" })]);
     setSaving(false);
-    setMessage("Product added with color options.");
+    setMessage("Product added with size inventory.");
     setUploadCelebrationKey(Date.now());
     closeCreate();
     void revalidatePublicCatalog();
@@ -616,6 +603,9 @@ export default function PortalProductsPage() {
         title: editDraft.title.trim(),
         product_tag: editDraft.product_tag.trim().toUpperCase() || null,
         price_aed: price,
+        stock: editColors[0]?.stock ? Number(editColors[0].stock) : editingProduct.stock,
+        sizes: hasSizes ? editColors[0]?.sizes ?? [] : [],
+        size_stock: hasSizes ? editColors[0]?.size_stock ?? {} : {},
         customization_enabled:
           categoryHasSizes(editDraft.categorySlug) &&
           editDraft.customization.enabled,
@@ -649,10 +639,19 @@ export default function PortalProductsPage() {
       });
     } catch (err) {
       setEditMessage(
-        err instanceof Error ? err.message : "Could not update colors.",
+        err instanceof Error ? err.message : "Could not update product inventory.",
       );
       setSavingEdits(false);
       return;
+    }
+
+    if (hasSizes) {
+      await supabase
+        .from("store_inventory_notifications")
+        .update({ status: "accepted", resolved_at: new Date().toISOString() })
+        .eq("product_id", editingProduct.id)
+        .eq("kind", "legacy_size_inventory")
+        .eq("status", "pending");
     }
 
     await loadProducts(store.id);
@@ -875,7 +874,7 @@ export default function PortalProductsPage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <input
             className="portal-input"
-            placeholder="Search title, description, or color"
+        placeholder="Search title or description"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -1167,7 +1166,7 @@ export default function PortalProductsPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
-                    Need colors, custom sizing, or other advanced options?
+                    Need custom sizing or other advanced options?
                     Expand below.
                   </p>
                 </div>
@@ -1185,12 +1184,7 @@ export default function PortalProductsPage() {
                         }
                       />
                     ) : null}
-                    <ColorVariantEditor
-                      value={createColors}
-                      onChange={setCreateColors}
-                      disabled={saving}
-                      showSizes={categoryHasSizes(form.categorySlug)}
-                    />
+                    {categoryHasSizes(form.categorySlug) ? <SizeInventoryEditor sizes={createColors[0]?.sizes ?? []} sizeStock={createColors[0]?.size_stock ?? {}} onChange={(sizes, size_stock) => updatePrimaryColorDraft({ ...(createColors[0] ?? createColorDraft({ color_name: "Default" })), sizes, size_stock, stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) })} disabled={saving} /> : null}
                   </div>
                 </details>
               </div>
@@ -1356,13 +1350,7 @@ export default function PortalProductsPage() {
                   }
                 />
               ) : null}
-              <ColorVariantEditor
-                compact
-                value={editColors}
-                onChange={setEditColors}
-                disabled={savingEdits}
-                showSizes={categoryHasSizes(editDraft.categorySlug)}
-              />
+              {categoryHasSizes(editDraft.categorySlug) ? <SizeInventoryEditor sizes={editColors[0]?.sizes ?? []} sizeStock={editColors[0]?.size_stock ?? {}} onChange={(sizes, size_stock) => setEditColors((current) => current.length ? [{ ...current[0], sizes, size_stock, stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) }, ...current.slice(1)] : current)} disabled={savingEdits} /> : null}
             </div>
 
             {editMessage ? (
@@ -1441,9 +1429,6 @@ function CatalogCards({
   return (
     <ul className={`space-y-3 ${className}`}>
       {products.map((product) => {
-        const variants = [...(product.product_variants ?? [])].sort(
-          (a, b) => a.sort_order - b.sort_order,
-        );
         return (
           <li key={product.id} className="portal-card overflow-hidden p-4">
             <div className="flex gap-3">
@@ -1491,27 +1476,6 @@ function CatalogCards({
                     <StatusBadge status="paused" />
                   )}
                 </div>
-                {variants.length ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {variants.slice(0, 4).map((variant) => (
-                      <span
-                        key={variant.id}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-[#fbfdfc] px-2 py-1 text-[11px] text-ink"
-                      >
-                        <span
-                          className="h-2.5 w-2.5 rounded-full border border-line"
-                          style={{ background: variant.color_hex ?? "#c45b7a" }}
-                        />
-                        {variant.color_name}
-                      </span>
-                    ))}
-                    {variants.length > 4 ? (
-                      <span className="text-[11px] text-muted">
-                        +{variants.length - 4}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
                 {product.customization_enabled ? (
                   <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#edf7f3] px-2 py-1 text-[11px] font-semibold text-[#2f6f66]">
                     <PortalIcon name="sparkle" className="h-3 w-3" /> Custom
@@ -1608,9 +1572,6 @@ function CatalogTable({
           </thead>
           <tbody>
             {products.map((product) => {
-              const variants = [...(product.product_variants ?? [])].sort(
-                (a, b) => a.sort_order - b.sort_order,
-              );
               return (
                 <tr key={product.id} className="transition hover:bg-[#f8faf9]">
                   <td className="px-5 py-4">
@@ -1647,16 +1608,6 @@ function CatalogTable({
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-[#34423d]">
                           {product.title}
-                        </span>
-                        <span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">
-                          {variants.length
-                            ? variants
-                                .map(
-                                  (variant) =>
-                                    `${variant.color_name} (${variant.stock})`,
-                                )
-                                .join(" / ")
-                            : "No colour variants"}
                         </span>
                         <span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">
                           Category:{" "}

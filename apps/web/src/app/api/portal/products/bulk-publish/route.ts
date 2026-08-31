@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePublicCatalog } from "@/lib/revalidate-catalog";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 
-const itemSchema = z.object({ title: z.string().trim().min(3).max(120), productTag: z.union([z.string().trim().regex(/^[A-Za-z][A-Za-z0-9-]{0,39}$/), z.literal("")]).default(""), description: z.string().trim().max(2000).default(""), fabric: z.enum(PRODUCT_FABRICS).nullable().optional(), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)).max(20), images: z.array(z.string().url()).min(1).max(5) });
+const itemSchema = z.object({ title: z.string().trim().min(3).max(120), productTag: z.union([z.string().trim().regex(/^[A-Za-z][A-Za-z0-9-]{0,39}$/), z.literal("")]).default(""), description: z.string().trim().max(2000).default(""), fabric: z.enum(PRODUCT_FABRICS).nullable().optional(), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)).max(20), sizeStock: z.record(z.string(), z.number().int().nonnegative()).default({}), images: z.array(z.string().url()).min(1).max(5) });
 // Validate store ownership against the authenticated membership below rather
 // than assuming every deployed database formats store IDs as UUIDs.
 const schema = z.object({ storeId: z.string().trim().min(1).max(200), items: z.array(itemSchema).min(1).max(100).optional(), importId: z.string().uuid().optional() });
@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     const { data: existing } = await admin.from("bulk_imports").select("id,store_id,status").eq("id", importId).maybeSingle();
     if (!existing || existing.store_id !== storeId || !["needs_review", "failed", "completed_with_errors"].includes(existing.status)) return NextResponse.json({ error: "This import is not available for publishing." }, { status: 409 });
     if (!items.length) {
-      const { data: pending } = await admin.from("bulk_import_items").select("title,product_tag,description,fabric,category_slug,price_aed,stock,sizes,image_urls").eq("import_id", importId).eq("status", "failed");
-      items = (pending ?? []).map((item) => ({ title: item.title, productTag: item.product_tag ?? "", description: item.description ?? "", fabric: item.fabric ?? null, categorySlug: item.category_slug, priceAed: Number(item.price_aed), stock: item.stock, sizes: item.sizes ?? [], images: item.image_urls ?? [] }));
+      const { data: pending } = await admin.from("bulk_import_items").select("title,product_tag,description,fabric,category_slug,price_aed,stock,sizes,size_stock,image_urls").eq("import_id", importId).eq("status", "failed");
+      items = (pending ?? []).map((item) => ({ title: item.title, productTag: item.product_tag ?? "", description: item.description ?? "", fabric: item.fabric ?? null, categorySlug: item.category_slug, priceAed: Number(item.price_aed), stock: item.stock, sizes: item.sizes ?? [], sizeStock: item.size_stock ?? {}, images: item.image_urls ?? [] }));
     }
   } else {
     const { data: createdImport, error: importError } = await admin.from("bulk_imports").insert({ store_id: storeId, created_by: user.id, status: "publishing", total_items: items.length }).select("id").single();
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   }
   await admin.from("bulk_imports").update({ status: "publishing", total_items: items.length }).eq("id", importId);
   await admin.from("bulk_import_items").delete().eq("import_id", importId).eq("status", "failed");
-  const { data: importRows, error: importItemsError } = await admin.from("bulk_import_items").insert(items.map((item) => ({ import_id: importId, title: item.title, product_tag: item.productTag?.trim().toUpperCase() || null, description: item.description || null, fabric: item.fabric || null, category_slug: item.categorySlug, price_aed: item.priceAed, stock: item.stock, sizes: item.sizes, image_urls: item.images }))).select("id,title");
+  const { data: importRows, error: importItemsError } = await admin.from("bulk_import_items").insert(items.map((item) => ({ import_id: importId, title: item.title, product_tag: item.productTag?.trim().toUpperCase() || null, description: item.description || null, fabric: item.fabric || null, category_slug: item.categorySlug, price_aed: item.priceAed, stock: item.stock, sizes: item.sizes, size_stock: item.sizeStock, image_urls: item.images }))).select("id,title");
   if (importItemsError) return NextResponse.json({ error: "Could not prepare import items." }, { status: 500 });
   const { data: published, error: publishError } = await admin.rpc("publish_bulk_import", { p_import_id: importId });
   if (publishError) return NextResponse.json({ error: "Could not publish this import." }, { status: 500 });

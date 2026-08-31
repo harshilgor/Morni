@@ -36,6 +36,7 @@ export type ColorDraft = {
   color_hex: string;
   sizes: string[];
   stock: string;
+  size_stock: Record<string, number>;
   images: ColorDraftImage[];
 };
 
@@ -53,6 +54,7 @@ export function createColorDraft(
     color_hex: partial?.color_hex ?? "#c45b7a",
     sizes: partial?.sizes?.length ? [...partial.sizes] : ["S", "M", "L"],
     stock: partial?.stock ?? "10",
+    size_stock: partial?.size_stock ?? Object.fromEntries((partial?.sizes ?? ["S", "M", "L"]).map((size) => [size, 0])),
     images: partial?.images ? [...partial.images] : [],
   };
 }
@@ -61,12 +63,14 @@ export function colorDraftFromProduct(product: {
   image_urls?: string[] | null;
   sizes?: string[] | null;
   stock?: number | null;
+  size_stock?: Record<string, number> | null;
 }): ColorDraft {
   return createColorDraft({
     color_name: "Default",
     color_hex: "#c45b7a",
     sizes: product.sizes?.length ? [...product.sizes] : ["S", "M", "L"],
     stock: String(product.stock ?? 0),
+    size_stock: product.size_stock ?? Object.fromEntries((product.sizes?.length ? product.sizes : ["S", "M", "L"]).map((size) => [size, 0])),
     images: (product.image_urls ?? []).map((url, index) => ({
       id: `existing-${index}-${url}`,
       url,

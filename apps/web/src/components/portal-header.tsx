@@ -30,18 +30,18 @@ export function PortalHeader() {
     const supabase = createClient();
     void Promise.all([
       supabase.from("orders").select("id, status").eq("store_id", store.id),
-      supabase.from("products").select("id, stock").eq("store_id", store.id),
+      supabase.from("products").select("id, stock, size_stock").eq("store_id", store.id),
       supabase
         .from("product_reviews")
         .select("id, owner_reply")
         .eq("store_id", store.id),
     ]).then(([ordersResult, productsResult, reviewsResult]) => {
       const orders = (ordersResult.data ?? []) as { id: string; status: string }[];
-      const products = (productsResult.data ?? []) as Pick<Product, "id" | "stock">[];
+      const products = (productsResult.data ?? []) as Pick<Product, "id" | "stock" | "size_stock">[];
       const reviews = (reviewsResult.data ?? []) as Pick<ProductReview, "id" | "owner_reply">[];
       const next: Activity[] = [];
       const newOrders = orders.filter((order) => order.status === "placed").length;
-      const lowStock = products.filter((product) => product.stock <= 5).length;
+      const lowStock = products.filter((product) => product.stock <= 5 || Object.values(product.size_stock ?? {}).some((quantity) => quantity <= 5)).length;
       const unanswered = reviews.filter((review) => !review.owner_reply?.trim()).length;
       if (newOrders) {
         next.push({

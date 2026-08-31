@@ -1,5 +1,9 @@
 alter table public.products add column if not exists product_tag text;
-alter table public.products add constraint products_product_tag_format check (product_tag is null or product_tag ~ '^[A-Za-z][A-Za-z0-9-]{0,39}$');
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'products_product_tag_format' and conrelid = 'public.products'::regclass) then
+    alter table public.products add constraint products_product_tag_format check (product_tag is null or product_tag ~ '^[A-Za-z][A-Za-z0-9-]{0,39}$');
+  end if;
+end $$;
 create unique index if not exists products_store_product_tag_unique on public.products(store_id, lower(product_tag)) where product_tag is not null;
 alter table public.bulk_import_items add column if not exists product_tag text;
 create or replace function public.publish_bulk_import(p_import_id uuid)

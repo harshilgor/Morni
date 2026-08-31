@@ -8,13 +8,15 @@ import { BrandMark } from "@/components/brand-logo";
 import { PortalIcon } from "@/components/portal-icons";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUser } from "@/lib/use-auth-user";
-import { uploadDeliveryProof } from "@/lib/media-upload";
+import { uploadDeliveryProof, uploadReturnProof } from "@/lib/media-upload";
 import { DriverMap } from "./driver-map";
 
 type DeliveryJobStatus = "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled";
 type DriverAvailability = "offline" | "available" | "assigned" | "paused";
 type DriverSection = "route" | "history" | "help";
 type JobAction = "accept" | "decline" | "at_pickup" | "collected" | "delivered" | "failed";
+type ReturnJobStatus = "assigned" | "accepted" | "at_customer" | "collected" | "at_store" | "completed" | "failed" | "cancelled";
+type ReturnJobAction = Extract<ReturnJobStatus, "accepted" | "at_customer" | "collected" | "at_store" | "failed">;
 
 type DriverJob = {
   id: string;
@@ -53,6 +55,28 @@ type DriverHistoryJob = {
   updated_at: string;
 };
 
+type ReturnJob = {
+  id: string;
+  status: ReturnJobStatus;
+  order_number: string;
+  store_name: string;
+  store_address: string;
+  store_lat: number | null;
+  store_lng: number | null;
+  delivery_street: string;
+  delivery_building: string | null;
+  delivery_apartment: string | null;
+  delivery_area: string;
+  delivery_emirate: string | null;
+  delivery_phone: string | null;
+  reason: string;
+  shopper_note: string | null;
+  items: Array<{ title: string; size: string | null; quantity: number }>;
+  customer_handoff_status?: "pending" | "verified" | "expired" | null;
+  store_handoff_status?: "pending" | "verified" | "expired" | null;
+  proof_count?: number;
+};
+
 type DriverData = {
   driver: {
     id: string;
@@ -65,6 +89,7 @@ type DriverData = {
   };
   partner?: { name?: string | null; support_email?: string | null };
   jobs: DriverJob[];
+  return_jobs: ReturnJob[];
   history: DriverHistoryJob[];
 };
 
@@ -97,7 +122,50 @@ function friendlyError(message: string) {
   if (/expired|no longer available/i.test(message)) return "That assignment is no longer available. Your route has been refreshed.";
   if (/finish the current delivery/i.test(message)) return "Finish the current delivery before changing availability.";
   if (/verification code|handoff/i.test(message)) return message;
+  if (/original driver|return/i.test(message)) return message;
   return "We could not complete that action. Check your connection and try again.";
+}
+
+const returnStatusLabel: Record<ReturnJobStatus, string> = { assigned: "Return assigned", accepted: "Heading to customer", at_customer: "At customer", collected: "Return collected", at_store: "At store", completed: "Completed", failed: "Needs attention", cancelled: "Cancelled" };
+const returnStatusTone: Record<ReturnJobStatus, string> = { assigned: "bg-[#FFF1C2] text-[#6B4F00]", accepted: "bg-[#DCEBFF] text-[#174A8B]", at_customer: "bg-[#FFE4CF] text-[#9A420D]", collected: "bg-[#DCEBFF] text-[#174A8B]", at_store: "bg-[#DDF5E7] text-[#12663B]", completed: "bg-[#DDF5E7] text-[#12663B]", failed: "bg-[#FFE0DC] text-[#9C2F28]", cancelled: "bg-[#E8ECEA] text-[#53625C]" };
+
+function LegacyReturnJobCard({ job, updating, onAction }: { job: ReturnJob; updating: boolean; onAction: (id: string, action: ReturnJobAction, note?: string) => void }) {
+  const destination = [job.delivery_street, job.delivery_building, job.delivery_apartment, job.delivery_area, job.delivery_emirate].filter(Boolean).join(", ");
+  const goingToCustomer = ["assigned", "accepted", "at_customer"].includes(job.status);
+  const mapsTarget = goingToCustomer ? destination : job.store_address;
+  const mapsHref = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.store_lat != null && job.store_lng != null && !goingToCustomer ? `${job.store_lat},${job.store_lng}` : mapsTarget)}`;
+  const nextAction: ReturnJobAction | null = job.status === "assigned" ? "accepted" : job.status === "accepted" ? "at_customer" : job.status === "at_customer" ? "collected" : job.status === "collected" ? "at_store" : null;
+  const nextLabel = job.status === "assigned" ? "Accept return pickup" : job.status === "accepted" ? "I am at the customer" : job.status === "at_customer" ? "Collect return from customer" : job.status === "collected" ? "Return is at the store" : null;
+  return <article className="overflow-hidden rounded-[1.5rem] border border-[#e4c6a8] bg-white shadow-[0_14px_30px_-28px_rgba(130,75,29,0.7)]"><div className="flex items-start justify-between gap-3 border-b border-[#f0e2d3] bg-[#fffaf4] px-4 py-4 sm:px-5"><div className="min-w-0"><p className="text-xs font-bold text-[#a65316]">Return · {job.order_number}</p><p className="mt-1 truncate text-base font-semibold text-[#19342b]">Reverse pickup for {job.store_name}</p></div><span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${returnStatusTone[job.status]}`}>{returnStatusLabel[job.status]}</span></div><div className="space-y-4 p-4 sm:p-5"><div className="rounded-xl border border-[#efdcc7] bg-[#fffdf9] p-3"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#a65316]">Items to collect</p><p className="mt-2 text-sm font-semibold text-[#263530]">{job.items.map((item) => `${item.title}${item.size ? ` · ${item.size}` : ""} ×${item.quantity}`).join(", ")}</p><p className="mt-2 text-xs text-[#7b6b5d]"><strong>Reason:</strong> {job.reason}{job.shopper_note ? ` · ${job.shopper_note}` : ""}</p></div><div className="rounded-xl border border-[#e2ebe6] bg-[#fbfdfc] p-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#708078]">{goingToCustomer ? "Pickup from customer" : "Return to store"}</p><p className="mt-1 text-sm font-bold text-[#213d33]">{goingToCustomer ? destination : job.store_name}</p><p className="mt-0.5 text-xs leading-5 text-[#60736a]">{goingToCustomer ? "This is the same customer and order you delivered earlier." : job.store_address}</p></div><div className="flex flex-wrap items-center gap-2"><a href={mapsHref} target="_blank" rel="noreferrer" className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#155C4B] px-3 py-2.5 text-sm font-semibold text-white"><PortalIcon name="location" className="h-4 w-4" />{goingToCustomer ? "Navigate to customer" : "Navigate to store"}</a>{job.delivery_phone ? <a href={`tel:${job.delivery_phone}`} className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-[#D3DDD8] text-[#155C4B]" aria-label="Call customer"><PortalIcon name="phone" className="h-4 w-4" /></a> : null}</div>{nextAction && nextLabel ? <button type="button" disabled={updating} onClick={() => onAction(job.id, nextAction)} className="min-h-12 w-full rounded-xl bg-[#F97316] px-3 py-2.5 text-sm font-bold text-[#132C2A] disabled:opacity-50">{updating ? "Updating…" : nextLabel}</button> : job.status === "at_store" ? <p className="rounded-xl bg-[#eef8f1] px-3 py-3 text-xs font-semibold leading-5 text-[#277044]">Hand the return to the store owner. They will confirm receipt and restore inventory.</p> : null}</div></article>;
+}
+
+function ReturnJobCard({ job, updating, onAction, onRequestHandoff, onVerifyHandoff, onUploadProof }: { job: ReturnJob; updating: boolean; onAction: (id: string, action: ReturnJobAction, note?: string) => void; onRequestHandoff: (id: string, type: "customer" | "store") => Promise<boolean>; onVerifyHandoff: (id: string, type: "customer" | "store", code: string) => Promise<boolean>; onUploadProof: (id: string, file: File) => Promise<boolean> }) {
+  const destination = [job.delivery_street, job.delivery_building, job.delivery_apartment, job.delivery_area, job.delivery_emirate].filter(Boolean).join(", ");
+  const goingToCustomer = ["assigned", "accepted", "at_customer"].includes(job.status);
+  const mapsTarget = goingToCustomer ? destination : job.store_address;
+  const mapsHref = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.store_lat != null && job.store_lng != null && !goingToCustomer ? `${job.store_lat},${job.store_lng}` : mapsTarget)}`;
+  const [handoffType, setHandoffType] = useState<"customer" | "store" | null>(null);
+  const [code, setCode] = useState("");
+  const [proofBusy, setProofBusy] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
+  const proofCount = job.proof_count ?? 0;
+  const handoffStatus = handoffType === "customer" ? job.customer_handoff_status : job.store_handoff_status;
+  const nextAction: ReturnJobAction | null = job.status === "assigned" ? "accepted" : job.status === "accepted" ? "at_customer" : job.status === "collected" ? "at_store" : null;
+  const nextLabel = job.status === "assigned" ? "Accept return pickup" : job.status === "accepted" ? "I am at the customer" : job.status === "collected" ? "Return is at the store" : null;
+
+  async function captureProof(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setProofBusy(true); setProofError(null);
+    try { if (!(await onUploadProof(job.id, file))) throw new Error("Could not save the return photo."); }
+    catch (error) { setProofError(error instanceof Error ? error.message : "Could not save the return photo."); }
+    finally { setProofBusy(false); event.target.value = ""; }
+  }
+
+  async function request(type: "customer" | "store") { const ok = await onRequestHandoff(job.id, type); if (ok) { setHandoffType(type); setCode(""); } }
+  async function verify() { if (!handoffType || code.length !== 6) return; if (await onVerifyHandoff(job.id, handoffType, code)) { setHandoffType(null); setCode(""); } }
+
+  return <article className="overflow-hidden rounded-[1.5rem] border border-[#e4c6a8] bg-white shadow-[0_14px_30px_-28px_rgba(130,75,29,0.7)]"><div className="flex items-start justify-between gap-3 border-b border-[#f0e2d3] bg-[#fffaf4] px-4 py-4 sm:px-5"><div className="min-w-0"><p className="text-xs font-bold text-[#a65316]">Return · {job.order_number}</p><p className="mt-1 truncate text-base font-semibold text-[#19342b]">Reverse pickup for {job.store_name}</p></div><span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${returnStatusTone[job.status]}`}>{returnStatusLabel[job.status]}</span></div><div className="space-y-4 p-4 sm:p-5"><div className="rounded-xl border border-[#efdcc7] bg-[#fffdf9] p-3"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#a65316]">Items to collect</p><p className="mt-2 text-sm font-semibold text-[#263530]">{job.items.map((item) => `${item.title}${item.size ? ` · ${item.size}` : ""} ×${item.quantity}`).join(", ")}</p><p className="mt-2 text-xs text-[#7b6b5d]"><strong>Reason:</strong> {job.reason}{job.shopper_note ? ` · ${job.shopper_note}` : ""}</p></div><div className="rounded-xl border border-[#e2ebe6] bg-[#fbfdfc] p-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#708078]">{goingToCustomer ? "Pickup from customer" : "Return to store"}</p><p className="mt-1 text-sm font-bold text-[#213d33]">{goingToCustomer ? destination : job.store_name}</p><p className="mt-0.5 text-xs leading-5 text-[#60736a]">{goingToCustomer ? "This is the same customer and order you delivered earlier." : job.store_address}</p></div><div className="flex flex-wrap items-center gap-2"><a href={mapsHref} target="_blank" rel="noreferrer" className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#155C4B] px-3 py-2.5 text-sm font-semibold text-white"><PortalIcon name="location" className="h-4 w-4" />{goingToCustomer ? "Navigate to customer" : "Navigate to store"}</a>{job.delivery_phone ? <a href={`tel:${job.delivery_phone}`} className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-[#D3DDD8] text-[#155C4B]" aria-label="Call customer"><PortalIcon name="phone" className="h-4 w-4" /></a> : null}</div>{nextAction && nextLabel ? <button type="button" disabled={updating} onClick={() => onAction(job.id, nextAction)} className="min-h-12 w-full rounded-xl bg-[#F97316] px-3 py-2.5 text-sm font-bold text-[#132C2A] disabled:opacity-50">{updating ? "Updating…" : nextLabel}</button> : null}{job.status === "at_customer" || job.status === "at_store" ? <div className="rounded-xl border border-[#dce5e0] bg-[#f7faf8] p-3"><p className="text-xs font-bold text-[#213d33]">{job.status === "at_customer" ? "Customer handoff" : "Store handoff"}</p><p className="mt-1 text-xs leading-5 text-[#60736a]">Take a photo of the returned parcel before asking for the verification code.</p><label className="mt-3 flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-[#cfdcd5] bg-white px-3 py-2 text-xs font-semibold text-[#155C4B]">{proofBusy ? "Uploading photo…" : proofCount ? `${proofCount} proof photo${proofCount === 1 ? "" : "s"} · Add another` : "Take return photo"}<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(event) => void captureProof(event)} disabled={proofBusy} /></label>{proofError ? <p className="mt-2 text-xs text-[#a53b16]">{proofError}</p> : null}{handoffStatus === "pending" ? <button type="button" disabled={!proofCount || updating} onClick={() => setHandoffType(job.status === "at_customer" ? "customer" : "store")} className="mt-3 min-h-10 w-full rounded-lg bg-[#155C4B] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Enter {job.status === "at_customer" ? "customer" : "store"} code</button> : <button type="button" disabled={!proofCount || updating} onClick={() => void request(job.status === "at_customer" ? "customer" : "store")} className="mt-3 min-h-10 w-full rounded-lg border border-[#9fc4b8] bg-white px-3 py-2 text-xs font-bold text-[#155C4B] disabled:opacity-50">Request {job.status === "at_customer" ? "customer" : "store"} code</button>}</div> : null}{job.status === "at_store" ? <p className="rounded-xl bg-[#eef8f1] px-3 py-3 text-xs font-semibold leading-5 text-[#277044]">The owner will give you the store code. Verify it after the owner receives the return.</p> : null}</div>{handoffType ? <div className="fixed inset-0 z-50 grid place-items-end bg-[#132c2a]/45 p-4 sm:place-items-center"><div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-[1.5rem] bg-white p-5 shadow-2xl"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Return handoff</p><h2 className="mt-1 text-xl font-semibold text-[#19342b]">Enter the 6-digit code</h2><p className="mt-3 text-sm leading-6 text-[#5b6e65]">{handoffType === "customer" ? "Ask the customer for the code shown in their order page." : "Ask the store owner for the code shown in the owner portal."}</p><input autoFocus inputMode="numeric" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} className="mt-5 h-14 w-full rounded-xl border border-[#cfdcd5] text-center text-2xl font-bold tracking-[0.35em] text-[#19342b]" placeholder="000000" aria-label="6-digit return verification code" /><div className="mt-4 flex gap-2"><button type="button" onClick={() => setHandoffType(null)} className="min-h-11 flex-1 rounded-xl border border-[#cfdcd5] px-3 text-sm font-semibold text-[#52615b]">Cancel</button><button type="button" disabled={code.length !== 6 || updating} onClick={() => void verify()} className="min-h-11 flex-1 rounded-xl bg-[#155C4B] px-3 text-sm font-bold text-white disabled:opacity-50">{updating ? "Verifying…" : "Verify code"}</button></div></div></div> : null}</article>;
 }
 
 function destinationFor(job: DriverJob) {
@@ -264,7 +332,7 @@ export function DriverWorkspace() {
     if (silent) setRefreshing(true); else setLoading(true);
     const { data: response, error: rpcError } = await createClient().rpc("driver_delivery_workspace_data");
     if (rpcError) { setError(friendlyError(rpcError.message)); if (!silent) setData(null); }
-    else { const nextData = response as unknown as Partial<DriverData>; setData({ ...(nextData as DriverData), jobs: nextData.jobs ?? [], history: nextData.history ?? [] }); setError(null); setLastUpdatedAt(new Date().toISOString()); }
+    else { const nextData = response as unknown as Partial<DriverData>; setData({ ...(nextData as DriverData), jobs: nextData.jobs ?? [], return_jobs: nextData.return_jobs ?? [], history: nextData.history ?? [] }); setError(null); setLastUpdatedAt(new Date().toISOString()); }
     setLoading(false); setRefreshing(false);
   }, []);
 
@@ -289,7 +357,7 @@ export function DriverWorkspace() {
   useEffect(() => {
     if (!auth || !data?.driver.id) return;
     const supabase = createClient();
-    const channel = supabase.channel(`driver-jobs-${data.driver.id}`).on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" }, () => void load(true)).subscribe();
+    const channel = supabase.channel(`driver-jobs-${data.driver.id}`).on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" }, () => void load(true)).on("postgres_changes", { event: "*", schema: "public", table: "return_jobs", filter: `driver_id=eq.${data.driver.id}` }, () => void load(true)).subscribe();
     const poll = window.setInterval(() => void load(true), 15_000);
     return () => { window.clearInterval(poll); void supabase.removeChannel(channel); };
   }, [auth, data?.driver.id, load]);
@@ -356,6 +424,36 @@ export function DriverWorkspace() {
     setUpdating(null);
   }
 
+  async function returnJobAction(jobId: string, action: ReturnJobAction, note?: string) {
+    if (!online) { setError("You are offline. Reconnect before updating a return pickup."); return; }
+    setUpdating(jobId); setError(null);
+    const { error: rpcError } = await createClient().rpc("advance_return_job", { p_return_job_id: jobId, p_status: action, p_note: note ?? null });
+    if (rpcError) setError(friendlyError(rpcError.message)); else await load(true);
+    setUpdating(null);
+  }
+
+  async function requestReturnHandoff(jobId: string, type: "customer" | "store") {
+    if (!online) { setError("You are offline. Reconnect before requesting a return code."); return false; }
+    setUpdating(jobId); setError(null);
+    const { error: rpcError } = await createClient().rpc("request_return_handoff", { p_return_job_id: jobId, p_handoff_type: type });
+    if (rpcError) { setError(friendlyError(rpcError.message)); setUpdating(null); return false; }
+    await load(true); setUpdating(null); return true;
+  }
+
+  async function verifyReturnHandoff(jobId: string, type: "customer" | "store", code: string) {
+    if (!online) { setError("You are offline. Reconnect before verifying a return code."); return false; }
+    setUpdating(jobId); setError(null);
+    const { error: rpcError } = await createClient().rpc("verify_return_handoff", { p_return_job_id: jobId, p_handoff_type: type, p_code: code });
+    if (rpcError) { setError(friendlyError(rpcError.message)); setUpdating(null); return false; }
+    await load(true); setUpdating(null); return true;
+  }
+
+  async function uploadReturnProofForJob(jobId: string, file: File) {
+    if (!online) { setError("You are offline. Reconnect before uploading return proof."); return false; }
+    try { await uploadReturnProof({ returnJobId: jobId, file }); await load(true); return true; }
+    catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : "Could not upload return proof."); return false; }
+  }
+
   async function requestHandoff(jobId: string, type: "pickup" | "delivery") {
     if (!online) { setError("You are offline. Reconnect before requesting a verification code."); return false; }
     setUpdating(jobId); setError(null);
@@ -383,6 +481,7 @@ export function DriverWorkspace() {
 
   const driver = data!.driver;
   const activeJobs = data!.jobs.filter((job) => job.status !== "unassigned");
+  const activeReturnJobs = data!.return_jobs.filter((job) => !["completed", "failed", "cancelled"].includes(job.status));
   const currentJob = activeJobs.find((job) => ["accepted", "at_pickup", "collected"].includes(job.status)) ?? activeJobs[0] ?? null;
   const openOffers = currentJob ? [] : data!.jobs.filter((job) => job.status === "unassigned");
   const otherJobs = currentJob
@@ -398,7 +497,7 @@ export function DriverWorkspace() {
     {!online ? <div className="border-b border-[#E6B879] bg-[#FFF1C2] px-4 py-2.5 text-center text-xs font-semibold text-[#6B4F00]">You are offline. Current jobs are visible, but actions are paused until you reconnect.</div> : null}
     {assignmentNotice ? <AssignmentNotice job={assignmentNotice} alertsEnabled={alertsEnabled} onEnableAlerts={() => void enableAlerts()} onDismiss={() => setAssignmentNotice(null)} /> : null}
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8"><div className="mb-5 flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#4e8875]">Driver cockpit</p><h1 className="mt-1 text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">{section === "route" ? "Today’s route" : section === "history" ? "Delivery history" : "Rider support"}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#64736c]">{section === "route" ? "Keep your availability accurate and take the next delivery one clear step at a time." : section === "history" ? "Review completed and exception deliveries from the last 30 days." : "Get help from your delivery partner when a route or customer needs attention."}</p></div><Link href="/" className="hidden text-xs font-semibold text-[#487368] transition hover:text-[#19342b] sm:inline-flex">Open Morni</Link></div>
-      {section === "route" ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]"><div className="space-y-5"><AvailabilityCard driver={driver} activeJobs={activeJobs.length} updating={updating === "availability"} online={online} onAvailability={(next) => void setAvailability(next)} />{mapOpen ? <DriverMap job={currentJob} driverLat={driver.last_lat} driverLng={driver.last_lng} locationUpdatedAt={driver.last_location_at} online={online} updating={updating === "location"} onRefreshLocation={() => void refreshLocation()} /> : <section className="rounded-[1.5rem] border border-[#dce5e0] bg-white p-5 shadow-[0_14px_30px_-28px_rgba(30,55,43,0.7)]"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8f4ee] text-[#2f6f5d]"><PortalIcon name="location" className="h-5 w-5" /></span><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Live navigation</p><h2 className="mt-1 text-lg font-semibold text-[#19342b]">Map is ready when you need it</h2><p className="mt-1 text-xs leading-5 text-[#718079]">Open the live map only when you want route details. Your deliveries and navigation links stay available without it.</p></div></div><button type="button" onClick={() => setMapOpen(true)} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#cfdcd5] px-4 py-2.5 text-sm font-semibold text-[#155C4B] transition hover:bg-[#f5f8f6]"><PortalIcon name="location" className="h-4 w-4" />Open live map</button></section>}{error ? <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</p> : null}<section><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Open offers</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em]">{openOffers.length ? "Claim a delivery" : currentJob ? "Active delivery" : "No active delivery"}</h2></div><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#5b6e65]">{activeJobs.length} active · {openOffers.length} offers</span></div><div className="mt-4 space-y-4">{openOffers.map((job) => <DriverJobCard key={job.id} job={job} updating={updating === job.id} onAction={jobAction} onRequestHandoff={requestHandoff} onVerifyHandoff={verifyHandoff} onRefresh={() => void load(true)} />)}{currentJob ? <DriverJobCard job={currentJob} updating={updating === currentJob.id} onAction={jobAction} onRequestHandoff={requestHandoff} onVerifyHandoff={verifyHandoff} onRefresh={() => void load(true)} /> : openOffers.length === 0 ? <div className="rounded-2xl border border-dashed border-[#cad8d1] bg-white p-8 text-center"><span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-[#e8f4ee] text-[#3c7d68]"><PortalIcon name="package" className="h-5 w-5" /></span><h2 className="mt-4 font-semibold">No active delivery jobs</h2><p className="mt-2 text-sm leading-6 text-[#6d7d75]">You are available. Morni will send the next open delivery offer here.</p></div> : null}{otherJobs.length > 0 ? <div><p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#708078]">Other active jobs</p><div className="space-y-4">{otherJobs.map((job) => <DriverJobCard key={job.id} job={job} updating={updating === job.id} onAction={jobAction} onRequestHandoff={requestHandoff} onVerifyHandoff={verifyHandoff} onRefresh={() => void load(true)} />)}</div></div> : null}</div></section></div><aside className="hidden space-y-5 xl:block"><ShiftSummary activeJobs={activeJobs.length} completedJobs={completedToday} /><HelpPanel supportEmail={data!.partner?.support_email} partnerName={data!.partner?.name} /></aside></div> : null}
+      {section === "route" ? <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]"><div className="space-y-5"><AvailabilityCard driver={driver} activeJobs={activeJobs.length} updating={updating === "availability"} online={online} onAvailability={(next) => void setAvailability(next)} />{mapOpen ? <DriverMap job={currentJob} driverLat={driver.last_lat} driverLng={driver.last_lng} locationUpdatedAt={driver.last_location_at} online={online} updating={updating === "location"} onRefreshLocation={() => void refreshLocation()} /> : <section className="rounded-[1.5rem] border border-[#dce5e0] bg-white p-5 shadow-[0_14px_30px_-28px_rgba(30,55,43,0.7)]"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8f4ee] text-[#2f6f5d]"><PortalIcon name="location" className="h-5 w-5" /></span><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Live navigation</p><h2 className="mt-1 text-lg font-semibold text-[#19342b]">Map is ready when you need it</h2><p className="mt-1 text-xs leading-5 text-[#718079]">Open the live map only when you want route details. Your deliveries and navigation links stay available without it.</p></div></div><button type="button" onClick={() => setMapOpen(true)} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#cfdcd5] px-4 py-2.5 text-sm font-semibold text-[#155C4B] transition hover:bg-[#f5f8f6]"><PortalIcon name="location" className="h-4 w-4" />Open live map</button></section>}{error ? <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</p> : null}{activeReturnJobs.length ? <section><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#a65316]">Reverse logistics</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em]">Return pickups</h2></div><span className="rounded-full bg-[#fff1dc] px-2.5 py-1 text-xs font-semibold text-[#8d4a10]">{activeReturnJobs.length} assigned to you</span></div><div className="mt-4 space-y-4">{activeReturnJobs.map((job) => <ReturnJobCard key={job.id} job={job} updating={updating === job.id} onAction={returnJobAction} onRequestHandoff={requestReturnHandoff} onVerifyHandoff={verifyReturnHandoff} onUploadProof={uploadReturnProofForJob} />)}</div></section> : null}<section><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">Open offers</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em]">{openOffers.length ? "Claim a delivery" : currentJob ? "Active delivery" : "No active delivery"}</h2></div><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#5b6e65]">{activeJobs.length} active · {openOffers.length} offers</span></div><div className="mt-4 space-y-4">{openOffers.map((job) => <DriverJobCard key={job.id} job={job} updating={updating === job.id} onAction={jobAction} onRequestHandoff={requestHandoff} onVerifyHandoff={verifyHandoff} onRefresh={() => void load(true)} />)}{currentJob ? <DriverJobCard job={currentJob} updating={updating === currentJob.id} onAction={jobAction} onRequestHandoff={requestHandoff} onVerifyHandoff={verifyHandoff} onRefresh={() => void load(true)} /> : openOffers.length === 0 ? <div className="rounded-2xl border border-dashed border-[#cad8d1] bg-white p-8 text-center"><span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-[#e8f4ee] text-[#3c7d68]"><PortalIcon name="package" className="h-11 w-11" /></span><h2 className="mt-4 font-semibold">No active delivery jobs</h2><p className="mt-2 text-sm leading-6 text-[#6d7d75]">You are available. Morni will send the next open delivery offer here.</p></div> : null}{otherJobs.length > 0 ? <div><p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#708078]">Other active jobs</p><div className="space-y-4">{otherJobs.map((job) => <DriverJobCard key={job.id} job={job} updating={updating === job.id} onAction={jobAction} onRequestHandoff={requestHandoff} onVerifyHandoff={verifyHandoff} onRefresh={() => void load(true)} />)}</div></div> : null}</div></section></div><aside className="hidden space-y-5 xl:block"><ShiftSummary activeJobs={activeJobs.length} completedJobs={completedToday} /><HelpPanel supportEmail={data!.partner?.support_email} partnerName={data!.partner?.name} /></aside></div> : null}
       {section === "history" ? <HistoryList history={data!.history} /> : null}
       {section === "help" ? <div className="max-w-xl"><HelpPanel supportEmail={data!.partner?.support_email} partnerName={data!.partner?.name} /></div> : null}
     </div>

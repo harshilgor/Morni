@@ -15,6 +15,8 @@ import { formatAed } from "@/lib/format";
 import { getOnboardingChecklist } from "@/lib/onboarding";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
 import type { Order, OrderItem, Product, ProductReview, Store } from "@/lib/types";
+import { InventoryNotifications } from "@/components/inventory-notifications";
+import { ReturnRequestsPanel } from "@/components/return-requests-panel";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] | null };
 type WishRow = { product_id: string; count: number; title: string };
@@ -102,7 +104,7 @@ export default function PortalOverviewPage() {
     return {
       activeOrders: orders.filter((order) => ACTIVE_STATUSES.has(order.status)),
       newOrders: orders.filter((order) => order.status === "placed"),
-      lowStock: products.filter((product) => product.stock <= 5),
+      lowStock: products.filter((product) => product.stock <= 5 || Object.values(product.size_stock ?? {}).some((quantity) => quantity <= 5)),
       unreplied: reviews.filter((review) => !review.owner_reply?.trim()),
       todayRevenue: todayOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),
       weekRevenue: weekOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),
@@ -159,6 +161,7 @@ export default function PortalOverviewPage() {
           reviews={reviews}
           orders={orders}
           wishlistRows={wishlistRows}
+          storeId={store.id}
         />
       </div>
 
@@ -172,7 +175,9 @@ export default function PortalOverviewPage() {
           <Link href={setupComplete && store.is_active ? `/stores/${store.slug}` : "/portal/settings"} className="portal-button-primary">{setupComplete && store.is_active ? "View storefront" : "Finish setup"}<PortalIcon name="external" className="h-3.5 w-3.5" /></Link>
         </PortalPageHeader>
 
-        {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
+      {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
+      <InventoryNotifications storeId={store.id} />
+      <ReturnRequestsPanel storeId={store.id} />
 
         <section>
           <div className="mb-3 flex items-center justify-between">
@@ -217,6 +222,7 @@ function MobileOverview({
   reviews,
   orders,
   wishlistRows,
+  storeId,
 }: {
   store: Store;
   setupComplete: boolean;
@@ -237,6 +243,7 @@ function MobileOverview({
   reviews: ProductReview[];
   orders: OrderWithItems[];
   wishlistRows: WishRow[];
+  storeId: string;
 }) {
   const attentionCount = insights.newOrders.length + insights.lowStock.length + insights.unreplied.length;
   const checklistComplete = checklist.filter((item) => item.done).length;
@@ -244,6 +251,7 @@ function MobileOverview({
   return (
     <div className="space-y-4">
       {!setupComplete || !store.is_active ? <MobileLaunchCard storeActive={store.is_active} complete={setupComplete} /> : null}
+      <ReturnRequestsPanel storeId={storeId} />
 
       <section className="overflow-hidden rounded-2xl bg-[#21342e] text-white shadow-[0_18px_40px_-28px_rgba(33,52,46,0.75)]">
         <div className="flex items-start justify-between gap-3 px-4 py-5">

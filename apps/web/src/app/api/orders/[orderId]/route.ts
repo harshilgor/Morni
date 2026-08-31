@@ -44,13 +44,7 @@ export async function DELETE(
     return NextResponse.json({ error: "This order is already with delivery dispatch and cannot be deleted." }, { status: 409 });
   }
 
-  const { data: cancelledOrder, error: cancelError } = await admin
-    .from("orders")
-    .update({ status: "cancelled" })
-    .eq("id", orderId)
-    .eq("status", order.status)
-    .select("id, status")
-    .maybeSingle();
+  const { data: cancelledOrder, error: cancelError } = await admin.rpc("cancel_order_and_restore_inventory", { p_order_id: orderId });
   if (cancelError) return NextResponse.json({ error: cancelError.message }, { status: 500 });
   if (!cancelledOrder) {
     return NextResponse.json({ error: "This order changed before it could be deleted. Refresh and try again." }, { status: 409 });

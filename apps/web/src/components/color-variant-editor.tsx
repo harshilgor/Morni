@@ -576,7 +576,7 @@ export function ColorVariantEditor({
                     </div>
                   ) : null}
                   <label className="block space-y-1.5 text-xs text-muted">
-                    Stock
+                    Total stock
                     <input
                       type="number"
                       min="0"
@@ -589,6 +589,16 @@ export function ColorVariantEditor({
                     />
                   </label>
                 </div>
+                {showSizes ? (
+                  <div className="grid grid-cols-3 gap-2 rounded-xl border border-line bg-white p-3">
+                    {draft.sizes.map((size) => (
+                      <label key={size} className="text-xs font-medium text-muted">
+                        {size}
+                        <input type="number" min="0" value={draft.size_stock[size] ?? 0} disabled={disabled} onChange={(event) => { const size_stock = { ...draft.size_stock, [size]: Math.max(0, Number(event.target.value) || 0) }; updateDraft(draft.key, { size_stock, stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) }); }} className="mt-1 w-full rounded-xl border border-line bg-background px-2 py-2 text-sm text-ink" />
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             );
           })}

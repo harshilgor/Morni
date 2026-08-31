@@ -86,6 +86,7 @@ export type Product = {
   compare_at_price_aed: number | null;
   image_urls: string[];
   sizes: string[];
+  size_stock?: Record<string, number> | null;
   stock: number;
   is_available: boolean;
   customization_enabled?: boolean;

@@ -16,6 +16,7 @@ type StoreRowProduct = {
   compare_at_price_aed: number | null;
   image_urls: string[] | null;
   sizes: string[] | null;
+  size_stock?: Record<string, number> | null;
   stock: number;
   is_available?: boolean;
   category_id?: string | null;
@@ -53,12 +54,14 @@ export function StoreProductRow({
       compare_at_price_aed: product.compare_at_price_aed,
       image_urls: product.image_urls ?? [],
       sizes: product.sizes ?? [],
+      size_stock: product.size_stock ?? {},
       stock: product.stock,
       is_available: product.is_available ?? true,
     };
   }
 
   function addWithSize(size?: string) {
+    if (size && Object.keys(product.size_stock ?? {}).length > 0 && (product.size_stock?.[size] ?? 0) <= 0) return;
     addItem(cartProduct(), storeName, 1, {
       size,
       imageUrl: image,
@@ -78,6 +81,8 @@ export function StoreProductRow({
     }
     setPickingSize((open) => !open);
   }
+
+  const hasSizeInventory = Object.keys(product.size_stock ?? {}).length > 0;
 
   return (
     <article className="border-b border-line/80 py-4 last:border-b-0 sm:py-5">
@@ -116,9 +121,10 @@ export function StoreProductRow({
                   key={size}
                   type="button"
                   onClick={() => addWithSize(size)}
+                  disabled={hasSizeInventory && (product.size_stock?.[size] ?? 0) <= 0}
                   className="min-h-9 min-w-11 rounded-lg border border-line bg-white px-2.5 text-xs font-semibold text-ink transition hover:border-ink hover:bg-ink hover:text-white"
                 >
-                  {size}
+                  {hasSizeInventory && (product.size_stock?.[size] ?? 0) <= 0 ? `${size} ×` : size}
                 </button>
               ))}
             </div>

@@ -1,7 +1,6 @@
 import { FeaturedCategories } from "@/components/featured-categories";
 import { HomeDiscovery, type IntentRail } from "@/components/home-discovery";
 import { HomeStores } from "@/components/home-stores";
-import { MegaSaleRail } from "@/components/mega-sale-rail";
 import { NewAndPopular, type PopularTab } from "@/components/new-and-popular";
 import { ProductRail } from "@/components/product-rail";
 import { RecentlyViewedRail } from "@/components/recently-viewed-rail";
@@ -30,9 +29,9 @@ export async function HomeCatalog({
     rating: includeRating ? ratingRecord[product.id] ?? null : undefined,
   });
 
-  const under99Rail = under99.slice(0, 10).map((product) => toRailProduct(product));
-
   const megaSaleRail = megaSale.slice(0, 10).map((product) => toRailProduct(product));
+
+  const under99Rail = under99.slice(0, 10).map((product) => toRailProduct(product));
 
   const under199Rail = under199.slice(0, 10).map((product) => toRailProduct(product));
 
@@ -57,6 +56,14 @@ export async function HomeCatalog({
     .map(({ product }) => toRailProduct(product, true));
 
   const intentRails: IntentRail[] = [
+    {
+      id: "under-55",
+      label: "Under AED 55",
+      title: "Under AED 55",
+      subtitle: "High-value boutique finds at an easy price.",
+      href: "/collection/under-55",
+      products: megaSaleRail,
+    },
     {
       id: "under-99",
       label: "Under AED 99",
@@ -130,7 +137,6 @@ export async function HomeCatalog({
     <>
       <FeaturedCategories categories={featured} />
       <ShopBySize />
-      <MegaSaleRail products={megaSaleRail} />
       <HomeDiscovery intents={intentRails} />
       <HomeStores
         stores={stores}

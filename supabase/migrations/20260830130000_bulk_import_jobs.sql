@@ -30,5 +30,7 @@ create index if not exists bulk_imports_store_created_idx on public.bulk_imports
 create index if not exists bulk_import_items_import_status_idx on public.bulk_import_items(import_id, status);
 alter table public.bulk_imports enable row level security;
 alter table public.bulk_import_items enable row level security;
+drop policy if exists "bulk_import_owner_read" on public.bulk_imports;
 create policy "bulk_import_owner_read" on public.bulk_imports for select using (public.is_store_member(store_id));
+drop policy if exists "bulk_import_item_owner_read" on public.bulk_import_items;
 create policy "bulk_import_item_owner_read" on public.bulk_import_items for select using (exists (select 1 from public.bulk_imports i where i.id = import_id and public.is_store_member(i.store_id)));

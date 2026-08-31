@@ -11,6 +11,8 @@ import {
   defaultCustomizationConfig,
   type ProductCustomizationConfig,
 } from "@/lib/product-customization";
+import { SizeInventoryEditor } from "@/components/size-inventory-editor";
+import type { SizeStock } from "@/lib/size-inventory";
 
 export type ProductFormValue = {
   title: string;
@@ -21,6 +23,7 @@ export type ProductFormValue = {
   compare_at_price_aed: string;
   stock: string;
   sizes: string[];
+  sizeStock?: SizeStock;
   customization: ProductCustomizationConfig;
   images: ProductImageItem[];
 };
@@ -152,23 +155,6 @@ export function ProductFormFields({
         </label>
       </div>
 
-      <label className="block space-y-1.5 text-sm">
-        <span className="text-muted">
-          Stock <span className="text-accent-deep">*</span>
-        </span>
-        <input
-          type="number"
-          min="0"
-          className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-          value={value.stock}
-          onChange={(e) => patch({ stock: e.target.value })}
-          required
-        />
-        {fieldErrors?.stock ? (
-          <p className="text-sm text-accent-deep">{fieldErrors.stock}</p>
-        ) : null}
-      </label>
-
       {!(["gifting", "hamper", "hampers"].includes(value.categorySlug)) ? <fieldset className="rounded-xl border border-line bg-background p-3">
         <legend className="px-1 text-sm text-muted">
           Available sizes <span className="text-accent-deep">*</span>
@@ -208,6 +194,10 @@ export function ProductFormFields({
         )}
       </fieldset> : null}
 
+      {!( ["gifting", "hamper", "hampers"].includes(value.categorySlug)) ? (
+        <SizeInventoryEditor sizes={value.sizes} sizeStock={value.sizeStock ?? {}} onChange={(sizes, sizeStock) => patch({ sizes, sizeStock, stock: String(Object.values(sizeStock).reduce((sum, quantity) => sum + quantity, 0)) })} />
+      ) : null}
+
       {!(["gifting", "hamper", "hampers"].includes(value.categorySlug)) ? (
         <CustomizationEditor
           value={value.customization}
@@ -235,6 +225,7 @@ export function emptyProductForm(): ProductFormValue {
     compare_at_price_aed: "",
     stock: "10",
     sizes: ["S", "M", "L"],
+    sizeStock: { S: 0, M: 0, L: 0 },
     customization: defaultCustomizationConfig(),
     images: [],
   };

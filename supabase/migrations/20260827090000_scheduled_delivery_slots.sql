@@ -1,5 +1,8 @@
 -- Scheduled delivery windows chosen at checkout.
 
+alter table public.products
+  add column if not exists size_stock jsonb not null default '{}'::jsonb;
+
 alter table public.orders
   add column if not exists delivery_slot_start timestamptz,
   add column if not exists delivery_slot_end timestamptz;
@@ -182,6 +185,8 @@ begin
          and not (v_size = any (v_variant.sizes)) then
         raise exception 'Selected size is no longer available.';
       end if;
+    elsif v_size is not null and v_product.size_stock <> '{}'::jsonb and coalesce((v_product.size_stock->>v_size)::integer, 0) < v_qty then
+      raise exception '% (%) only has % left.', v_product.title, v_size, coalesce((v_product.size_stock->>v_size)::integer, 0);
     elsif v_product.stock < v_qty then
       raise exception '% only has % left.', v_product.title, v_product.stock;
     elsif v_size is not null and cardinality(v_product.sizes) > 0
@@ -230,11 +235,15 @@ begin
       end if;
       select color_name into v_color_name from public.product_variants where id = v_variant_id;
     else
-      update public.products
-      set stock = stock - v_qty
-      where id = v_product_id and stock >= v_qty;
+      if v_size is not null and v_product.size_stock <> '{}'::jsonb then
+        update public.products
+        set size_stock = jsonb_set(size_stock, array[v_size], to_jsonb((size_stock->>v_size)::integer - v_qty), false)
+        where id = v_product_id and coalesce((size_stock->>v_size)::integer, 0) >= v_qty;
+      else
+        update public.products set stock = stock - v_qty where id = v_product_id and stock >= v_qty;
+      end if;
       if not found then
-        raise exception 'Not enough stock for a selected item.';
+        raise exception 'Not enough stock for the selected size.';
       end if;
       v_color_name := null;
     end if;

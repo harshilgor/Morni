@@ -8,7 +8,7 @@ import { formatAed, orderStatusLabel } from "@/lib/format";
 import { PortalIcon, type PortalIconName } from "@/components/portal-icons";
 import type { OrderStatus } from "@/lib/types";
 
-type FounderView = "overview" | "operations" | "delivery" | "stores" | "customers" | "catalogue" | "finance" | "settlements" | "alerts";
+type FounderView = "overview" | "operations" | "delivery" | "stores" | "customers" | "catalogue" | "finance" | "settlements" | "refunds" | "alerts";
 type FounderTone = "urgent" | "warning" | "default";
 type DeliveryJobStatus = "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled";
 
@@ -35,6 +35,7 @@ type FounderData = {
 };
 type SettlementStore = { store_id: string; store_name: string; commission_rate: number; order_count: number; gross_sales: number; commission: number; net_payout: number; paid_amount: number };
 type SettlementData = { period_start: string; period_end: string; default_commission_rate: number; stores: SettlementStore[]; history: Array<{ id: string; store_name: string; period_start: string; period_end: string; order_count: number; net_payout: number; payment_method: string; payment_reference: string | null; paid_at: string }> };
+type FounderRefund = { refund_id: string; return_request_id: string; order_number: string; store_name: string; shopper_name: string; shopper_phone: string | null; amount_aed: number; method: string; status: "pending_processor" | "processed" | "failed"; reason: string; created_at: string; processed_at: string | null; processor_reference: string | null; processor_note: string | null };
 
 const operateNav: Array<{ id: FounderView; label: string; icon: PortalIconName }> = [
   { id: "overview", label: "Today", icon: "overview" },
@@ -49,6 +50,7 @@ const growNav: Array<{ id: FounderView; label: string; icon: PortalIconName }> =
   { id: "catalogue", label: "Catalogue", icon: "products" },
   { id: "finance", label: "Finance", icon: "analytics" },
   { id: "settlements", label: "Settlements", icon: "analytics" },
+  { id: "refunds", label: "Refunds", icon: "refresh" },
 ];
 
 const statusOrder: OrderStatus[] = ["placed", "accepted", "picking", "out_for_delivery", "delivered"];
@@ -1089,6 +1091,33 @@ function SettlementsView() {
   </div>;
 }
 
+function RefundsView() {
+  const [refunds, setRefunds] = useState<FounderRefund[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await createClient().rpc("founder_refund_data");
+    if (error) setMessage(error.message); else setRefunds((data as FounderRefund[]) ?? []);
+    setLoading(false);
+  };
+  useEffect(() => { void load(); }, []);
+  async function markSent(refund: FounderRefund) {
+    const reference = window.prompt(`External payment reference for ${formatAed(refund.amount_aed)} to ${refund.shopper_name}:`)?.trim() ?? "";
+    if (!reference) return;
+    setBusyId(refund.refund_id); setMessage(null);
+    const { error } = await createClient().rpc("founder_mark_refund_sent", { p_return_request_id: refund.return_request_id, p_processor_reference: reference, p_note: null });
+    if (error) setMessage(error.message); else { setMessage(`${refund.order_number} refund recorded as sent.`); await load(); }
+    setBusyId(null);
+  }
+  const pending = refunds.filter((refund) => refund.status === "pending_processor");
+  return <div className="space-y-5">
+    <div className="grid gap-3 sm:grid-cols-3"><MetricCard label="Refunds to send" value={number(pending.length)} detail="After owner confirms receipt" tone={pending.length ? "attention" : "default"} icon="refresh" /><MetricCard label="Amount outstanding" value={formatAed(pending.reduce((sum, refund) => sum + Number(refund.amount_aed), 0))} detail="Manual external payments" tone={pending.length ? "attention" : "default"} icon="analytics" /><MetricCard label="Recent refunds" value={number(refunds.length)} detail="Pending and completed records" icon="orders" /></div>
+    <Panel className="p-5 sm:p-6"><SectionTitle title="Refund queue" detail="Send the external payment, then record the reference here. Morni does not move money automatically." /><div className="mt-5 overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead className="border-y border-[#e2e7e4] bg-[#f7faf8]"><tr>{["Order", "Shopper", "Boutique", "Amount", "Method", "Requested", "Status", "Action"].map((heading) => <th key={heading} className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">{heading}</th>)}</tr></thead><tbody className="divide-y divide-[#eef2f0]">{loading ? <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-[#687770]">Loading refunds…</td></tr> : refunds.map((refund) => <tr key={refund.refund_id}><td className="px-4 py-4 text-sm font-semibold text-[#17231f]">{refund.order_number}<span className="mt-1 block text-xs font-normal text-[#687770]">{refund.reason}</span></td><td className="px-4 py-4 text-sm text-[#52615b]">{refund.shopper_name}<span className="mt-1 block text-xs text-[#687770]">{refund.shopper_phone || "No phone"}</span></td><td className="px-4 py-4 text-sm text-[#52615b]">{refund.store_name}</td><td className="px-4 py-4 text-sm font-bold tabular-nums text-[#17231f]">{formatAed(refund.amount_aed)}</td><td className="px-4 py-4 text-xs font-semibold text-[#52615b]">{refund.method === "original_payment_method" ? "Original payment" : "Manual wallet credit"}</td><td className="px-4 py-4 text-xs text-[#687770]">{dateTime(refund.created_at)}</td><td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${refund.status === "processed" ? "bg-[#e5f5eb] text-[#277044]" : "bg-[#fff1dc] text-[#9c5b05]"}`}>{refund.status === "processed" ? "Sent" : "To send"}</span></td><td className="px-4 py-4">{refund.status === "pending_processor" ? <button type="button" onClick={() => void markSent(refund)} disabled={busyId === refund.refund_id} className="rounded-lg bg-[#21342e] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busyId === refund.refund_id ? "Saving…" : "Record payment"}</button> : <span className="text-xs text-[#687770]">{refund.processor_reference || "Recorded"}</span>}</td></tr>)}{!loading && !refunds.length ? <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-[#687770]">No refunds are waiting.</td></tr> : null}</tbody></table></div>{message ? <p role="status" className="mt-4 rounded-lg bg-[#fff1dc] px-3 py-2.5 text-sm text-[#805313]">{message}</p> : null}</Panel>
+  </div>;
+}
+
 function WorkspaceContent({ data, deliveryData, activeView, ownerName, onViewChange, onRefresh }: { data: FounderData; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void }) {
   if (activeView === "operations") return <Panel><OrderTable orders={data.recent_orders} /></Panel>;
   if (activeView === "delivery") return <DeliveryView data={deliveryData} onRefresh={onRefresh} />;
@@ -1097,6 +1126,7 @@ function WorkspaceContent({ data, deliveryData, activeView, ownerName, onViewCha
   if (activeView === "catalogue") return <CatalogueView products={data.top_products} />;
   if (activeView === "finance") return <FinanceView data={data} />;
   if (activeView === "settlements") return <SettlementsView />;
+  if (activeView === "refunds") return <RefundsView />;
   if (activeView === "alerts") return <ActionCentre alerts={data.alerts} onViewChange={onViewChange} />;
   return <Overview data={data} ownerName={ownerName} onViewChange={onViewChange} />;
 }
@@ -1159,6 +1189,7 @@ export function FounderWorkspace() {
           catalogue: ["Catalogue", "Demand and inventory signals."],
           finance: ["Finance", "Sales, fees, and payment readiness."],
           settlements: ["Settlements", "Store payouts, balances, and payment history."],
+          refunds: ["Refunds", "Manual refund queue for completed returns."],
           alerts: ["Action centre", "Exceptions that deserve attention first."],
         }) satisfies Record<FounderView, [string, string]>
       )[activeView],
