@@ -27,6 +27,7 @@ import {
   listBookableDeliverySlots,
   type BookableDeliverySlot,
 } from "@/lib/delivery-slots";
+import { navigateToPaymentPage } from "@/lib/payment-navigation";
 
 const CHECKOUT_DRAFT_KEY = "morni.checkout.delivery.v1";
 
@@ -237,7 +238,10 @@ export default function CheckoutPage() {
       clear();
       if (typeof window !== "undefined") window.localStorage.removeItem(CHECKOUT_DRAFT_KEY);
       if (payload.next === "pay" || method === "card") {
-        router.push(`/checkout/pay/${payload.order.id}`);
+        // The payment route has a broader frame-src policy for issuer-owned
+        // 3DS frames. A client-side transition would retain this document's
+        // stricter storefront CSP, so card checkout must load a new document.
+        navigateToPaymentPage(payload.order.id);
         return;
       }
       router.push(`/orders/${payload.order.id}`);
