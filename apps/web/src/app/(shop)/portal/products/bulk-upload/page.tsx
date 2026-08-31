@@ -396,16 +396,18 @@ export default function BulkUploadPage() {
     setBusyPhase("reading");
     setMessage("Preparing photos securely…");
     try {
-      const localFingerprints = Object.fromEntries(
-        await Promise.all(
-          draftsToAnalyze.flatMap((draft) =>
-            draft.photos.map(
-              async (photo) =>
-                [photo.id, await fingerprintImage(photo.file)] as const,
-            ),
-          ),
+      const localFingerprintEntries = await Promise.all(
+        draftsToAnalyze.flatMap((draft) =>
+          draft.photos.map(async (photo) => {
+            try {
+              return [photo.id, await fingerprintImage(photo.file)] as const;
+            } catch {
+              return [photo.id, null] as const;
+            }
+          }),
         ),
       );
+      const localFingerprints = Object.fromEntries(localFingerprintEntries);
       const images = await Promise.all(
         draftsToAnalyze.flatMap((draft) =>
           draft.photos.map(async (photo) => ({
@@ -479,7 +481,8 @@ export default function BulkUploadPage() {
       );
       setDrafts(locallyMerged);
       setMessage(
-        `AI grouped ${images.length} photos into ${locallyMerged.length} product candidates. Review flagged groups before publishing.`,
+        result.warning ??
+          `AI grouped ${images.length} photos into ${locallyMerged.length} product candidates. Review flagged groups before publishing.`,
       );
     } catch (error) {
       setMessage(

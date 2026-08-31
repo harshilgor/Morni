@@ -1,4 +1,4 @@
-export type ImageFingerprint = { id: string; bits: number[] };
+export type ImageFingerprint = { bits: number[] };
 
 export async function fingerprintImage(file: File): Promise<ImageFingerprint> {
   const bitmap = await createImageBitmap(file);
@@ -22,7 +22,6 @@ export async function fingerprintImage(file: File): Promise<ImageFingerprint> {
   const average =
     luminance.reduce((sum, value) => sum + value, 0) / luminance.length;
   return {
-    id: file.name,
     bits: luminance.map((value) => (value >= average ? 1 : 0)),
   };
 }
