@@ -6,11 +6,17 @@ const WIDGET_TIMEOUT_MS = 15_000;
 
 type WpwlOptions = {
   onReady?: (...args: unknown[]) => void;
+  onError?: (error: unknown) => void;
   [key: string]: unknown;
+};
+
+type WpwlRuntime = {
+  unload?: () => void;
 };
 
 type WidgetWindow = Window & {
   wpwlOptions?: WpwlOptions;
+  wpwl?: WpwlRuntime;
 };
 
 type AfsPaymentWidgetProps = {
@@ -36,6 +42,27 @@ function widgetHasRenderedCardForm(form: HTMLFormElement) {
       ".wpwl-form-card, .wpwl-control-cardNumber, input[name='card.number'], .wpwl-button",
     ),
   );
+}
+
+function unloadAfsRuntime(widgetWindow: WidgetWindow) {
+  try {
+    widgetWindow.wpwl?.unload?.();
+  } catch {
+    // AFS owns this runtime. Cleanup must continue even if its unload hook
+    // throws while a third-party iframe is still settling.
+  }
+
+  document
+    .querySelectorAll<HTMLScriptElement>('script[src*="static.min.js"]')
+    .forEach((script) => script.remove());
+}
+
+function describeWidgetError(error: unknown) {
+  if (!error || typeof error !== "object") return "AFS did not provide an error message.";
+  const details = error as { name?: unknown; message?: unknown };
+  const name = typeof details.name === "string" ? details.name : "WidgetError";
+  const message = typeof details.message === "string" ? details.message : "Unknown provider error";
+  return `${name}: ${message}`.slice(0, 240);
 }
 
 export default function AfsPaymentWidget({
@@ -67,8 +94,10 @@ export default function AfsPaymentWidget({
 
     let finished = false;
     const widgetWindow = window as WidgetWindow;
+    unloadAfsRuntime(widgetWindow);
     const previousOptions = widgetWindow.wpwlOptions;
     const previousOnReady = previousOptions?.onReady;
+    const previousOnError = previousOptions?.onError;
 
     const markReady = () => {
       if (finished) return;
@@ -94,12 +123,20 @@ export default function AfsPaymentWidget({
         previousOnReady?.(...args);
         markReady();
       },
+      onError: (error: unknown) => {
+        previousOnError?.(error);
+        console.error("AFS payment widget error", describeWidgetError(error));
+        fail();
+      },
     };
 
     const script = document.createElement("script");
     script.id = `afs-payment-widget-${checkoutId}`;
     script.src = scriptUrl;
-    script.async = true;
+    script.type = "text/javascript";
+    // AFS documents a normal classic script tag. Keep this dynamically
+    // inserted script non-async so its form scan cannot race the mount.
+    script.async = false;
     script.crossOrigin = integrity ? "anonymous" : "";
     if (integrity) script.integrity = integrity;
     script.addEventListener("error", fail, { once: true });
@@ -108,6 +145,7 @@ export default function AfsPaymentWidget({
     return () => {
       window.clearTimeout(timeout);
       observer.disconnect();
+      unloadAfsRuntime(widgetWindow);
       script.remove();
       host.replaceChildren();
       if (previousOptions) {
