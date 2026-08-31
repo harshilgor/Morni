@@ -249,6 +249,7 @@ export default function BulkUploadPage() {
   >("idle");
   const [showCoach, setShowCoach] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   useEffect(() => {
     void loadBrowseCategoryOptions().then(setCategories);
   }, []);
@@ -319,6 +320,12 @@ export default function BulkUploadPage() {
         draft.id === draftId ? { ...draft, ...changes } : draft,
       ),
     );
+  }
+  function hasValidationError(draftId: string, field: string) {
+    return validationErrors[draftId]?.includes(field) ?? false;
+  }
+  function hasProductTagError(draftId: string) {
+    return hasValidationError(draftId, "unique product tag") || hasValidationError(draftId, "product tag format");
   }
   function move(photoId: string, targetId: string) {
     const source = drafts.find((draft) =>
@@ -497,27 +504,58 @@ export default function BulkUploadPage() {
   }
   async function publish() {
     if (!store || !drafts.length) return;
+    const missingByDraft = Object.fromEntries(
+      drafts
+        .map((draft) => {
+          const missing = [
+            !draft.photos.length ? "photos" : null,
+            !draft.title.trim() ? "product name" : null,
+            !draft.categorySlug ? "category" : null,
+            !draft.priceAed ? "price" : null,
+            draft.stock === "" ? "stock" : null,
+          ].filter((field): field is string => Boolean(field));
+          return [draft.id, missing] as const;
+        })
+        .filter(([, missing]) => missing.length),
+    ) as Record<string, string[]>;
+    const tags = drafts.map((draft) => draft.productTag.trim().toUpperCase()).filter(Boolean);
+    drafts.forEach((draft) => {
+      const tag = draft.productTag.trim();
+      if (tag && !/^[A-Za-z][A-Za-z0-9-]{0,39}$/.test(tag))
+        missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "product tag format"];
+    });
+    if (new Set(tags).size !== tags.length) {
+      drafts.forEach((draft) => {
+        const tag = draft.productTag.trim().toUpperCase();
+        if (tag && tags.filter((value) => value === tag).length > 1)
+          missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "unique product tag"];
+      });
+    }
+    if (Object.keys(missingByDraft).length) {
+      setValidationErrors(missingByDraft);
+      const summary = Object.entries(missingByDraft)
+        .map(([draftId, fields]) => `Product ${drafts.findIndex((draft) => draft.id === draftId) + 1}: ${fields.join(", ")}`)
+        .join(" · ");
+      setMessage(`Complete the highlighted fields before publishing. ${summary}`);
+      return;
+    }
+    setValidationErrors({});
     setBusy(true);
     setBusyPhase("publishing");
     setMessage(null);
     const uploadedUrls: string[] = [];
     try {
-      const tags = drafts.map((draft) => draft.productTag.trim().toUpperCase());
-      if (new Set(tags).size !== tags.length) {
-        throw new Error("Each product must have a unique product tag.");
-      }
       const items = [];
       for (const draft of drafts) {
         if (
           !draft.photos.length ||
           !draft.title.trim() ||
-          !draft.productTag.trim() ||
           !draft.categorySlug ||
           !draft.priceAed ||
           draft.stock === ""
         )
           throw new Error(
-            `Complete the photos, name, product tag, category, price, and stock for ${draft.title || "a draft"}.`,
+            `Complete the photos, name, category, price, and stock for ${draft.title || "a draft"}.`,
           );
         const images = await uploadProductImages({
           storeId: store.id,
@@ -693,7 +731,7 @@ export default function BulkUploadPage() {
         </div>
       ) : null}
       {message ? (
-        <p className="mt-5 rounded-xl bg-[#eef8f1] px-4 py-3 text-sm text-[#245448]">
+        <p className={`mt-5 rounded-xl px-4 py-3 text-sm ${Object.keys(validationErrors).length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length ? "alert" : "status"}>
           {message}
         </p>
       ) : null}
@@ -728,7 +766,7 @@ export default function BulkUploadPage() {
               event.preventDefault();
               move(event.dataTransfer.getData("photo-id"), draft.id);
             }}
-            className="rounded-2xl border border-line bg-surface p-4"
+            className={`rounded-2xl border bg-surface p-4 ${hasValidationError(draft.id, "photos") ? "border-red-400" : "border-line"}`}
           >
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep">
@@ -763,18 +801,19 @@ export default function BulkUploadPage() {
               />
             ) : null}
             {!draft.photos.length ? (
-              <div className="mt-3 rounded-xl border border-dashed border-line bg-[#f8fbf9] py-6 text-center text-sm text-muted">
+              <div className={`mt-3 rounded-xl border border-dashed bg-[#f8fbf9] py-6 text-center text-sm ${hasValidationError(draft.id, "photos") ? "border-red-400 text-red-600" : "border-line text-muted"}`}>
                 Drop a photo here.
               </div>
             ) : null}
             <div className="mt-4 grid gap-3">
-              <label className="flex items-center gap-2 border-b border-line py-2">
+              <label className={`flex items-center gap-2 border-b py-2 ${hasValidationError(draft.id, "product name") ? "border-red-400" : "border-line"}`}>
                 <input
                   value={draft.title}
                   onChange={(event) =>
                     patch(draft.id, { title: event.target.value })
                   }
-                  className="min-w-0 flex-1 bg-transparent font-display text-xl outline-none"
+                  aria-invalid={hasValidationError(draft.id, "product name")}
+                  className={`min-w-0 flex-1 bg-transparent font-display text-xl outline-none ${hasValidationError(draft.id, "product name") ? "placeholder:text-red-400" : ""}`}
                   placeholder="Product name"
                 />
                 <PortalIcon
@@ -790,9 +829,9 @@ export default function BulkUploadPage() {
                   onChange={(event) =>
                     patch(draft.id, { productTag: event.target.value })
                   }
-                  className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm normal-case tracking-normal"
+                  aria-invalid={hasProductTagError(draft.id)}
+                  className={`mt-1 w-full rounded-lg border bg-background px-2 py-2 text-sm normal-case tracking-normal ${hasProductTagError(draft.id) ? "border-red-400" : "border-line"}`}
                   placeholder="e.g. LUME-001"
-                  required
                 />
               </label>
               <textarea
@@ -817,7 +856,8 @@ export default function BulkUploadPage() {
                           : ["S", "M", "L"],
                     })
                   }
-                  className="rounded-lg border border-line bg-background px-2 py-2 text-sm"
+                  aria-invalid={hasValidationError(draft.id, "category")}
+                  className={`rounded-lg border bg-background px-2 py-2 text-sm ${hasValidationError(draft.id, "category") ? "border-red-400" : "border-line"}`}
                 >
                   <option value="">Category</option>
                   {categories.map((category) => (
@@ -834,7 +874,8 @@ export default function BulkUploadPage() {
                   onChange={(event) =>
                     patch(draft.id, { priceAed: event.target.value })
                   }
-                  className="rounded-lg border border-line bg-background px-2 py-2 text-sm"
+                  aria-invalid={hasValidationError(draft.id, "price")}
+                  className={`rounded-lg border bg-background px-2 py-2 text-sm ${hasValidationError(draft.id, "price") ? "border-red-400" : "border-line"}`}
                   placeholder="Price"
                 />
                 <label className="text-[10px] font-semibold text-muted">
@@ -845,9 +886,9 @@ export default function BulkUploadPage() {
                     onChange={(event) =>
                       patch(draft.id, { stock: event.target.value })
                     }
-                    className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm font-normal"
+                    aria-invalid={hasValidationError(draft.id, "stock")}
+                    className={`mt-1 w-full rounded-lg border bg-background px-2 py-2 text-sm font-normal ${hasValidationError(draft.id, "stock") ? "border-red-400" : "border-line"}`}
                     placeholder="Stock"
-                    required
                   />
                 </label>
               </div>
