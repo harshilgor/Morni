@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import type { Order } from "@/lib/types";
+import AfsPaymentWidget from "./afs-payment-widget";
 
 type CheckoutSession = {
   checkoutId: string;
@@ -25,6 +25,7 @@ export default function CheckoutPayPageClient({ orderId }: { orderId: string }) 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [widgetAttempt, setWidgetAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -158,18 +159,14 @@ export default function CheckoutPayPageClient({ orderId }: { orderId: string }) 
 
       {session ? (
         <div className="mt-8 min-h-[12rem]">
-          <form
-            action={session.shopperResultUrl}
-            className="paymentWidgets"
-            data-brands={brands}
-          ></form>
-          <Script
-            id={`afs-payment-widget-${session.checkoutId}`}
-            src={session.scriptUrl}
-            integrity={session.integrity ?? undefined}
-            crossOrigin={session.integrity ? "anonymous" : undefined}
-            strategy="afterInteractive"
-            onError={() => setError("Unable to load the secure payment form. Please try again.")}
+          <AfsPaymentWidget
+            key={`${session.checkoutId}-${widgetAttempt}`}
+            checkoutId={session.checkoutId}
+            scriptUrl={session.scriptUrl}
+            integrity={session.integrity}
+            shopperResultUrl={session.shopperResultUrl}
+            brands={brands}
+            onRetry={() => setWidgetAttempt((attempt) => attempt + 1)}
           />
         </div>
       ) : null}
