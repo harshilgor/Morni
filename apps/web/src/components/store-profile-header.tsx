@@ -56,6 +56,7 @@ export function StoreProfileHeader({
   rating,
   reviewCount,
   promos = [],
+  publicPickupLocation,
 }: {
   store: Store;
   openNow: boolean | null;
@@ -63,6 +64,11 @@ export function StoreProfileHeader({
   rating: number | null;
   reviewCount: number;
   promos?: StorePromo[];
+  publicPickupLocation?: {
+    area: string;
+    address: string;
+    emirate: Store["emirate"];
+  } | null;
 }) {
   const eta = deliveryEtaLabel(store.delivery_eta_minutes || 60);
   const location = `${store.area}, ${emirateLabel(store.emirate)}`;
@@ -128,6 +134,11 @@ export function StoreProfileHeader({
               <span className="font-normal text-muted"> · {eta}</span>
             </p>
             <p className="truncate text-xs text-muted">{location}</p>
+            {publicPickupLocation ? (
+              <p className="mt-1 truncate text-xs text-muted" title={publicPickupLocation.address}>
+                Pickup from: {publicPickupLocation.address}, {publicPickupLocation.area}
+              </p>
+            ) : null}
           </div>
         </motion.div>
 

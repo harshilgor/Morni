@@ -8,26 +8,43 @@ import { useOwnerStore } from "@/lib/use-owner-store";
 import type { Order, OrderItem, Product } from "@/lib/types";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] | null };
-type DeliveryJobSummary = {
-  id: string;
-  order_id: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  assignment_expires_at: string | null;
-};
+type DeliveryJob = { id: string; order_id: string; status: string; created_at: string; updated_at: string; delivered_at: string | null; assignment_expires_at: string | null };
+type Range = 7 | 30 | 90;
+type ProductSales = { id: string; title: string; units: number; revenue: number; imageUrl: string | null; stock: number | null };
 
-function dayKey(value: Date) {
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+const dayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const percentChange = (current: number, previous: number) => previous ? ((current - previous) / previous) * 100 : current ? 100 : 0;
+const signedPercent = (value: number) => `${value >= 0 ? "+" : ""}${Math.round(value * 10) / 10}%`;
+const dateLabel = (date: Date, range: Range) => range === 7 ? date.toLocaleDateString("en-AE", { weekday: "short" }) : date.toLocaleDateString("en-AE", { day: "numeric", month: "short" });
+
+function Change({ value, inverse = false }: { value: number; inverse?: boolean }) {
+  const positive = inverse ? value < 0 : value > 0;
+  return <span className={`inline-flex items-center gap-1 text-xs font-bold ${value === 0 ? "text-[#75827c]" : positive ? "text-[#2f8060]" : "text-[#b85b4b]"}`}><span aria-hidden="true">{value > 0 ? "↗" : value < 0 ? "↘" : "→"}</span>{signedPercent(value)}</span>;
+}
+
+function MiniBars({ values, color = "#5b9183" }: { values: number[]; color?: string }) {
+  const max = Math.max(...values, 1);
+  return <div className="flex h-10 items-end gap-0.5" aria-hidden="true">{values.map((value, index) => <span key={index} className="min-w-0 flex-1 rounded-t-sm" style={{ height: `${Math.max(8, value / max * 100)}%`, backgroundColor: color }} />)}</div>;
+}
+
+function TrendChart({ days, previous }: { days: Array<{ key: string; label: string; revenue: number; orders: number }>; previous: number }) {
+  const max = Math.max(...days.map((day) => day.revenue), 1);
+  const points = days.map((day, index) => `${(index / Math.max(days.length - 1, 1)) * 100},${100 - (day.revenue / max) * 86}`).join(" ");
+  return <div className="mt-5"><div className="flex items-center gap-4 text-xs text-[#687870]"><span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#2f8060]" />Revenue</span><span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#d9c0ca]" />Previous period</span></div><div className="relative mt-4 h-64 rounded-xl bg-[#f7faf8] px-2 py-4 sm:h-72 sm:px-5"><div className="pointer-events-none absolute inset-x-4 top-5 grid gap-11 text-[10px] text-[#a1aea8] sm:inset-x-7"><span>{formatAed(max)}</span><span>{formatAed(max / 2)}</span><span>{formatAed(0)}</span></div><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-x-5 bottom-10 top-6 h-[calc(100%-4.5rem)] w-[calc(100%-2.5rem)] overflow-visible" role="img" aria-label="Revenue trend chart"><path d="M0 100H100 M0 50H100 M0 0H100" stroke="#e4ece7" strokeWidth="0.5" fill="none" vectorEffect="non-scaling-stroke" />{previous > 0 ? <path d="M0 70 C 20 60, 35 77, 50 52 S 78 62, 100 38" stroke="#d9c0ca" strokeWidth="1.5" fill="none" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" /> : null}<polygon points={`0,100 ${points} 100,100`} fill="#dceee5" opacity="0.8" /><polyline points={points} stroke="#2f8060" strokeWidth="2.5" fill="none" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" /></svg><div className="absolute inset-x-5 bottom-2 flex justify-between gap-2 text-[10px] font-semibold text-[#7b8882] sm:inset-x-7">{days.map((day, index) => <span key={day.key} className={`${days.length > 14 && index % 5 !== 0 ? "hidden sm:block" : ""} truncate`}>{day.label}</span>)}</div></div><p className="mt-3 text-xs text-[#7b8882]">Revenue is based on non-cancelled orders in the selected period.</p></div>;
+}
+
+function Opportunity({ title, detail, action, tone = "neutral" }: { title: string; detail: string; action?: string; tone?: "neutral" | "urgent" | "good" }) {
+  return <div className={`rounded-xl border p-4 ${tone === "urgent" ? "border-[#f0d5b0] bg-[#fff9ef]" : tone === "good" ? "border-[#cfe5d8] bg-[#f3fbf5]" : "border-[#dce8e1] bg-[#f8fbf9]"}`}><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold text-[#31443d]">{title}</p><p className="mt-1 text-xs leading-5 text-[#718079]">{detail}</p></div>{action ? <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.1em] text-[#3c7561]">{action}</span> : null}</div></div>;
 }
 
 export default function PortalAnalyticsPage() {
   const { store, loading, error } = useOwnerStore();
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [deliveryJobs, setDeliveryJobs] = useState<DeliveryJobSummary[]>([]);
-  const [range, setRange] = useState<7 | 30>(7);
-  const [operationalNow] = useState(() => Date.now());
+  const [deliveryJobs, setDeliveryJobs] = useState<DeliveryJob[]>([]);
+  const [range, setRange] = useState<Range>(30);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!store) return;
@@ -35,102 +52,56 @@ export default function PortalAnalyticsPage() {
     void Promise.all([
       supabase.from("orders").select("*, order_items(*)").eq("store_id", store.id).order("placed_at", { ascending: false }),
       supabase.from("products").select("*").eq("store_id", store.id),
-      supabase.from("delivery_jobs").select("id, order_id, status, created_at, updated_at, assignment_expires_at").order("updated_at", { ascending: false }),
+      supabase.from("delivery_jobs").select("id,order_id,status,created_at,updated_at,delivered_at,assignment_expires_at").order("updated_at", { ascending: false }),
     ]).then(([ordersResult, productsResult, jobsResult]) => {
+      const firstError = ordersResult.error ?? productsResult.error ?? jobsResult.error;
+      setDataError(firstError?.message ?? null);
       setOrders((ordersResult.data as OrderWithItems[]) ?? []);
       setProducts((productsResult.data as Product[]) ?? []);
-      setDeliveryJobs((jobsResult.data as DeliveryJobSummary[]) ?? []);
+      setDeliveryJobs((jobsResult.data as DeliveryJob[]) ?? []);
+      setRefreshedAt(new Date());
     });
   }, [store]);
 
   const report = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const start = new Date(today);
-    start.setDate(start.getDate() - (range - 1));
-    const periodOrders = orders.filter((order) => order.status !== "cancelled" && new Date(order.placed_at) >= start);
-    const allCompleted = orders.filter((order) => order.status !== "cancelled");
-    const salesByDay = Array.from({ length: range }, (_, index) => {
-      const date = new Date(start);
-      date.setDate(start.getDate() + index);
-      const matching = periodOrders.filter((order) => dayKey(new Date(order.placed_at)) === dayKey(date));
-      return {
-        key: dayKey(date),
-        label: range === 7 ? date.toLocaleDateString("en-AE", { weekday: "short" }) : date.toLocaleDateString("en-AE", { day: "numeric", month: "short" }),
-        revenue: matching.reduce((sum, order) => sum + Number(order.total_aed), 0),
-        orders: matching.length,
-      };
-    });
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const start = new Date(today); start.setDate(start.getDate() - (range - 1));
+    const previousStart = new Date(start); previousStart.setDate(previousStart.getDate() - range);
+    const active = orders.filter((order) => order.status !== "cancelled");
+    const periodOrders = active.filter((order) => new Date(order.placed_at) >= start);
+    const previousOrders = active.filter((order) => { const placed = new Date(order.placed_at); return placed >= previousStart && placed < start; });
+    const merchandise = (rows: OrderWithItems[]) => rows.reduce((sum, order) => sum + Number(order.subtotal_aed ?? order.total_aed ?? 0), 0);
+    const totalRevenue = merchandise(periodOrders); const previousRevenue = merchandise(previousOrders);
+    const totalFees = periodOrders.reduce((sum, order) => sum + Number(order.delivery_fee_aed ?? 0) + Number(order.small_order_fee_aed ?? 0) + Number(order.service_fee_aed ?? 0), 0);
+    const pendingPayment = periodOrders.filter((order) => order.payment_status === "pending").reduce((sum, order) => sum + Number(order.total_aed), 0);
+    const paidOrders = periodOrders.filter((order) => order.payment_status === "paid").length;
+    const salesByDay = Array.from({ length: range }, (_, index) => { const date = new Date(start); date.setDate(start.getDate() + index); const matching = periodOrders.filter((order) => dayKey(new Date(order.placed_at)) === dayKey(date)); return { key: dayKey(date), label: dateLabel(date, range), revenue: merchandise(matching), orders: matching.length }; });
     const productsById = new Map(products.map((product) => [product.id, product]));
-    const productSales = new Map<string, { id: string; title: string; units: number; revenue: number }>();
-    for (const order of periodOrders) {
-      for (const item of order.order_items ?? []) {
-        const key = item.product_id ?? item.title;
-        const row = productSales.get(key) ?? { id: key, title: productsById.get(item.product_id ?? "")?.title ?? item.title, units: 0, revenue: 0 };
-        row.units += item.quantity;
-        row.revenue += Number(item.line_total_aed);
-        productSales.set(key, row);
-      }
-    }
-    const maxRevenue = Math.max(...salesByDay.map((day) => day.revenue), 1);
-    const totalRevenue = periodOrders.reduce((sum, order) => sum + Number(order.total_aed), 0);
-    const unitsSold = Array.from(productSales.values()).reduce((sum, product) => sum + product.units, 0);
-    const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, count: periodOrders.filter((order) => new Date(order.placed_at).getHours() === hour).length })).filter((slot) => slot.count > 0).sort((a, b) => b.count - a.count).slice(0, 4);
-    return {
-      totalRevenue,
-      orderCount: periodOrders.length,
-      averageOrder: periodOrders.length ? totalRevenue / periodOrders.length : 0,
-      unitsSold,
-      salesByDay,
-      maxRevenue,
-      topProducts: Array.from(productSales.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 6),
-      hourly,
-      delivered: allCompleted.filter((order) => order.status === "delivered").length,
-      lowStock: products.filter((product) => product.stock <= 5).length,
-    };
-  }, [orders, products, range]);
+    const productSales = new Map<string, ProductSales>(); const categorySales = new Map<string, number>();
+    for (const order of periodOrders) for (const item of order.order_items ?? []) { const product = productsById.get(item.product_id ?? ""); const key = item.product_id ?? item.title; const row = productSales.get(key) ?? { id: key, title: product?.title ?? item.title, units: 0, revenue: 0, imageUrl: product?.image_urls?.[0] ?? item.image_url ?? null, stock: product?.stock ?? null }; row.units += item.quantity; row.revenue += Number(item.line_total_aed); productSales.set(key, row); const categoryName = product?.category?.name ?? "Uncategorised"; categorySales.set(categoryName, (categorySales.get(categoryName) ?? 0) + Number(item.line_total_aed)); }
+    const deliveredOrders = periodOrders.filter((order) => order.status === "delivered"); const orderById = new Map(periodOrders.map((order) => [order.id, order])); const completedJobs = deliveryJobs.filter((job) => job.delivered_at && orderById.has(job.order_id));
+    const deliveryMinutes = completedJobs.map((job) => Math.round((new Date(job.delivered_at!).getTime() - new Date(orderById.get(job.order_id)!.placed_at).getTime()) / 60000)).filter((value) => value >= 0);
+    const withinEta = completedJobs.filter((job) => { const order = orderById.get(job.order_id); return order && job.delivered_at && (new Date(job.delivered_at).getTime() - new Date(order.placed_at).getTime()) / 60000 <= order.delivery_eta_minutes; }).length;
+    const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, count: periodOrders.filter((order) => new Date(order.placed_at).getHours() === hour).length })).sort((a, b) => b.count - a.count).slice(0, 3).filter((slot) => slot.count);
+    const lowStock = products.filter((product) => product.is_available && product.stock <= 5).sort((a, b) => a.stock - b.stock).slice(0, 4); const soldIds = new Set(Array.from(productSales.keys())); const noSales = products.filter((product) => product.is_available && product.stock > 0 && !soldIds.has(product.id)).slice(0, 4); const topCategory = Array.from(categorySales.entries()).sort((a, b) => b[1] - a[1])[0];
+    return { start, totalRevenue, previousRevenue, revenueChange: percentChange(totalRevenue, previousRevenue), periodOrders, previousOrders, orderChange: percentChange(periodOrders.length, previousOrders.length), averageOrder: periodOrders.length ? totalRevenue / periodOrders.length : 0, totalFees, pendingPayment, paidOrders, salesByDay, topProducts: Array.from(productSales.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 6), categorySales: Array.from(categorySales.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5), hourly, lowStock, noSales, topCategory, delivered: deliveredOrders.length, deliveryMinutes, withinEta, completedJobs: completedJobs.length, cancellationRate: orders.length ? orders.filter((order) => order.status === "cancelled" && new Date(order.placed_at) >= start).length / Math.max(orders.filter((order) => new Date(order.placed_at) >= start).length, 1) * 100 : 0 };
+  }, [deliveryJobs, orders, products, range]);
 
-  const operationalAlerts = useMemo(() => {
-    const now = operationalNow;
-    const orderById = new Map(orders.map((order) => [order.id, order]));
-    const stuckOrders = orders.filter((order) => ["placed", "accepted", "picking"].includes(order.status) && now - new Date(order.placed_at).getTime() > 2 * 60 * 60 * 1000).length;
-    const failedPayments = orders.filter((order) => order.payment_status === "failed" && order.status !== "cancelled").length;
-    const abandonedOffers = deliveryJobs.filter((job) => job.status === "unassigned" && now - new Date(job.updated_at).getTime() > 30 * 60 * 1000).length;
-    const proofAttention = deliveryJobs.filter((job) => {
-      const order = orderById.get(job.order_id);
-      return job.status === "collected" && order && now - new Date(job.updated_at).getTime() > 30 * 60 * 1000;
-    }).length;
-    return { stuckOrders, failedPayments, abandonedOffers, proofAttention };
-  }, [deliveryJobs, orders, operationalNow]);
+  const operations = useMemo(() => { const now = Date.now(); const periodIds = new Set(report.periodOrders.map((order) => order.id)); return { stuckOrders: report.periodOrders.filter((order) => ["placed", "accepted", "picking"].includes(order.status) && now - new Date(order.placed_at).getTime() > 2 * 60 * 60 * 1000).length, unclaimed: deliveryJobs.filter((job) => periodIds.has(job.order_id) && job.status === "unassigned" && now - new Date(job.updated_at).getTime() > 30 * 60 * 1000).length, failedPayments: report.periodOrders.filter((order) => order.payment_status === "failed").length }; }, [deliveryJobs, report.periodOrders]);
 
   if (error === "unauthenticated") return <PortalEmpty icon="analytics" title="Sign in to see store analytics" description="Use the owner account linked to your Morni store." action={{ label: "Sign in", href: "/auth?next=/portal/analytics" }} />;
   if (loading) return <div className="grid gap-4 sm:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-white/65" />)}</div>;
   if (!store) return <PortalEmpty icon="store" title="Set up a store to see analytics" description="Sales, product demand, and fulfilment trends become available as you receive orders." action={{ label: "Start store setup", href: "/sell/setup" }} />;
 
-  return <div className="space-y-6">
-    <PortalPageHeader eyebrow="Performance" title="Sales analytics" description="An accurate view of order revenue and product demand, calculated from your order items.">
-      <div className="flex rounded-lg border border-[#dce5e0] bg-white p-1">{([7, 30] as const).map((value) => <button key={value} type="button" onClick={() => setRange(value)} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${range === value ? "bg-[#21342e] text-white" : "text-[#66736e] hover:text-[#2f6f66]"}`}>Last {value} days</button>)}</div>
-    </PortalPageHeader>
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><PortalMetric label="Gross sales" value={formatAed(report.totalRevenue)} detail={`Last ${range} days · excludes cancelled`} icon="analytics" /><PortalMetric label="Orders" value={String(report.orderCount)} detail={`${report.delivered} delivered all time`} icon="orders" /><PortalMetric label="Average order" value={formatAed(report.averageOrder)} detail="Across active orders" icon="sparkle" /><PortalMetric label="Items sold" value={String(report.unitsSold)} detail={`${report.lowStock} low-stock catalog items`} icon="products" tone={report.lowStock ? "urgent" : "default"} /></div>
-    <section className="portal-card p-5" aria-labelledby="operational-pulse-heading">
-      <PortalSectionHeading title="Operational pulse" description="Exceptions worth checking before they become customer issues." />
-      <div id="operational-pulse-heading" className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <OperationalAlert label="Stuck orders" value={operationalAlerts.stuckOrders} detail="Preparing for over 2 hours" tone={operationalAlerts.stuckOrders ? "urgent" : "good"} />
-        <OperationalAlert label="Failed payments" value={operationalAlerts.failedPayments} detail="Orders needing payment" tone={operationalAlerts.failedPayments ? "urgent" : "good"} />
-        <OperationalAlert label="Unclaimed offers" value={operationalAlerts.abandonedOffers} detail="Waiting for a rider over 30 min" tone={operationalAlerts.abandonedOffers ? "urgent" : "good"} />
-        <OperationalAlert label="Proof attention" value={operationalAlerts.proofAttention} detail="Collected deliveries without recent proof" tone={operationalAlerts.proofAttention ? "urgent" : "good"} />
-      </div>
-      <p className="mt-4 text-xs leading-5 text-[#7b8882]">Counts refresh when this page opens. Open Orders to resolve an exception; photo-upload failures are surfaced as proof attention when a delivery remains collected without a recent update.</p>
-    </section>
-    <section className="portal-card p-5"><PortalSectionHeading title={`Daily sales · last ${range} days`} description="Gross order value for each day." /><div className="mt-8 flex h-56 items-end gap-1.5 overflow-hidden sm:gap-2">{report.salesByDay.map((day) => <div key={day.key} className="group flex min-w-0 flex-1 flex-col items-center gap-2"><span className="h-5 whitespace-nowrap text-[10px] font-semibold text-[#466058] opacity-0 transition group-hover:opacity-100">{day.revenue ? formatAed(day.revenue) : ""}</span><div className="relative flex h-40 w-full items-end rounded-t-md bg-[#edf3f0]"><div className="w-full rounded-t-md bg-[#5b9183] transition-all" style={{ height: `${Math.max(day.revenue ? (day.revenue / report.maxRevenue) * 100 : 2, 2)}%` }} /></div><span className={`w-full truncate text-center text-[10px] font-semibold text-[#7b8882] ${range === 30 ? "hidden sm:block" : ""}`}>{day.label}</span></div>)}</div><div className="mt-4 flex items-center justify-between border-t border-[#edf1ef] pt-3 text-xs text-[#7b8882]"><span>Hover a bar to see sales value.</span><span>{report.orderCount} non-cancelled orders in this period</span></div></section>
-    <section className="grid gap-5 xl:grid-cols-[1.45fr_0.75fr]"><div className="portal-card overflow-hidden"><div className="p-5"><PortalSectionHeading title="Top products" description="Ranked by actual order-item sales in the selected period." /></div>{report.topProducts.length ? <div className="overflow-x-auto"><table className="portal-table w-full min-w-[530px]"><thead className="bg-[#fbfdfc]"><tr><th className="px-5 py-3">Product</th><th className="px-4 py-3 text-right">Units sold</th><th className="px-5 py-3 text-right">Product sales</th></tr></thead><tbody>{report.topProducts.map((product, index) => <tr key={product.id}><td className="px-5 py-4"><span className="mr-3 inline-grid h-6 w-6 place-items-center rounded-md bg-[#edf3f0] text-[10px] font-bold text-[#3c685c]">{index + 1}</span><span className="text-sm font-semibold text-[#34423d]">{product.title}</span></td><td className="px-4 py-4 text-right text-sm text-[#5b6a64]">{product.units}</td><td className="px-5 py-4 text-right text-sm font-semibold text-[#263530]">{formatAed(product.revenue)}</td></tr>)}</tbody></table></div> : <div className="px-5 pb-5"><PortalEmpty icon="products" title="No product sales yet" description="Product demand will appear as soon as shoppers complete orders." /></div>}</div>
-      <div className="portal-card p-5"><PortalSectionHeading title="When shoppers order" description="The busiest order hours in this period." />{report.hourly.length ? <ol className="mt-5 space-y-4">{report.hourly.map((slot, index) => <li key={slot.hour} className="flex items-center gap-3"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#edf3f0] text-xs font-bold text-[#3c685c]">{index + 1}</span><span className="flex-1 text-sm font-medium text-[#34423d]">{String(slot.hour).padStart(2, "0")}:00 – {String((slot.hour + 1) % 24).padStart(2, "0")}:00</span><span className="text-xs font-semibold text-[#66736e]">{slot.count} order{slot.count === 1 ? "" : "s"}</span></li>)}</ol> : <p className="mt-5 text-sm leading-6 text-[#7b8882]">Your peak ordering periods will appear here once you receive orders.</p>}</div></section>
-  </div>;
-}
-
-function OperationalAlert({ label, value, detail, tone }: { label: string; value: number; detail: string; tone: "urgent" | "good" }) {
-  return <div className={`rounded-xl border p-4 ${tone === "urgent" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
-    <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[#64736c]">{label}</p><span className={`grid h-7 min-w-7 place-items-center rounded-full px-2 text-sm font-bold ${tone === "urgent" ? "bg-amber-200 text-amber-900" : "bg-emerald-200 text-emerald-900"}`}>{value}</span></div>
-    <p className="mt-2 text-xs leading-5 text-[#708078]">{detail}</p>
+  const averageDelivery = report.deliveryMinutes.length ? Math.round(report.deliveryMinutes.reduce((sum, value) => sum + value, 0) / report.deliveryMinutes.length) : null; const bestHour = report.hourly[0];
+  return <div className="space-y-7">
+    <PortalPageHeader eyebrow="Performance" title="Store analytics" description="A practical view of sales, inventory, fulfilment, and cash flow for your store."><div className="flex flex-wrap items-center gap-2"><div className="flex rounded-lg border border-[#dce5e0] bg-white p-1" aria-label="Analytics date range">{([7, 30, 90] as const).map((value) => <button key={value} type="button" onClick={() => setRange(value)} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${range === value ? "bg-[#21342e] text-white" : "text-[#66736e] hover:text-[#2f6f66]"}`}>Last {value} days</button>)}</div><span className="text-xs text-[#7b8882]">{refreshedAt ? `Updated ${refreshedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Updating…"}</span></div></PortalPageHeader>
+    {dataError ? <div role="alert" className="rounded-xl border border-[#f0d5b0] bg-[#fff9ef] px-4 py-3 text-sm text-[#8c5c2e]">Some analytics data could not be loaded. Refresh the page and try again.</div> : null}
+    <section aria-labelledby="overview-heading"><div className="mb-3 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#9c4961]">At a glance</p><h2 id="overview-heading" className="mt-1 font-display text-2xl text-ink">Your store this period</h2></div><span className="text-xs text-[#7b8882]">Excludes cancelled orders</span></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><PortalMetric label="Merchandise sales" value={formatAed(report.totalRevenue)} detail={<><Change value={report.revenueChange} /> vs previous period</>} icon="analytics" /><PortalMetric label="Orders" value={String(report.periodOrders.length)} detail={<><Change value={report.orderChange} /> vs previous period</>} icon="orders" /><PortalMetric label="Average order" value={formatAed(report.averageOrder)} detail="Merchandise value per order" icon="sparkle" /><PortalMetric label="Items sold" value={String(report.topProducts.reduce((sum, product) => sum + product.units, 0))} detail={`${report.lowStock.length} low-stock priorities`} icon="products" tone={report.lowStock.length ? "urgent" : "default"} /></div></section>
+    <section className="portal-card p-5 sm:p-6"><PortalSectionHeading title="Sales and growth" description="See whether your store is growing through more orders or larger baskets." /><div className="mt-5 grid gap-4 sm:grid-cols-3"><div className="rounded-xl bg-[#f7faf8] p-4"><p className="text-xs text-[#718079]">Sales trend</p><p className="mt-1 text-xl font-bold text-[#31443d]">{report.revenueChange >= 0 ? "Growing" : "Needs attention"}</p><div className="mt-3"><MiniBars values={report.salesByDay.map((day) => day.revenue)} /></div></div><div className="rounded-xl bg-[#f7faf8] p-4"><p className="text-xs text-[#718079]">Paid orders</p><p className="mt-1 text-xl font-bold text-[#31443d]">{report.paidOrders} <span className="text-sm font-normal text-[#718079]">of {report.periodOrders.length}</span></p><p className="mt-3 text-xs text-[#718079]">{formatAed(report.pendingPayment)} currently pending payment</p></div><div className="rounded-xl bg-[#f7faf8] p-4"><p className="text-xs text-[#718079]">Top category</p><p className="mt-1 truncate text-xl font-bold text-[#31443d]">{report.topCategory?.[0] ?? "No sales yet"}</p><p className="mt-3 text-xs text-[#718079]">{report.topCategory ? formatAed(report.topCategory[1]) + " in merchandise sales" : "Category trends appear after orders."}</p></div></div><TrendChart days={report.salesByDay} previous={report.previousRevenue} /></section>
+    <section className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]"><div className="portal-card overflow-hidden"><div className="p-5"><PortalSectionHeading title="Top products" description="Ranked by product sales in the selected period." /></div>{report.topProducts.length ? <div className="divide-y divide-[#edf1ef]">{report.topProducts.map((product, index) => <div key={product.id} className="flex items-center gap-3 px-5 py-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#edf3f0] text-xs font-bold text-[#3c685c]">{index + 1}</span><span className="h-12 w-10 shrink-0 overflow-hidden rounded-lg border border-line bg-[#f1f5f2]">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-[9px] text-muted">No image</span>}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-[#34423d]">{product.title}</span><span className="mt-1 block text-xs text-[#7b8882]">{product.units} unit{product.units === 1 ? "" : "s"} sold{product.stock != null ? ` · ${product.stock} left` : ""}</span></span><span className="text-right text-sm font-bold text-[#263530]">{formatAed(product.revenue)}</span></div>)}</div> : <div className="px-5 pb-5"><PortalEmpty icon="products" title="No product sales yet" description="Product demand will appear as soon as shoppers complete orders." /></div>}</div><div className="portal-card p-5"><PortalSectionHeading title="When shoppers order" description="Busiest periods in this range." />{bestHour ? <ol className="mt-5 space-y-4">{report.hourly.map((slot, index) => <li key={slot.hour} className="flex items-center gap-3"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#edf3f0] text-xs font-bold text-[#3c685c]">{index + 1}</span><span className="flex-1 text-sm font-medium text-[#34423d]">{String(slot.hour).padStart(2, "0")}:00 – {String((slot.hour + 1) % 24).padStart(2, "0")}:00</span><span className="text-xs font-semibold text-[#66736e]">{slot.count} orders</span></li>)}</ol> : <p className="mt-5 text-sm leading-6 text-[#7b8882]">Peak ordering periods will appear after your first orders.</p>}</div></section>
+    <section><PortalSectionHeading title="Inventory opportunities" description="Actions that can help you protect sales and move slow stock." /><div className="mt-4 grid gap-3 md:grid-cols-2">{report.lowStock.length ? <Opportunity title={`${report.lowStock.length} product${report.lowStock.length === 1 ? " is" : "s are"} running low`} detail={report.lowStock.map((product) => `${product.title} (${product.stock} left)`).join(" · ")} action="Review stock" tone="urgent" /> : <Opportunity title="Stock levels look healthy" detail="No available products are at or below five units." action="Healthy" tone="good" />}{report.noSales.length ? <Opportunity title="Products with no sales this period" detail={report.noSales.map((product) => product.title).join(" · ")} action="Consider a sale" /> : <Opportunity title="Every available product has sales" detail="Keep monitoring new products as they are added to the catalogue." action="Good signal" tone="good" />}</div></section>
+    <section className="grid gap-5 xl:grid-cols-[1fr_1fr]"><div className="portal-card p-5"><PortalSectionHeading title="Fulfilment health" description="Use delivery performance to spot customer experience issues." /><div className="mt-5 grid grid-cols-2 gap-3"><div className="rounded-xl bg-[#f7faf8] p-4"><p className="text-xs text-[#718079]">Delivered</p><p className="mt-1 text-2xl font-bold text-[#31443d]">{report.delivered}</p><p className="mt-1 text-xs text-[#718079]">of {report.periodOrders.length} orders</p></div><div className="rounded-xl bg-[#f7faf8] p-4"><p className="text-xs text-[#718079]">Average delivery</p><p className="mt-1 text-2xl font-bold text-[#31443d]">{averageDelivery != null ? `${averageDelivery} min` : "—"}</p><p className="mt-1 text-xs text-[#718079]">from order to delivery</p></div><div className="rounded-xl bg-[#f7faf8] p-4"><p className="text-xs text-[#718079]">Within ETA</p><p className="mt-1 text-2xl font-bold text-[#31443d]">{report.completedJobs ? `${Math.round(report.withinEta / report.completedJobs * 100)}%` : "—"}</p><p className="mt-1 text-xs text-[#718079]">based on completed deliveries</p></div><div className="rounded-xl bg-[#f7faf8] p-4"><p className="text-xs text-[#718079]">Cancellations</p><p className="mt-1 text-2xl font-bold text-[#31443d]">{Math.round(report.cancellationRate)}%</p><p className="mt-1 text-xs text-[#718079]">in this period</p></div></div></div><div className="portal-card p-5"><PortalSectionHeading title="Finance snapshot" description="Transparent cash-flow figures from order records." /><div className="mt-5 space-y-3"><div className="flex items-center justify-between border-b border-[#edf1ef] pb-3 text-sm"><span className="text-[#718079]">Merchandise sales</span><strong className="text-[#31443d]">{formatAed(report.totalRevenue)}</strong></div><div className="flex items-center justify-between border-b border-[#edf1ef] pb-3 text-sm"><span className="text-[#718079]">Customer fees collected</span><strong className="text-[#31443d]">{formatAed(report.totalFees)}</strong></div><div className="flex items-center justify-between border-b border-[#edf1ef] pb-3 text-sm"><span className="text-[#718079]">Pending customer payment</span><strong className="text-[#9d5c2f]">{formatAed(report.pendingPayment)}</strong></div><div className="rounded-xl bg-[#f3fbf5] p-3 text-xs leading-5 text-[#587067]">Profit and merchant payout are not estimated here because the current order schema does not store cost basis, platform commission, or settlement status. Add those fields before showing an authoritative profit number.</div></div></div></section>
+    <section><PortalSectionHeading title="What to do next" description="A short list of the most useful actions from this report." /><div className="mt-4 grid gap-3 sm:grid-cols-3"><Opportunity title={operations.stuckOrders ? `${operations.stuckOrders} stuck order${operations.stuckOrders === 1 ? "" : "s"}` : "Orders are moving"} detail={operations.stuckOrders ? "Open Orders and check preparation status." : "No active orders have been waiting over two hours."} tone={operations.stuckOrders ? "urgent" : "good"} /><Opportunity title={operations.unclaimed ? `${operations.unclaimed} unclaimed offer${operations.unclaimed === 1 ? "" : "s"}` : "Rider coverage looks good"} detail={operations.unclaimed ? "Review dispatch from the Orders tab." : "No delivery offers have been waiting over 30 minutes."} tone={operations.unclaimed ? "urgent" : "good"} /><Opportunity title={operations.failedPayments ? `${operations.failedPayments} failed payment${operations.failedPayments === 1 ? "" : "s"}` : "Payments look healthy"} detail={operations.failedPayments ? "Contact shoppers or review affected orders." : "No non-cancelled orders have failed payments."} tone={operations.failedPayments ? "urgent" : "good"} /></div></section>
   </div>;
 }

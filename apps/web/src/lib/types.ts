@@ -63,6 +63,16 @@ export type Store = {
   created_at?: string;
 };
 
+export type StorePickupLocation = {
+  store_id: string;
+  emirate: UaeEmirate;
+  area: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+  is_public: boolean;
+};
+
 export type Product = {
   id: string;
   store_id: string;

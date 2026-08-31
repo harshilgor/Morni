@@ -11,7 +11,11 @@ import {
   type StorePromo,
 } from "@/components/store-profile-header";
 import { ProductGridSkeleton } from "@/components/catalog-skeletons";
-import { getCachedStoreBySlug, getCachedStoreCatalog } from "@/lib/catalog";
+import {
+  getCachedPublicPickupLocation,
+  getCachedStoreBySlug,
+  getCachedStoreCatalog,
+} from "@/lib/catalog";
 import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
 import { emirateLabel } from "@/lib/format";
 import type { Product, Store } from "@/lib/types";
@@ -48,12 +52,18 @@ async function LiveStoreHeader({
   rating,
   reviewCount,
   promos,
+  publicPickupLocation,
 }: {
   store: Store;
   hours: string;
   rating: number | null;
   reviewCount: number;
   promos: StorePromo[];
+  publicPickupLocation: {
+    area: string;
+    address: string;
+    emirate: Store["emirate"];
+  } | null;
 }) {
   await connection();
   const openNow = isStoreOpenNow(store.opens_at, store.closes_at);
@@ -65,6 +75,7 @@ async function LiveStoreHeader({
       rating={rating}
       reviewCount={reviewCount}
       promos={promos}
+      publicPickupLocation={publicPickupLocation}
     />
   );
 }
@@ -80,6 +91,7 @@ async function StorePageContent({
 
   const { products, browseCategories, campaign, ratings } =
     await getCachedStoreCatalog(store.id, slug);
+  const publicPickupLocation = await getCachedPublicPickupLocation(store.id);
   const list = products as StoreProduct[];
   const catalog = browseCategories;
   const activeCampaign = campaign;
@@ -180,6 +192,7 @@ async function StorePageContent({
               rating={storeRating}
               reviewCount={reviewCount}
               promos={promos}
+              publicPickupLocation={publicPickupLocation}
             />
           }
         >
@@ -189,6 +202,7 @@ async function StorePageContent({
             rating={storeRating}
             reviewCount={reviewCount}
             promos={promos}
+            publicPickupLocation={publicPickupLocation}
           />
         </Suspense>
       </div>

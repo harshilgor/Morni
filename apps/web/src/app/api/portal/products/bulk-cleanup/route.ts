@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-const schema = z.object({ storeId: z.string().uuid(), urls: z.array(z.string().url()).min(1).max(500) });
+const schema = z.object({ storeId: z.string().trim().min(1).max(200), urls: z.array(z.string().url()).min(1).max(500) });
 
 export async function POST(request: Request) {
   const supabase = await createClient();

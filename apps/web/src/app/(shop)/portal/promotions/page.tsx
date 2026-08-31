@@ -24,6 +24,7 @@ type Product = {
   price_aed: number;
   stock: number;
   is_available: boolean;
+  image_urls: string[] | null;
   categories?: { name: string; slug: string } | null;
 };
 type SaleForm = {
@@ -71,7 +72,7 @@ export default function PortalPromotionsPage() {
     const supabase = createClient();
     const [promoResult, productResult] = await Promise.all([
       supabase.from("store_promotions").select("*, promotion_products(product_id)").eq("store_id", storeId).order("created_at", { ascending: false }),
-      supabase.from("products").select("id,title,price_aed,stock,is_available,categories(name,slug)").eq("store_id", storeId).order("created_at", { ascending: false }),
+      supabase.from("products").select("id,title,price_aed,stock,is_available,image_urls,categories(name,slug)").eq("store_id", storeId).order("created_at", { ascending: false }),
     ]);
     if (promoResult.error) setMessage(promoResult.error.message);
     if (productResult.error) setMessage(productResult.error.message);
@@ -263,8 +264,8 @@ export default function PortalPromotionsPage() {
                   const conflict = conflicts[product.id];
                   const active = selected.includes(product.id);
                   const next = reduced(product.price_aed);
-                  return <div key={product.id} className={"border p-3 " + (active ? "border-ink" : "border-line")}>
-                    <label className="flex cursor-pointer gap-3"><input type="checkbox" className="mt-1" checked={active} onChange={() => toggleProduct(product.id)} /><span className="min-w-0 flex-1"><span className="block font-medium text-ink">{product.title}</span><span className="mt-1 block text-xs text-muted">{product.categories?.name ?? "Uncategorised"} · {product.is_available ? product.stock + " in stock" : "Unavailable"}</span><span className="mt-2 flex flex-wrap gap-x-2 text-sm"><span className="text-muted line-through">{money(product.price_aed)}</span><span className="font-medium text-ink">{money(next)}</span><span className="text-accent-deep">Save {money(product.price_aed - next)}</span></span></span></label>
+                  return <div key={product.id} className={"border p-3 transition " + (active ? "border-ink bg-[#f8fbf9] shadow-sm" : "border-line")}>
+                    <label className="flex cursor-pointer gap-3"><input type="checkbox" className="mt-1 h-4 w-4 accent-[#21342e]" checked={active} onChange={() => toggleProduct(product.id)} /><span className="flex min-w-0 flex-1 gap-3"><span className="h-20 w-16 shrink-0 overflow-hidden rounded-lg border border-line bg-[#f1f5f2]">{product.image_urls?.[0] ? <img src={product.image_urls[0]} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-[10px] text-muted">No image</span>}</span><span className="min-w-0 flex-1"><span className="block font-medium text-ink">{product.title}</span><span className="mt-1 block text-xs text-muted">{product.categories?.name ?? "Uncategorised"} · {product.is_available ? product.stock + " in stock" : "Unavailable"}</span><span className="mt-2 flex flex-wrap gap-x-2 text-sm"><span className="text-muted line-through">{money(product.price_aed)}</span><span className="font-medium text-ink">{money(next)}</span><span className="text-accent-deep">Save {money(product.price_aed - next)}</span></span></span></span></label>
                     {conflict ? <div className="mt-3 border-t border-line pt-3"><p className="text-sm text-muted">Already in <span className="font-medium text-ink">{conflict.title}</span>.</p><div className="mt-2 flex gap-2"><button type="button" onClick={() => setReplace((current) => ({ ...current, [product.id]: true }))} className={"border px-3 py-1.5 text-xs " + (replace[product.id] ? "border-ink bg-ink text-white" : "border-line")}>Apply new sale</button><button type="button" onClick={() => setReplace((current) => ({ ...current, [product.id]: false }))} className={"border px-3 py-1.5 text-xs " + (!replace[product.id] ? "border-ink" : "border-line")}>Keep existing</button></div></div> : null}
                   </div>;
                 })}

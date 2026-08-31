@@ -240,6 +240,22 @@ export async function getCachedStoreBySlug(slug: string) {
   return (data as Store | null) ?? null;
 }
 
+export async function getCachedPublicPickupLocation(storeId: string) {
+  "use cache";
+  cacheLife("minutes");
+  tagCatalog("stores", `store-pickup:${storeId}`);
+
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from("store_pickup_locations")
+    .select("area, address, emirate")
+    .eq("store_id", storeId)
+    .eq("is_public", true)
+    .maybeSingle();
+
+  return (data as { area: string; address: string; emirate: Store["emirate"] } | null) ?? null;
+}
+
 export async function getCachedStoreCatalog(storeId: string, slug: string) {
   "use cache";
   cacheLife("minutes");

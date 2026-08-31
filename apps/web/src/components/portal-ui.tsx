@@ -36,7 +36,7 @@ export function PortalMetric({
 }: {
   label: string;
   value: string;
-  detail?: string;
+  detail?: ReactNode;
   tone?: "default" | "urgent" | "success";
   icon?: PortalIconName;
 }) {

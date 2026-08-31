@@ -18,6 +18,7 @@ import {
 } from "@/components/delivery-setup-fields";
 import { uploadStoreMedia } from "@/lib/media-upload";
 import { PortalEmpty, PortalPageHeader, StatusBadge } from "@/components/portal-ui";
+import type { StorePickupLocation } from "@/lib/types";
 
 export default function PortalSettingsPage() {
   const { store, loading, error, refresh } = useOwnerStore();
@@ -38,6 +39,14 @@ export default function PortalSettingsPage() {
     opens_at: "10:00",
     closes_at: "22:00",
   });
+  const [pickupLocation, setPickupLocation] = useState<StoreLocationValue>({
+    emirate: "dubai",
+    area: "",
+    address: "",
+    lat: null,
+    lng: null,
+  });
+  const [pickupLocationPublic, setPickupLocationPublic] = useState(false);
   const [branding, setBranding] = useState<StoreBrandingValue>({
     logoFile: null,
     logoUrl: null,
@@ -52,6 +61,7 @@ export default function PortalSettingsPage() {
 
   useEffect(() => {
     if (!store) return;
+    const currentStore = store;
     const syncFromStore = () => {
       setForm({
         name: store.name,
@@ -77,6 +87,40 @@ export default function PortalSettingsPage() {
     };
     if (typeof queueMicrotask === "function") queueMicrotask(syncFromStore);
     else window.setTimeout(syncFromStore, 0);
+
+    let cancelled = false;
+    async function loadPickupLocation() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("store_pickup_locations")
+        .select("store_id, emirate, area, address, lat, lng, is_public")
+        .eq("store_id", currentStore.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const pickup = data as StorePickupLocation | null;
+      setPickupLocation(
+        pickup
+          ? {
+              emirate: pickup.emirate,
+              area: pickup.area,
+              address: pickup.address,
+              lat: pickup.lat,
+              lng: pickup.lng,
+            }
+          : {
+              emirate: currentStore.emirate,
+              area: "",
+              address: "",
+              lat: null,
+              lng: null,
+            },
+      );
+      setPickupLocationPublic(pickup?.is_public ?? false);
+    }
+    void loadPickupLocation();
+    return () => {
+      cancelled = true;
+    };
   }, [store]);
 
   async function onSave(e: FormEvent) {
@@ -84,6 +128,12 @@ export default function PortalSettingsPage() {
     if (!store) return;
     if (!location.area.trim() || !location.address.trim()) {
       setMessage("Add your area and exact street address.");
+      return;
+    }
+    const pickupArea = pickupLocation.area.trim();
+    const pickupAddress = pickupLocation.address.trim();
+    if (Boolean(pickupArea) !== Boolean(pickupAddress)) {
+      setMessage("Add both pickup area and pickup address, or leave both blank.");
       return;
     }
     setSaving(true);
@@ -119,6 +169,30 @@ export default function PortalSettingsPage() {
         .eq("id", store.id);
 
       if (updateError) throw new Error(updateError.message);
+
+      if (pickupArea && pickupAddress) {
+        const { error: pickupError } = await supabase
+          .from("store_pickup_locations")
+          .upsert(
+            {
+              store_id: store.id,
+              emirate: pickupLocation.emirate,
+              area: pickupArea,
+              address: pickupAddress,
+              lat: pickupLocation.lat,
+              lng: pickupLocation.lng,
+              is_public: pickupLocationPublic,
+            },
+            { onConflict: "store_id" },
+          );
+        if (pickupError) throw new Error(pickupError.message);
+      } else {
+        const { error: pickupDeleteError } = await supabase
+          .from("store_pickup_locations")
+          .delete()
+          .eq("store_id", store.id);
+        if (pickupDeleteError) throw new Error(pickupDeleteError.message);
+      }
 
       setBranding({
         logoFile: null,
@@ -213,7 +287,7 @@ export default function PortalSettingsPage() {
   const incomplete = !isOnboardingComplete(store);
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-6xl">
       <PortalPageHeader eyebrow="Store management" title="Store settings" description="Set your branding, location, delivery hours, and public visibility so shoppers know what to expect." />
 
       {incomplete ? (
@@ -226,46 +300,105 @@ export default function PortalSettingsPage() {
         </div>
       ) : null}
 
-      <form
-        onSubmit={onSave}
-        className="portal-card mt-6 space-y-4 p-6"
-      >
-        <label className="block space-y-1.5 text-sm">
-          <span className="text-muted">Name</span>
-          <input
-            className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            required
-          />
-        </label>
-        <label className="block space-y-1.5 text-sm">
-          <span className="text-muted">Description</span>
-          <textarea
-            className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
-            rows={3}
-            value={form.description}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, description: e.target.value }))
-            }
-          />
-        </label>
+      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <form onSubmit={onSave} className="portal-card space-y-6 p-6">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <label className="block space-y-1.5 text-sm">
+              <span className="text-muted">Name</span>
+              <input
+                className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="block space-y-1.5 text-sm">
+              <span className="text-muted">Store hours summary</span>
+              <div className="flex min-h-[2.75rem] items-center rounded-xl border border-line bg-[#f7faf8] px-3 text-sm text-muted">
+                {storeHours.opens_at} – {storeHours.closes_at}
+              </div>
+            </label>
+          </div>
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-muted">Description</span>
+            <textarea
+              className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+              rows={3}
+              value={form.description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+            />
+          </label>
 
-        <StoreBrandingFields value={branding} onChange={setBranding} />
-        <StoreLocationFields value={location} onChange={setLocation} />
-        <StoreHoursFields value={storeHours} onChange={setStoreHours} />
+          <section className="rounded-2xl border border-line bg-[#fbfdfc] p-5">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-[#263530]">Branding</h2>
+              <p className="mt-1 text-sm text-muted">Keep your storefront recognizable across Morni.</p>
+            </div>
+            <StoreBrandingFields value={branding} onChange={setBranding} />
+          </section>
 
-        {message ? <p className="rounded-xl bg-[#edf7f3] px-4 py-3 text-sm text-[#277044]">{message}</p> : null}
-        <button
-          type="submit"
-          disabled={saving}
-          className="portal-button-primary disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-      </form>
+          <section className="rounded-2xl border border-line bg-[#fbfdfc] p-5">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-[#263530]">Public store location</h2>
+              <p className="mt-1 text-sm text-muted">This is the location shoppers see on your storefront.</p>
+            </div>
+            <StoreLocationFields value={location} onChange={setLocation} />
+          </section>
 
-      <section className="portal-card mt-6 p-6">
+          <section className="rounded-2xl border border-[#f0d8c8] bg-[#fffaf6] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-[#7b492d]">Driver pickup location</h2>
+                <p className="mt-1 max-w-xl text-sm leading-6 text-[#8b6958]">
+                  Use this when riders collect orders from a home, studio, or a different address. Leave it blank to use the public store location.
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#8b6958]">Private by default</span>
+            </div>
+            <div className="mt-4">
+              <StoreLocationFields
+                value={pickupLocation}
+                onChange={setPickupLocation}
+                required={false}
+                mapTitle="Driver pickup location map"
+              />
+            </div>
+            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-[#ecd9cc] bg-white p-3.5">
+              <input
+                type="checkbox"
+                checked={pickupLocationPublic}
+                onChange={(event) => setPickupLocationPublic(event.target.checked)}
+                disabled={!pickupLocation.area.trim() || !pickupLocation.address.trim()}
+                className="mt-0.5 h-4 w-4 accent-[#b75c35]"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-[#6f432c]">Show pickup location to shoppers</span>
+                <span className="mt-1 block text-xs leading-5 text-[#8b6958]">When enabled, the pickup address can appear on your public storefront. Riders always receive it for assigned orders.</span>
+              </span>
+            </label>
+          </section>
+
+          <section className="rounded-2xl border border-line bg-[#fbfdfc] p-5">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-[#263530]">Delivery hours</h2>
+              <p className="mt-1 text-sm text-muted">Tell shoppers when orders can be prepared.</p>
+            </div>
+            <StoreHoursFields value={storeHours} onChange={setStoreHours} />
+          </section>
+
+          {message ? <p role="status" className="rounded-xl bg-[#edf7f3] px-4 py-3 text-sm text-[#277044]">{message}</p> : null}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
+            <p className="text-xs text-muted">Changes are saved to the selected store.</p>
+            <button type="submit" disabled={saving} className="portal-button-primary disabled:opacity-50">
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
+
+        <aside className="space-y-6 xl:sticky xl:top-24">
+        <section className="portal-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-sm">
             <div className="flex items-center gap-2">
@@ -297,9 +430,22 @@ export default function PortalSettingsPage() {
                 : "List store"}
           </button>
         </div>
-      </section>
+        </section>
 
-      <section className="mt-6 rounded-2xl border border-red-200 bg-white p-6">
+        <section className="portal-card p-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4e8875]">At a glance</p>
+          <h2 className="mt-2 text-lg font-semibold text-[#263530]">Pickup routing</h2>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            {pickupLocation.area.trim() && pickupLocation.address.trim()
+              ? `Riders will be routed to ${pickupLocation.area}.`
+              : "Riders will use your public store address until you add a separate pickup point."}
+          </p>
+          <div className="mt-4 rounded-xl bg-[#f7faf8] p-3 text-xs leading-5 text-muted">
+            <strong className="text-[#263530]">Privacy note:</strong> pickup details stay hidden from shoppers unless you switch on public visibility.
+          </div>
+        </section>
+
+      <section className="rounded-2xl border border-red-200 bg-white p-6">
         <h2 className="text-lg font-semibold text-red-700">Delete store</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           Permanently removes your catalog and access to this store. Completed
@@ -360,6 +506,8 @@ export default function PortalSettingsPage() {
           </div>
         )}
       </section>
+        </aside>
+      </div>
 
       {storeActionError ? (
         <p

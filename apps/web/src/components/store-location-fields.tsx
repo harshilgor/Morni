@@ -25,9 +25,13 @@ type GeocodeHit = {
 export function StoreLocationFields({
   value,
   onChange,
+  required = true,
+  mapTitle = "Store location map",
 }: {
   value: StoreLocationValue;
   onChange: (next: StoreLocationValue) => void;
+  required?: boolean;
+  mapTitle?: string;
 }) {
   const listId = useId();
   const [searching, setSearching] = useState(false);
@@ -165,7 +169,7 @@ export function StoreLocationFields({
           value={value.area}
           onChange={(e) => patch({ area: e.target.value, lat: null, lng: null })}
           placeholder="e.g. Al Quoz Industrial Area 3, Dubai Hills, Khalifa City A"
-          required
+          required={required}
         />
         <datalist id={listId}>
           {suggestions.map((item) => (
@@ -184,7 +188,7 @@ export function StoreLocationFields({
             patch({ address: e.target.value, lat: null, lng: null })
           }
           placeholder="Building name / number, street, unit or shop number"
-          required
+          required={required}
         />
       </label>
 
@@ -236,7 +240,7 @@ export function StoreLocationFields({
       {mapSrc ? (
         <div className="overflow-hidden rounded-xl border border-line">
           <iframe
-            title="Store location map"
+            title={mapTitle}
             src={mapSrc}
             className="h-52 w-full border-0"
             loading="lazy"

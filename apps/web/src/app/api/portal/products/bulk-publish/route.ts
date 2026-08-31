@@ -4,7 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const itemSchema = z.object({ title: z.string().trim().min(3).max(120), productTag: z.string().trim().regex(/^[A-Za-z][A-Za-z0-9-]{0,39}$/), description: z.string().trim().max(2000).default(""), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)).max(20), images: z.array(z.string().url()).min(1).max(5) });
-const schema = z.object({ storeId: z.string().uuid(), items: z.array(itemSchema).min(1).max(100).optional(), importId: z.string().uuid().optional() });
+// Validate store ownership against the authenticated membership below rather
+// than assuming every deployed database formats store IDs as UUIDs.
+const schema = z.object({ storeId: z.string().trim().min(1).max(200), items: z.array(itemSchema).min(1).max(100).optional(), importId: z.string().uuid().optional() });
 
 export async function POST(request: Request) {
   const supabase = await createClient();

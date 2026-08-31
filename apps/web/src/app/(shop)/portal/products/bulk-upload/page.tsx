@@ -7,6 +7,7 @@ import { PRODUCT_SIZES } from "@/lib/product-sizes";
 import { uploadProductImages, validateImageFile } from "@/lib/media-upload";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { PortalIcon } from "@/components/portal-icons";
+import { fingerprintDistance, fingerprintImage } from "@/lib/image-similarity";
 
 type Photo = { id: string; file: File; preview: string };
 type Draft = {
@@ -22,6 +23,163 @@ type Draft = {
   confidence?: number;
   needsReview?: boolean;
 };
+
+function PhotoStack({
+  draft,
+  draftIndex,
+  onMakeCover,
+  onSplit,
+  onMove,
+  otherDrafts,
+}: {
+  draft: Draft;
+  draftIndex: number;
+  onMakeCover: (photoId: string) => void;
+  onSplit: (photoId: string) => void;
+  onMove: (photoId: string, targetId: string) => void;
+  otherDrafts: Array<{ id: string; label: string }>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const cover = draft.photos[0];
+  if (!cover) return null;
+
+  return (
+    <div
+      className="mt-3 overflow-hidden rounded-2xl border border-[#dfe8e3] bg-[#f8fbf9] p-3"
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#34594d]">
+            Product photos
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Click a photo to make it the cover.
+          </p>
+        </div>
+        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#34594d]">
+          {draft.photos.length} {draft.photos.length === 1 ? "photo" : "photos"}
+        </span>
+      </div>
+
+      <div className="relative h-56 overflow-hidden rounded-xl bg-[#e8f0eb] p-2 sm:h-64">
+        <img
+          src={cover.preview}
+          alt={`Product ${draftIndex + 1} cover`}
+          className="h-full w-full rounded-lg object-cover shadow-sm transition duration-500"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+        <span className="absolute left-4 top-4 rounded-full bg-ink/90 px-2.5 py-1 text-[10px] font-bold text-white">
+          Cover photo
+        </span>
+        <span className="absolute bottom-4 left-4 text-xs font-semibold text-white drop-shadow">
+          {expanded ? "Choose a photo below to change the cover" : "AI-selected cover"}
+        </span>
+      </div>
+
+      <div className={`mt-3 flex gap-2 overflow-x-auto pb-1 transition-all duration-300 ${expanded ? "max-h-24 opacity-100" : "max-h-16 opacity-90"}`}>
+        {draft.photos.map((photo, photoIndex) => (
+          <button
+            key={photo.id}
+            type="button"
+            onClick={() => onMakeCover(photo.id)}
+            aria-label={`${photoIndex === 0 ? "Current cover" : `Make photo ${photoIndex + 1} the cover`}`}
+            className={`group relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 bg-white transition duration-200 hover:-translate-y-0.5 sm:h-16 sm:w-16 ${photoIndex === 0 ? "border-[#245448] ring-2 ring-[#cfe5d8]" : "border-transparent hover:border-[#7ca994]"}`}
+          >
+            <img src={photo.preview} alt={`Photo ${photoIndex + 1}`} className="h-full w-full object-cover" />
+            <span className="absolute inset-x-0 bottom-0 bg-black/55 py-0.5 text-[9px] font-bold text-white">
+              {photoIndex === 0 ? "Cover" : photoIndex + 1}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <details className="mt-2 rounded-lg border border-[#dfe8e3] bg-white/70 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-semibold text-[#34594d]">
+          Organize photos
+        </summary>
+        <div className="mt-3 space-y-2 border-t border-[#e8efeb] pt-3">
+          {draft.photos.map((photo, photoIndex) => (
+            <div key={photo.id} className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="min-w-16 font-semibold text-ink">Photo {photoIndex + 1}</span>
+              {photoIndex > 0 ? (
+                <button type="button" onClick={() => onSplit(photo.id)} className="rounded-md border border-[#e7c7d4] px-2 py-1 font-semibold text-accent-deep hover:bg-[#fff3f7]">
+                  Split into product
+                </button>
+              ) : null}
+              <select
+                aria-label={`Move photo ${photoIndex + 1} to another product`}
+                defaultValue=""
+                onChange={(event) => {
+                  if (event.target.value) onMove(photo.id, event.target.value);
+                }}
+                className="min-w-0 flex-1 rounded-md border border-line bg-white px-2 py-1.5 text-xs text-ink"
+              >
+                <option value="">Move to another product…</option>
+                {otherDrafts.map((otherDraft) => (
+                  <option key={otherDraft.id} value={otherDraft.id}>
+                    {otherDraft.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+          <p className="text-[11px] leading-5 text-muted">The AI grouping is advisory. Keep the cover clean and use these controls only when a photo belongs elsewhere.</p>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function AiProcessingOverlay({
+  phase,
+  photoCount,
+  productCount,
+}: {
+  phase: "reading" | "analyzing" | "publishing";
+  photoCount: number;
+  productCount: number;
+}) {
+  const copy = phase === "reading"
+    ? { eyebrow: "Step 1 of 3", title: "Preparing your photos", detail: "Optimizing image previews securely before AI reviews them." }
+    : phase === "analyzing"
+      ? { eyebrow: "Step 2 of 3", title: "AI is building your catalogue", detail: "Matching product views, writing descriptions, and suggesting categories." }
+      : { eyebrow: "Step 3 of 3", title: "Publishing your products", detail: "Uploading approved images and saving each product safely." };
+
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-[#14251f]/45 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="ai-processing-title" aria-describedby="ai-processing-detail">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/60 bg-[#f7fbf8]/95 p-6 shadow-[0_30px_100px_-35px_rgba(12,35,28,0.8)] sm:p-9">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+          <div className="absolute -left-16 -top-20 h-56 w-56 rounded-full bg-[#75c6a5]/25 blur-3xl animate-[pulse_4s_ease-in-out_infinite]" />
+          <div className="absolute -bottom-24 -right-12 h-64 w-64 rounded-full bg-[#6d91ff]/20 blur-3xl animate-[pulse_5s_ease-in-out_infinite]" />
+          <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#4f9c80]/20 animate-[spin_14s_linear_infinite]" />
+          <div className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#547fef]/25 animate-[spin_9s_linear_infinite_reverse]" />
+        </div>
+        <div className="relative">
+          <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-white/80 shadow-[0_0_0_10px_rgba(78,148,120,0.08),0_0_45px_rgba(84,125,255,0.28)]">
+            <div className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-[#5fc6a1] via-[#467eea] to-[#273f9b] shadow-[0_0_25px_rgba(70,126,234,0.65)] animate-[pulse_2.2s_ease-in-out_infinite]">
+              <PortalIcon name="sparkle" className="h-6 w-6 text-white" />
+            </div>
+          </div>
+          <p className="mt-6 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-[#4b806d]">{copy.eyebrow}</p>
+          <h2 id="ai-processing-title" className="mt-2 text-center font-display text-3xl tracking-[-0.035em] text-[#17362b]">{copy.title}</h2>
+          <p id="ai-processing-detail" className="mx-auto mt-3 max-w-sm text-center text-sm leading-6 text-[#60746b]">{copy.detail} This can take a few seconds—keep this window open.</p>
+          <div className="mt-7 grid grid-cols-3 gap-2 text-center text-[11px] font-semibold text-[#6c7f76]">
+            <div className={`rounded-xl px-2 py-2.5 ${phase === "reading" ? "bg-[#e0f2e9] text-[#2f765e]" : "bg-[#edf4ef]"}`}>Read photos</div>
+            <div className={`rounded-xl px-2 py-2.5 ${phase === "analyzing" ? "bg-[#e0e9ff] text-[#3c5caf]" : "bg-[#edf4ef]"}`}>Understand styles</div>
+            <div className={`rounded-xl px-2 py-2.5 ${phase === "publishing" ? "bg-[#e0f2e9] text-[#2f765e]" : "bg-[#edf4ef]"}`}>Save products</div>
+          </div>
+          <div className="mt-5 flex items-center justify-between text-xs text-[#71837a]">
+            <span>{photoCount} photo{photoCount === 1 ? "" : "s"} in this batch</span>
+            <span>{productCount} candidate{productCount === 1 ? "" : "s"}</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#dcebe2]"><div className={`h-full rounded-full bg-gradient-to-r from-[#5bb98f] to-[#4d78ed] transition-all duration-500 ${phase === "reading" ? "w-1/3" : phase === "analyzing" ? "w-2/3" : "w-full"}`} /></div>
+        </div>
+      </div>
+    </div>
+  );
+}
 const noSizes = (slug: string) =>
   ["gifting", "hamper", "hampers"].includes(slug);
 const uid = () => crypto.randomUUID();
@@ -36,8 +194,9 @@ const productKey = (name: string) =>
 async function imageDataForAnalysis(file: File) {
   try {
     const bitmap = await createImageBitmap(file);
-    // Keep each data URL comfortably below the server validation limit.
-    const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+    // Keep each data URL small enough for a multi-image request while preserving
+    // enough detail for visual matching.
+    const scale = Math.min(1, 768 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -45,11 +204,21 @@ async function imageDataForAnalysis(file: File) {
       .getContext("2d")
       ?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    return canvas.toDataURL("image/jpeg", 0.72);
+    return canvas.toDataURL("image/jpeg", 0.5);
   } catch {
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).replace(/^data:image\/jpg;/i, "data:image/jpeg;"));
+      reader.onload = () => {
+        const data = String(reader.result).replace(
+          /^data:image\/jpg;/i,
+          "data:image/jpeg;",
+        );
+        if (data.length > 6_000_000) {
+          reject(new Error(`${file.name} is too large to prepare for AI analysis.`));
+          return;
+        }
+        resolve(data);
+      };
       reader.onerror = () => reject(new Error("Could not read image."));
       reader.readAsDataURL(file);
     });
@@ -110,7 +279,11 @@ export default function BulkUploadPage() {
       if (!validateImageFile(file)) return true;
       // Some mobile browsers leave File.type empty or report image/jpg.
       const extension = file.name.split(".").pop()?.toLowerCase();
-      return Boolean(extension && ["jpg", "jpeg", "png", "webp"].includes(extension) && file.size <= 8 * 1024 * 1024);
+      return Boolean(
+        extension &&
+        ["jpg", "jpeg", "png", "webp"].includes(extension) &&
+        file.size <= 8 * 1024 * 1024,
+      );
     });
     if (!valid.length) {
       setMessage("Upload up to 30 valid JPG, PNG, or WebP images.");
@@ -168,25 +341,6 @@ export default function BulkUploadPage() {
         .filter((draft) => draft.photos.length),
     );
   }
-  function movePhotoInDraft(
-    draftId: string,
-    photoId: string,
-    direction: -1 | 1,
-  ) {
-    setDrafts((current) =>
-      current.map((draft) => {
-        if (draft.id !== draftId) return draft;
-        const index = draft.photos.findIndex((photo) => photo.id === photoId);
-        const target = index + direction;
-        if (index < 0 || target < 0 || target >= draft.photos.length)
-          return draft;
-        const photos = [...draft.photos];
-        const [picked] = photos.splice(index, 1);
-        photos.splice(target, 0, picked);
-        return { ...draft, photos };
-      }),
-    );
-  }
   function makeCover(draftId: string, photoId: string) {
     setDrafts((current) =>
       current.map((draft) => {
@@ -242,6 +396,16 @@ export default function BulkUploadPage() {
     setBusyPhase("reading");
     setMessage("Preparing photos securely…");
     try {
+      const localFingerprints = Object.fromEntries(
+        await Promise.all(
+          draftsToAnalyze.flatMap((draft) =>
+            draft.photos.map(
+              async (photo) =>
+                [photo.id, await fingerprintImage(photo.file)] as const,
+            ),
+          ),
+        ),
+      );
       const images = await Promise.all(
         draftsToAnalyze.flatMap((draft) =>
           draft.photos.map(async (photo) => ({
@@ -261,13 +425,16 @@ export default function BulkUploadPage() {
         body: JSON.stringify({ storeId: store.id, images }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "AI grouping failed. You can continue manually.");
+      if (!response.ok)
+        throw new Error(
+          result.error ?? "AI grouping failed. You can continue manually.",
+        );
       const photoMap = new Map(
         draftsToAnalyze.flatMap((draft) =>
           draft.photos.map((photo) => [photo.id, photo]),
         ),
       );
-      const grouped = result.groups
+      const grouped: Draft[] = result.groups
         .map(
           (group: {
             imageIds: string[];
@@ -293,9 +460,26 @@ export default function BulkUploadPage() {
           }),
         )
         .filter((draft: Draft) => draft.photos.length);
-      setDrafts(grouped);
+      const locallyMerged = grouped.reduce(
+        (result: Draft[], draft: Draft) => {
+        const match = result.find((candidate: Draft) => {
+          const first = candidate.photos[0];
+          const incoming = draft.photos[0];
+          const a = first ? localFingerprints[first.id] : undefined;
+          const b = incoming ? localFingerprints[incoming.id] : undefined;
+          return a && b && fingerprintDistance(a, b) <= 28;
+        });
+        if (!match) return [...result, draft];
+        return result.map((candidate: Draft) =>
+          candidate === match
+            ? { ...candidate, photos: [...candidate.photos, ...draft.photos] }
+            : candidate,
+        );
+        }, [] as Draft[],
+      );
+      setDrafts(locallyMerged);
       setMessage(
-        `AI grouped ${images.length} photos into ${grouped.length} product candidates. Review flagged groups before publishing.`,
+        `AI grouped ${images.length} photos into ${locallyMerged.length} product candidates. Review flagged groups before publishing.`,
       );
     } catch (error) {
       setMessage(
@@ -380,6 +564,7 @@ export default function BulkUploadPage() {
   async function retryImport(importId: string) {
     if (!store) return;
     setBusy(true);
+    setBusyPhase("publishing");
     setMessage("Retrying failed products…");
     try {
       const response = await fetch("/api/portal/products/bulk-publish", {
@@ -409,6 +594,7 @@ export default function BulkUploadPage() {
       setMessage(error instanceof Error ? error.message : "Retry failed.");
     } finally {
       setBusy(false);
+      setBusyPhase("idle");
     }
   }
   if (loading)
@@ -561,87 +747,23 @@ export default function BulkUploadPage() {
                 Remove
               </button>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {draft.photos.map((photo) => (
-                <div
-                  key={photo.id}
-                  draggable
-                  onDragStart={(event) =>
-                    event.dataTransfer.setData("photo-id", photo.id)
-                  }
-                  className="group relative"
-                >
-                  <img
-                    src={photo.preview}
-                    alt={`Product ${index + 1} photo ${draft.photos.indexOf(photo) + 1}`}
-                    className="h-28 w-20 rounded-lg object-cover"
-                  />
-                  {draft.photos.indexOf(photo) === 0 ? (
-                    <span className="absolute left-1 top-1 rounded bg-ink/90 px-1.5 py-0.5 text-[9px] font-semibold text-white">
-                      Cover
-                    </span>
-                  ) : null}
-                  <div className="flex flex-wrap gap-1 bg-white p-1">
-                    <button
-                      type="button"
-                      disabled={draft.photos.indexOf(photo) === 0}
-                      onClick={() => movePhotoInDraft(draft.id, photo.id, -1)}
-                      aria-label="Move photo earlier"
-                      className="rounded border border-line px-1.5 py-0.5 text-[10px] disabled:opacity-40"
-                    >
-                      ←
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        draft.photos.indexOf(photo) === draft.photos.length - 1
-                      }
-                      onClick={() => movePhotoInDraft(draft.id, photo.id, 1)}
-                      aria-label="Move photo later"
-                      className="rounded border border-line px-1.5 py-0.5 text-[10px] disabled:opacity-40"
-                    >
-                      →
-                    </button>
-                    <button
-                      type="button"
-                      disabled={draft.photos.indexOf(photo) === 0}
-                      onClick={() => makeCover(draft.id, photo.id)}
-                      className="rounded border border-line px-1 text-[10px] disabled:opacity-40"
-                    >
-                      Cover
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => split(draft.id, photo.id)}
-                      className="rounded bg-white/90 px-1 text-[10px]"
-                    >
-                      Split
-                    </button>
-                    <select
-                      aria-label="Move photo"
-                      defaultValue=""
-                      onChange={(event) => {
-                        if (event.target.value)
-                          move(photo.id, event.target.value);
-                      }}
-                      className="max-w-16 text-[10px]"
-                    >
-                      <option value="">Move</option>
-                      {drafts
-                        .filter((item) => item.id !== draft.id)
-                        .map((item, itemIndex) => (
-                          <option key={item.id} value={item.id}>
-                            P{itemIndex + 1}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-              ))}
-              {!draft.photos.length ? (
-                <p className="py-6 text-sm text-muted">Drop a photo here.</p>
-              ) : null}
-            </div>
+            {draft.photos.length ? (
+              <PhotoStack
+                draft={draft}
+                draftIndex={index}
+                onMakeCover={(photoId) => makeCover(draft.id, photoId)}
+                onSplit={(photoId) => split(draft.id, photoId)}
+                onMove={move}
+                otherDrafts={drafts
+                  .filter((item) => item.id !== draft.id)
+                  .map((item) => ({ id: item.id, label: `Product ${drafts.indexOf(item) + 1}` }))}
+              />
+            ) : null}
+            {!draft.photos.length ? (
+              <div className="mt-3 rounded-xl border border-dashed border-line bg-[#f8fbf9] py-6 text-center text-sm text-muted">
+                Drop a photo here.
+              </div>
+            ) : null}
             <div className="mt-4 grid gap-3">
               <label className="flex items-center gap-2 border-b border-line py-2">
                 <input
@@ -802,6 +924,13 @@ export default function BulkUploadPage() {
           <p className="mt-2 text-sm text-muted">No imports yet.</p>
         )}
       </section>
+      {busy ? (
+        <AiProcessingOverlay
+          phase={busyPhase === "idle" ? "reading" : busyPhase}
+          photoCount={drafts.reduce((sum, draft) => sum + draft.photos.length, 0)}
+          productCount={drafts.length}
+        />
+      ) : null}
     </main>
   );
 }
