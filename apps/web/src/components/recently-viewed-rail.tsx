@@ -16,7 +16,7 @@ export function RecentlyViewedRail() {
 
   return (
     <section className="border-y border-[#e2dfd8] bg-[#f8f7f4]">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-4 sm:mb-5">
           <h2 className="shop-section-title">Recently viewed</h2>
         </div>

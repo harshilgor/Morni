@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
 import { getCachedPriceRailProducts } from "@/lib/catalog";
 
 export default async function Under99Page() {
+  redirect("/collection/under-99");
   const { products, categories, ratings } = await getCachedPriceRailProducts(99);
 
   return (

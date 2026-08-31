@@ -294,6 +294,8 @@ export function ProductBrowser({
   variant = "default",
   showInStockFilter = true,
   sharp = false,
+  collectionLinks,
+  square = false,
 }: {
   products: BrowsableProduct[];
   categories?: { name: string; slug: string }[];
@@ -304,6 +306,8 @@ export function ProductBrowser({
   variant?: "default" | "store";
   showInStockFilter?: boolean;
   sharp?: boolean;
+  collectionLinks?: { label: string; href: string; active?: boolean }[];
+  square?: boolean;
 }) {
   const isStore = variant === "store";
   const supabase = useMemo(() => createClient(), []);
@@ -845,7 +849,7 @@ export function ProductBrowser({
   ];
 
   return (
-    <div className={isStore ? "lg:grid lg:grid-cols-[220px_1fr] lg:gap-8" : "lg:grid lg:grid-cols-[240px_1fr] lg:gap-10"}>
+    <div className={`catalog-browser ${square ? "square-catalog" : ""} ${isStore ? "lg:grid lg:grid-cols-[220px_1fr] lg:gap-8" : "lg:grid lg:grid-cols-[240px_1fr] lg:gap-10"}`}>
       <aside className="hidden lg:block">
         <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pr-2">
           <div className="flex items-center justify-between">
@@ -862,6 +866,21 @@ export function ProductBrowser({
               </button>
             ) : null}
           </div>
+
+          {collectionLinks && collectionLinks.length > 0 ? (
+            <div className="border-b border-line/70 pb-4 pt-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent-deep">
+                Shop collections
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {collectionLinks.map((link) => (
+                  <Link key={link.href} href={link.href} className={`block text-sm transition ${link.active ? "font-semibold text-accent-deep" : "text-ink/80 hover:text-accent-deep"}`}>
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-3">{panel}</div>
 

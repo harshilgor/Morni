@@ -59,7 +59,7 @@ export async function HomeCatalog({
       label: "Under AED 99",
       title: "Under AED 99",
       subtitle: "Budget-friendly picks from local boutiques.",
-      href: "/under-99",
+      href: "/collection/under-99",
       products: under99Rail,
     },
     {
@@ -67,7 +67,7 @@ export async function HomeCatalog({
       label: "Under AED 199",
       title: "Under AED 199",
       subtitle: "More to love, still easy on the budget.",
-      href: "/search?max=199",
+      href: "/collection/under-199",
       products: under199Rail,
     },
     {
@@ -75,7 +75,7 @@ export async function HomeCatalog({
       label: "Luxury picks",
       title: "Luxury picks",
       subtitle: "Statement pieces made for special plans.",
-      href: "/search?min=500",
+      href: "/collection/luxury",
       products: luxuryPicksRail,
     },
     {
@@ -83,7 +83,7 @@ export async function HomeCatalog({
       label: "New in",
       title: "New in",
       subtitle: "Fresh drops from boutiques across the UAE.",
-      href: "/search?sort=new",
+      href: "/collection/new-in",
       products: newIn,
     },
     {
@@ -91,7 +91,7 @@ export async function HomeCatalog({
       label: "Best rated",
       title: "Best rated",
       subtitle: "Looks shoppers love, sorted by verified ratings.",
-      href: "/search?sort=rated",
+      href: "/collection/best-rated",
       products: topRated.length > 0 ? topRated : newIn,
     },
   ];

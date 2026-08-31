@@ -114,7 +114,7 @@ export function HomeStores({
 
   return (
     <section id="stores" className="scroll-mt-28 border-y border-[#e2dfd8] bg-[#f8f7f4]">
-      <div className="mx-auto max-w-6xl px-4 pb-7 pt-8 sm:px-6 sm:pb-9 sm:pt-10">
+      <div className="mx-auto max-w-7xl px-4 pb-7 pt-8 sm:px-6 sm:pb-9 sm:pt-10">
         <div
           className={`mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-5 sm:gap-4 ${
             layout === "grid" ? "" : "sm:mb-7"

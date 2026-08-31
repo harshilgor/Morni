@@ -21,7 +21,7 @@ export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
   if (!active) return null;
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="flex gap-1.5 overflow-x-auto pb-1 sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {intents.map((intent) => {
           const selected = intent.id === active.id;

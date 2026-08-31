@@ -1,4 +1,9 @@
 @import "tailwindcss";
+
+.catalog-browser.square-catalog,
+.catalog-browser.square-catalog * {
+  border-radius: 0 !important;
+}
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 

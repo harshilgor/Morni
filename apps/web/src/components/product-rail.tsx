@@ -31,7 +31,7 @@ export function ProductRail({
   if (products.length === 0) return null;
 
   return (
-    <section id={id} className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+    <section id={id} className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="mb-4 flex items-end justify-between gap-3 sm:mb-5">
         <div className="min-w-0">
           <h2 className="shop-section-title">{title}</h2>
