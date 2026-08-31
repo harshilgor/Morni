@@ -59,7 +59,7 @@ export async function HomeCatalog({
       label: "Under AED 99",
       title: "Under AED 99",
       subtitle: "Budget-friendly picks from local boutiques.",
-      href: "/search?max=99",
+      href: "/under-99",
       products: under99Rail,
     },
     {
@@ -142,9 +142,9 @@ export async function HomeCatalog({
           href="/search?sort=rated"
         />
       ) : null}
-      <NewAndPopular tabs={popularTabs} />
       <ProductRail title="New in" products={newIn} href="/search?sort=new" sharp />
       <RecentlyViewedRail />
+      <NewAndPopular tabs={popularTabs} />
     </>
   );
 }

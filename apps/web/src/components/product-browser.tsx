@@ -293,6 +293,7 @@ export function ProductBrowser({
   loadMoreUrl,
   variant = "default",
   showInStockFilter = true,
+  sharp = false,
 }: {
   products: BrowsableProduct[];
   categories?: { name: string; slug: string }[];
@@ -302,6 +303,7 @@ export function ProductBrowser({
   loadMoreUrl?: string;
   variant?: "default" | "store";
   showInStockFilter?: boolean;
+  sharp?: boolean;
 }) {
   const isStore = variant === "store";
   const supabase = useMemo(() => createClient(), []);
@@ -496,8 +498,11 @@ export function ProductBrowser({
     annotated.forEach((p) => {
       if (p.category) map.set(p.category.slug, p.category.name);
     });
+    if (map.size === 0) {
+      categories?.forEach((category) => map.set(category.slug, category.name));
+    }
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [annotated]);
+  }, [annotated, categories]);
   const priceOptions = useMemo(() => {
     const present = new Set(
       annotated.map((p) => p.priceBucket).filter(Boolean) as string[],
@@ -1092,6 +1097,7 @@ export function ProductBrowser({
                   }}
                   rating={loadedRatings[product.id] ?? null}
                   href={`/stores/${product.stores.slug}/products/${product.id}`}
+                  sharp={sharp}
                 />
               ))}
             </div>

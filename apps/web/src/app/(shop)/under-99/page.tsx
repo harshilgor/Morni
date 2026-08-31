@@ -51,6 +51,7 @@ export default async function Under99Page() {
             categories={categories}
             ratings={ratings}
             showInStockFilter={false}
+            sharp
           />
         )}
       </div>

@@ -76,7 +76,8 @@ async function compressImageForListing(file: File) {
     image.src = sourceUrl;
     await image.decode();
 
-    const maxDimension = 1400;
+    // Keep listing originals detailed enough for large desktop cards and retina screens.
+    const maxDimension = 3000;
     const scale = Math.min(
       1,
       maxDimension / Math.max(image.width, image.height),
@@ -87,7 +88,7 @@ async function compressImageForListing(file: File) {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Could not prepare the product photo.");
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.8);
+    return canvas.toDataURL("image/jpeg", 0.94);
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }

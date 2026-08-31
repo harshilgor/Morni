@@ -7,7 +7,7 @@ import { PRODUCT_SIZES } from "@/lib/product-sizes";
 import { uploadProductImages, validateImageFile } from "@/lib/media-upload";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { PortalIcon } from "@/components/portal-icons";
-import { fingerprintDistance, fingerprintImage } from "@/lib/image-similarity";
+import { colorDistance, fingerprintImage } from "@/lib/image-similarity";
 
 type Photo = { id: string; file: File; preview: string };
 type Draft = {
@@ -17,6 +17,7 @@ type Draft = {
   productTag: string;
   description: string;
   categorySlug: string;
+  colorName: string;
   priceAed: string;
   stock: string;
   sizes: string[];
@@ -191,6 +192,18 @@ const productKey = (name: string) =>
     .trim()
     .toLowerCase();
 
+function colorFamily(value: string) {
+  const color = value.toLowerCase().trim();
+  if (!color) return "";
+  if (/black|charcoal|ebony|onyx/.test(color)) return "black";
+  if (/white|ivory|cream|off[- ]?white|beige|nude|tan|camel|mustard|yellow|gold/.test(color)) return "warm-light";
+  if (/pink|rose|blush|fuchsia|magenta|coral|peach|orange|red|maroon|burgundy/.test(color)) return "warm-color";
+  if (/blue|navy|teal|turquoise|cyan|aqua|green|olive|sage|mint/.test(color)) return "cool-color";
+  if (/purple|violet|lilac|plum/.test(color)) return "purple";
+  if (/grey|gray|silver|brown|mocha|coffee/.test(color)) return "neutral-dark";
+  return color;
+}
+
 async function imageDataForAnalysis(file: File) {
   try {
     const bitmap = await createImageBitmap(file);
@@ -305,6 +318,7 @@ export default function BulkUploadPage() {
         productTag: "",
         description: "",
         categorySlug: "",
+        colorName: "",
         priceAed: "",
         stock: "",
         sizes: ["S", "M", "L"],
@@ -391,6 +405,7 @@ export default function BulkUploadPage() {
         productTag: "",
         description: "",
         categorySlug: "",
+        colorName: "",
         priceAed: "",
         stock: "",
         sizes: ["S", "M", "L"],
@@ -450,6 +465,7 @@ export default function BulkUploadPage() {
             title: string;
             description: string;
             categorySlug: string | null;
+            colorName: string;
             confidence: number;
             needsReview: boolean;
           }) => ({
@@ -460,6 +476,7 @@ export default function BulkUploadPage() {
             title: group.title,
             description: group.description,
             categorySlug: group.categorySlug ?? "",
+            colorName: group.colorName ?? "",
             productTag: "",
             priceAed: "",
             stock: "",
@@ -469,27 +486,35 @@ export default function BulkUploadPage() {
           }),
         )
         .filter((draft: Draft) => draft.photos.length);
-      const locallyMerged = grouped.reduce(
-        (result: Draft[], draft: Draft) => {
-        const match = result.find((candidate: Draft) => {
-          const first = candidate.photos[0];
-          const incoming = draft.photos[0];
-          const a = first ? localFingerprints[first.id] : undefined;
-          const b = incoming ? localFingerprints[incoming.id] : undefined;
-          return a && b && fingerprintDistance(a, b) <= 28;
-        });
-        if (!match) return [...result, draft];
-        return result.map((candidate: Draft) =>
-          candidate === match
-            ? { ...candidate, photos: [...candidate.photos, ...draft.photos] }
-            : candidate,
-        );
-        }, [] as Draft[],
-      );
-      setDrafts(locallyMerged);
+      // Never merge AI groups locally. The old grayscale merge ignored color
+      // and combined different colorways. Split only when pixels clearly prove
+      // that a returned group contains distinct color families.
+      const safeGroups = grouped.flatMap((draft) => {
+        const groups: Draft[] = [];
+        for (const photo of draft.photos) {
+          const fingerprint = localFingerprints[photo.id];
+          const compatible = groups.find((candidate) => {
+            const cover = candidate.photos[0];
+            const coverFingerprint = cover ? localFingerprints[cover.id] : undefined;
+            const aiColorsMatch =
+              !colorFamily(draft.colorName) ||
+              !colorFamily(candidate.colorName) ||
+              colorFamily(draft.colorName) === colorFamily(candidate.colorName);
+            return Boolean(aiColorsMatch && fingerprint && coverFingerprint && colorDistance(fingerprint, coverFingerprint) < 0.42);
+          });
+          if (compatible) compatible.photos.push(photo);
+          else groups.push({ ...draft, id: uid(), photos: [photo], needsReview: true });
+        }
+        return groups.map((group) => ({
+          ...group,
+          colorName: group.colorName,
+          needsReview: draft.needsReview || groups.length > 1,
+        }));
+      });
+      setDrafts(safeGroups);
       setMessage(
         result.warning ??
-          `AI grouped ${images.length} photos into ${locallyMerged.length} product candidates. Review flagged groups before publishing.`,
+          `AI grouped ${images.length} photos into ${safeGroups.length} product candidates. Review flagged groups before publishing.`,
       );
     } catch (error) {
       setMessage(

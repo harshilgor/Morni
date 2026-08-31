@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ProductCardImage } from "@/components/product-card-image";
 import { formatAed } from "@/lib/format";
 import { WishlistToggle } from "@/components/wishlist-toggle";
 import type { RailProduct } from "@/components/product-rail";
@@ -15,9 +16,36 @@ export type PopularTab = {
 
 export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
   const [activeSlug, setActiveSlug] = useState(tabs[0]?.slug ?? "");
+  const [productsByTab, setProductsByTab] = useState<Record<string, RailProduct[]>>(
+    () => Object.fromEntries(tabs.map((tab) => [tab.slug, tab.products])),
+  );
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const loadTriggerRef = useRef<HTMLDivElement>(null);
   const active = tabs.find((tab) => tab.slug === activeSlug) ?? tabs[0];
+  const activeProducts = active ? productsByTab[active.slug] ?? active.products : [];
 
-  if (!active || active.products.length === 0) return null;
+  useEffect(() => setHasMore(true), [activeSlug]);
+  useEffect(() => {
+    const trigger = loadTriggerRef.current;
+    if (!trigger || !active || !hasMore || loading) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setLoading(true);
+      fetch(`/api/home/new-and-popular?slug=${encodeURIComponent(active.slug)}&offset=${activeProducts.length}`)
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error("load failed"))))
+        .then((result: { products: RailProduct[]; hasMore: boolean }) => {
+          setProductsByTab((current) => ({ ...current, [active.slug]: [...(current[active.slug] ?? []), ...result.products] }));
+          setHasMore(result.hasMore);
+        })
+        .catch(() => setHasMore(false))
+        .finally(() => setLoading(false));
+    }, { rootMargin: "500px 0px" });
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, [active, activeProducts.length, hasMore, loading]);
+
+  if (!active || activeProducts.length === 0) return null;
 
   return (
     <section className="w-full bg-white py-8 sm:py-12">
@@ -51,21 +79,14 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
       </div>
 
       <div className="mt-5 grid w-full grid-cols-2 gap-px border-y border-[#e8e8e8] bg-[#e8e8e8] sm:mt-8 sm:grid-cols-3 xl:grid-cols-5">
-        {active.products.map((product) => (
+        {activeProducts.map((product) => (
           <Link
             key={product.id}
             href={product.href}
             className="group relative flex flex-col bg-white"
           >
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-sand">
-              {product.image_urls?.[0] ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={product.image_urls[0]}
-                  alt={product.title}
-                  className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                />
-              ) : null}
+              <ProductCardImage src={product.image_urls?.[0]} alt={product.title} />
             </div>
             <div className="space-y-0 p-1.5 sm:p-3">
               <div className="flex items-start gap-0.5">
@@ -88,6 +109,8 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
           </Link>
         ))}
       </div>
+
+      {hasMore ? <div ref={loadTriggerRef} className="h-8" aria-hidden /> : null}
 
       <div className="mt-6 text-center sm:mt-8">
         <Link
