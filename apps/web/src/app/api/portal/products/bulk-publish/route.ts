@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { revalidatePublicCatalog } from "@/lib/revalidate-catalog";
 
 const itemSchema = z.object({ title: z.string().trim().min(3).max(120), productTag: z.union([z.string().trim().regex(/^[A-Za-z][A-Za-z0-9-]{0,39}$/), z.literal("")]).default(""), description: z.string().trim().max(2000).default(""), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)).max(20), images: z.array(z.string().url()).min(1).max(5) });
 // Validate store ownership against the authenticated membership below rather
@@ -32,8 +33,31 @@ export async function POST(request: Request) {
     if (importError || !createdImport) return NextResponse.json({ error: "Could not start the product import." }, { status: 500 });
     importId = createdImport.id;
   }
-  await admin.from("bulk_imports").update({ status: "publishing", total_items: items.length }).eq("id", importId);
   if (!items.length) return NextResponse.json({ error: "No products are ready to publish." }, { status: 400 });
+  items = items.map((item) => ({ ...item, categorySlug: item.categorySlug.trim().toLowerCase() }));
+  const categorySlugs = [...new Set(items.map((item) => item.categorySlug.trim().toLowerCase()))];
+  const { data: existingCategories, error: categoriesError } = await admin
+    .from("categories")
+    .select("slug")
+    .eq("store_id", storeId)
+    .in("slug", categorySlugs);
+  if (categoriesError) return NextResponse.json({ error: "Could not verify product categories." }, { status: 500 });
+  const existingSlugs = new Set((existingCategories ?? []).map((category) => category.slug));
+  const missingCategories = categorySlugs
+    .filter((slug) => !existingSlugs.has(slug))
+    .map((slug) => ({
+      store_id: storeId,
+      name: slug.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "),
+      slug,
+      sort_order: 0,
+    }));
+  if (missingCategories.length) {
+    const { error: categoryInsertError } = await admin
+      .from("categories")
+      .upsert(missingCategories, { onConflict: "store_id,slug", ignoreDuplicates: true });
+    if (categoryInsertError) return NextResponse.json({ error: "Could not prepare product categories." }, { status: 500 });
+  }
+  await admin.from("bulk_imports").update({ status: "publishing", total_items: items.length }).eq("id", importId);
   await admin.from("bulk_import_items").delete().eq("import_id", importId).eq("status", "failed");
   const { data: importRows, error: importItemsError } = await admin.from("bulk_import_items").insert(items.map((item) => ({ import_id: importId, title: item.title, product_tag: item.productTag?.trim().toUpperCase() || null, description: item.description || null, category_slug: item.categorySlug, price_aed: item.priceAed, stock: item.stock, sizes: item.sizes, image_urls: item.images }))).select("id,title");
   if (importItemsError) return NextResponse.json({ error: "Could not prepare import items." }, { status: 500 });
@@ -42,5 +66,6 @@ export async function POST(request: Request) {
   const titleByItem = new Map((importRows ?? []).map((row) => [row.id, row.title]));
   const results = ((published ?? []) as Array<{ item_id: string; product_id: string | null; ok: boolean; error_message: string | null }>).map((row) => ({ title: titleByItem.get(row.item_id) ?? "Product", ok: row.ok, id: row.product_id ?? undefined, error: row.error_message ?? undefined }));
   const created = results.filter((result) => result.ok).length;
+  if (created > 0) await revalidatePublicCatalog();
   return NextResponse.json({ importId, results, created, failed: results.length - created });
 }

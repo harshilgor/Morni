@@ -583,6 +583,14 @@ export default function BulkUploadPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Bulk publish failed.");
+      if (result.failed) {
+        const failures = (result.results ?? [])
+          .filter((item: { ok: boolean }) => !item.ok)
+          .map((item: { title: string; error?: string }) => `${item.title}: ${item.error ?? "could not be published"}`)
+          .join(" · ");
+        setMessage(`${result.created} products published, ${result.failed} failed. ${failures}`);
+        return;
+      }
       setMessage(
         `${result.created} products published${result.failed ? `, ${result.failed} failed` : ""}.`,
       );
