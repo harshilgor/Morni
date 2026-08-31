@@ -4,6 +4,43 @@ import type { NextConfig } from "next";
 const deliverySrc = path.join(__dirname, "../delivery/src");
 const founderSrc = path.join(__dirname, "../founder/src");
 
+function configuredSupabaseHostname() {
+  try {
+    return new URL(
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://api.morniuae.com",
+    ).hostname;
+  } catch {
+    return "api.morniuae.com";
+  }
+}
+
+const supabaseHostname = configuredSupabaseHostname();
+const storageRemotePatterns = [
+  {
+    protocol: "https" as const,
+    hostname: supabaseHostname,
+    pathname: "/storage/v1/object/public/**",
+  },
+  {
+    protocol: "https" as const,
+    hostname: supabaseHostname,
+    pathname: "/storage/v1/object/sign/**",
+  },
+  // Product and store uploads may still contain a direct Supabase project URL.
+  // Keep all Supabase project hosts valid so a project migration cannot break
+  // every vendor's catalog images again.
+  {
+    protocol: "https" as const,
+    hostname: "*.supabase.co",
+    pathname: "/storage/v1/object/public/**",
+  },
+  {
+    protocol: "https" as const,
+    hostname: "*.supabase.co",
+    pathname: "/storage/v1/object/sign/**",
+  },
+];
+
 const nextConfig: NextConfig = {
   // Partial prerendering + `use cache` for instant storefront shells.
   cacheComponents: true,
@@ -32,16 +69,7 @@ const nextConfig: NextConfig = {
     qualities: [75],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "xobagxgagarnzxujxfag.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
-      {
-        protocol: "https",
-        hostname: "xobagxgagarnzxujxfag.supabase.co",
-        pathname: "/storage/v1/object/sign/**",
-      },
+      ...storageRemotePatterns,
       {
         protocol: "https",
         hostname: "api.morniuae.com",
