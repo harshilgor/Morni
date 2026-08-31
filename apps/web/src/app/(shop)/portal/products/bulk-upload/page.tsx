@@ -587,6 +587,7 @@ export default function BulkUploadPage() {
         `${result.created} products published${result.failed ? `, ${result.failed} failed` : ""}.`,
       );
       setDrafts([]);
+      router.replace("/portal/products");
     } catch (error) {
       if (uploadedUrls.length && store)
         void fetch("/api/portal/products/bulk-cleanup", {
