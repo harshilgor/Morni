@@ -292,6 +292,10 @@ export function SiteHeader() {
     setCategoriesOpen(false);
   }
 
+  function closeCategoriesOnNavHover() {
+    if (isDesktopCategoriesMenu()) setCategoriesOpen(false);
+  }
+
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -547,10 +551,10 @@ export function SiteHeader() {
         }}
       >
         <div className="relative z-10 mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto px-3 py-3 pr-8 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-7 sm:px-5">
-          <Link href="/" className={getNavPillClasses(isActiveNavItem("/"))}>
+          <Link href="/" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/"))}>
             Home
           </Link>
-          <Link href="/for-you" className={getNavPillClasses(isActiveNavItem("/for-you"))}>
+          <Link href="/for-you" onMouseEnter={closeCategoriesOnNavHover} className={`${getNavPillClasses(isActiveNavItem("/for-you"))} text-[#f3b6c6] drop-shadow-[0_0_8px_rgba(243,182,198,0.55)]`}>
             For you
           </Link>
           <button
@@ -565,21 +569,21 @@ export function SiteHeader() {
           >
             Categories
           </button>
-          <Link href="/stores" className={getNavPillClasses(isActiveNavItem("/stores"))}>
+          <Link href="/stores" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/stores"))}>
             Stores
           </Link>
-          <Link href="/under-99" className={getNavPillClasses(isActiveNavItem("/under-99"))}>
+          <Link href="/under-99" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/under-99"))}>
             Under AED 99
           </Link>
-          <Link href="/under-149" className={getNavPillClasses(isActiveNavItem("/under-149"))}>
+          <Link href="/under-149" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/under-149"))}>
             Under AED 149
           </Link>
           {isStoreOwner ? (
-            <Link href="/portal" className={getNavPillClasses(isActiveNavItem("/portal"))}>
+            <Link href="/portal" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/portal"))}>
               My Store
             </Link>
           ) : (
-            <Link href="/sell" className={getNavPillClasses(isActiveNavItem("/sell"))}>
+            <Link href="/sell" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/sell"))}>
               Sell on Morni
             </Link>
           )}

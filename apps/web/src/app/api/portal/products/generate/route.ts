@@ -65,7 +65,8 @@ async function generateWithGemini(options: {
   const prompt = [
     "You create draft product listings for a UAE fashion marketplace.",
     "Use the product photos as evidence, but never invent a brand, fabric, measurements, care instructions, origin, or designer name.",
-    "Keep the title concise and shopper-friendly. Keep the description factual, warm, and under 80 words.",
+    "Write a natural, human-sounding description of 2 to 3 complete sentences and roughly 45 to 90 words. Mention the visible fabric or material and describe the look, feel, silhouette, finish, colour/pattern, styling and likely occasion when the photos support it. Use specific, varied language and avoid generic AI phrases such as 'elevate your wardrobe', 'timeless elegance', or 'perfect for any occasion'.",
+    "Never claim a fabric, texture, construction detail, fit, care instruction, origin, or occasion that cannot be reasonably supported by the photos or seller inputs. If fabric is not visually clear, describe the drape or finish cautiously without naming a material.",
     "Choose categorySlug only from the supplied category list. Return null when the category is genuinely unclear.",
     "The owner must review every field, so make conservative suggestions rather than confident guesses.",
     "Return only valid JSON with exactly these keys: title, description, categorySlug, colorName.",

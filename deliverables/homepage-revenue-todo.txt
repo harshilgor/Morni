@@ -1,0 +1,50 @@
+MORNI HOMEPAGE REVENUE TODO
+============================
+
+Timing note
+-----------
+Start these experiments after enough vendors have uploaded enough products to
+make recommendations representative and useful. Before that point, prioritize
+catalog quality, accurate fabric/material data, imagery, and vendor adoption.
+
+[ ] Complete the look
+    Recommend complementary products and coordinated outfits from the same or
+    nearby categories. Start on product detail pages, then add selected
+    homepage placements once recommendation quality is reliable.
+
+[ ] Limited-stock and selling-fast signals
+    Show honest inventory and velocity labels such as "Only 2 left" or
+    "Selling fast" when thresholds are supported by real catalog/order data.
+
+[ ] Stronger For You personalization
+    Use browsing, recently viewed, wishlist, category, price, and purchase
+    signals to improve the For You rail. Measure click-through, add-to-bag,
+    and conversion lift against a non-personalized baseline.
+
+[ ] Store-specific bundles
+    Let vendors promote coordinated sets, outfit bundles, or multi-item offers
+    with clear pricing and inventory rules.
+
+[ ] Outfit and accessory recommendations
+    Add relevant complementary pieces such as jewellery, bags, shoes, or
+    layering items without overwhelming the primary product journey.
+
+[ ] Delivery urgency messaging
+    Show accurate delivery expectations and, where supported, messages such as
+    "Order now for today's delivery." Never create urgency without live
+    availability and delivery data.
+
+[ ] Homepage merchandising analytics
+    Track impressions, rail/tab clicks, product opens, add-to-bag, checkout,
+    and purchases by homepage section. Use this to test ordering, copy, and
+    card density.
+
+[ ] Vendor-funded featured placements
+    Explore paid or sponsored visibility for vendors only after measurement,
+    disclosure, eligibility, and ranking safeguards are defined.
+
+Success criteria
+---------------
+For each item, define a control group and monitor revenue per session,
+add-to-bag rate, checkout conversion, average order value, repeat visits, and
+vendor participation. Keep recommendation and merchandising changes reversible.
