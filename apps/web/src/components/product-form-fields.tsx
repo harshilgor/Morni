@@ -5,6 +5,7 @@ import {
   type ProductImageItem,
 } from "@/components/product-images-field";
 import { PRODUCT_SIZES } from "@/lib/product-sizes";
+import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { CustomizationEditor } from "@/components/customization-editor";
 import {
   defaultCustomizationConfig,
@@ -14,6 +15,7 @@ import {
 export type ProductFormValue = {
   title: string;
   description: string;
+  fabric: string;
   categorySlug: string;
   price_aed: string;
   compare_at_price_aed: string;
@@ -61,6 +63,14 @@ export function ProductFormFields({
         {fieldErrors?.title ? (
           <p className="text-sm text-accent-deep">{fieldErrors.title}</p>
         ) : null}
+      </label>
+
+      <label className="block space-y-1.5 text-sm">
+        <span className="text-muted">Fabric / material</span>
+        <select className="w-full rounded-xl border border-line bg-background px-3 py-2.5" value={value.fabric} onChange={(e) => patch({ fabric: e.target.value })}>
+          <option value="">Select material</option>
+          {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
+        </select>
       </label>
 
       <label className="block space-y-1.5 text-sm">
@@ -219,6 +229,7 @@ export function emptyProductForm(): ProductFormValue {
   return {
     title: "",
     description: "",
+    fabric: "",
     categorySlug: "",
     price_aed: "",
     compare_at_price_aed: "",

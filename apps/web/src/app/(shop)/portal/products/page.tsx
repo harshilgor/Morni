@@ -42,6 +42,7 @@ import {
   defaultCustomizationConfig,
   type ProductCustomizationConfig,
 } from "@/lib/product-customization";
+import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 
 type ProductWithVariants = Product & {
   product_variants?: ProductVariant[] | null;
@@ -53,6 +54,7 @@ type ProductDraft = {
   product_tag: string;
   price_aed: string;
   categorySlug: string;
+  fabric: string;
   customization: ProductCustomizationConfig;
 };
 
@@ -181,6 +183,7 @@ export default function PortalProductsPage() {
     title: "",
     product_tag: "",
     description: "",
+    fabric: "",
     price_aed: "",
     categorySlug: "",
     customization: defaultCustomizationConfig(),
@@ -287,6 +290,7 @@ export default function PortalProductsPage() {
       title: "",
       product_tag: "",
       description: "",
+      fabric: "",
       price_aed: "",
       categorySlug: "",
       customization: defaultCustomizationConfig(),
@@ -408,6 +412,7 @@ export default function PortalProductsPage() {
       product_tag: product.product_tag ?? "",
       price_aed: String(product.price_aed),
       categorySlug: product.categories?.slug ?? "",
+      fabric: product.fabric ?? "",
       customization:
         product.categories?.slug === "gifting"
           ? defaultCustomizationConfig()
@@ -493,6 +498,7 @@ export default function PortalProductsPage() {
         title: form.title,
         product_tag: form.product_tag.trim().toUpperCase() || null,
         description: form.description || null,
+        fabric: form.fabric || null,
         price_aed: Number(form.price_aed),
         stock: aggregate.stock,
         sizes: aggregate.sizes,
@@ -534,6 +540,7 @@ export default function PortalProductsPage() {
       title: "",
       product_tag: "",
       description: "",
+      fabric: "",
       price_aed: "",
       categorySlug: "",
       customization: defaultCustomizationConfig(),
@@ -602,6 +609,7 @@ export default function PortalProductsPage() {
       .from("products")
       .update({
         category_id: categoryId,
+        fabric: editDraft.fabric || null,
         title: editDraft.title.trim(),
         product_tag: editDraft.product_tag.trim().toUpperCase() || null,
         price_aed: price,
@@ -1118,6 +1126,13 @@ export default function PortalProductsPage() {
                   </select>
                 </label>
                 <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">Fabric / material</span>
+                  <select className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm" value={form.fabric} onChange={(e) => setForm((current) => ({ ...current, fabric: e.target.value }))}>
+                    <option value="">Select material</option>
+                    {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
+                  </select>
+                </label>
+                <label className="block space-y-1.5 text-sm">
                   <span className="font-medium text-[#40534d]">
                     Description *
                   </span>
@@ -1317,6 +1332,13 @@ export default function PortalProductsPage() {
                       {category.name}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-[#40534d]">Fabric / material</span>
+                <select className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm" value={editDraft.fabric} onChange={(e) => setEditDraft((current) => current ? { ...current, fabric: e.target.value } : current)}>
+                  <option value="">Select material</option>
+                  {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
                 </select>
               </label>
               {categoryHasSizes(editDraft.categorySlug) ? (

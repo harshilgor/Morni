@@ -244,6 +244,7 @@ export function ProductDetail({
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [bagSheet, setBagSheet] = useState<"size" | "added" | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(true);
+  const [fabricOpen, setFabricOpen] = useState(false);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [returnsOpen, setReturnsOpen] = useState(false);
 
@@ -545,6 +546,11 @@ export function ProductDetail({
               <p>{product.description ?? "A thoughtfully selected piece from this local boutique."}</p>
               {selectedVariant ? <p className="mt-3">Colour: {selectedVariant.color_name}.</p> : null}
             </ProductAccordion>
+            {product.fabric ? (
+              <ProductAccordion title="Fabric" open={fabricOpen} onToggle={() => setFabricOpen((open) => !open)}>
+                <p>{product.fabric}</p>
+              </ProductAccordion>
+            ) : null}
             <ProductAccordion title="Delivery" open={deliveryOpen} onToggle={() => setDeliveryOpen((open) => !open)}>
               <p>Delivery is available across Dubai. Your exact delivery estimate is confirmed at checkout once you choose an address.</p>
             </ProductAccordion>

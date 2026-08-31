@@ -8,6 +8,7 @@ import { uploadProductImages, validateImageFile } from "@/lib/media-upload";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { PortalIcon } from "@/components/portal-icons";
 import { colorDistance, fingerprintImage } from "@/lib/image-similarity";
+import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 
 type Photo = { id: string; file: File; preview: string };
 type Draft = {
@@ -16,6 +17,7 @@ type Draft = {
   title: string;
   productTag: string;
   description: string;
+  fabric: string;
   categorySlug: string;
   colorName: string;
   priceAed: string;
@@ -317,6 +319,7 @@ export default function BulkUploadPage() {
         title: key.replace(/\b\w/g, (letter) => letter.toUpperCase()),
         productTag: "",
         description: "",
+        fabric: "",
         categorySlug: "",
         colorName: "",
         priceAed: "",
@@ -404,6 +407,7 @@ export default function BulkUploadPage() {
         title: "",
         productTag: "",
         description: "",
+        fabric: "",
         categorySlug: "",
         colorName: "",
         priceAed: "",
@@ -475,6 +479,7 @@ export default function BulkUploadPage() {
               .filter(Boolean),
             title: group.title,
             description: group.description,
+            fabric: "",
             categorySlug: group.categorySlug ?? "",
             colorName: group.colorName ?? "",
             productTag: "",
@@ -591,6 +596,7 @@ export default function BulkUploadPage() {
           title: draft.title,
           productTag: draft.productTag,
           description: draft.description,
+          fabric: draft.fabric || null,
           categorySlug: draft.categorySlug,
           priceAed: Number(draft.priceAed),
           stock: Number(draft.stock),
@@ -926,6 +932,13 @@ export default function BulkUploadPage() {
                   />
                 </label>
               </div>
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Fabric / material
+                <select value={draft.fabric} onChange={(event) => patch(draft.id, { fabric: event.target.value })} className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm font-normal normal-case tracking-normal">
+                  <option value="">Select material</option>
+                  {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
+                </select>
+              </label>
               {!noSizes(draft.categorySlug) ? (
                 <div className="flex flex-wrap gap-2">
                   {PRODUCT_SIZES.map((size) => (
