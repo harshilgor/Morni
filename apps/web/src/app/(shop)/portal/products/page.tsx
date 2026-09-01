@@ -315,7 +315,13 @@ export default function PortalProductsPage() {
 
   async function generateListing() {
     if (!store) return;
-    const primary = createColors[0];
+    let workingColors = createColors;
+    if (createColors.length <= 1 && createColors[0]?.images.length) {
+      const organized = await organizeCreatePhotos();
+      if (!organized) return;
+      workingColors = organized;
+    }
+    const primary = workingColors[0];
     if (!primary || primary.images.length === 0) {
       setMessage("Add at least one product photo to generate a listing.");
       return;
@@ -420,6 +426,7 @@ export default function PortalProductsPage() {
       if (!next.length) throw new Error("AI could not group these photos. You can continue manually.");
       setCreateColors(next);
       setMessage(`${photos.length} photos grouped into ${next.length} colour${next.length === 1 ? "" : "s"}. Review or drag any photo to another colour.`);
+      return next;
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not group the photos."); }
     finally { setOrganizing(false); }
   }
@@ -1054,7 +1061,7 @@ export default function PortalProductsPage() {
               }
               void onCreate();
             }}
-            className="mx-auto flex min-h-full max-w-2xl flex-col"
+            className="mx-auto flex min-h-full w-full max-w-5xl flex-col"
           >
             <div className="mb-4 flex gap-2">
               {[1, 2].map((step) => (
@@ -1080,12 +1087,6 @@ export default function PortalProductsPage() {
                 onChange={updatePrimaryColorDraft}
                 disabled={generating || saving}
               />
-              <div className="rounded-2xl border border-[#c9ddd4] bg-white p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div><p className="text-sm font-semibold text-[#21463b]">Organize colours automatically</p><p className="mt-1 text-xs text-muted">Upload all photos once. Morni will group matching colourways for you.</p></div>
-                  <button type="button" onClick={() => void organizeCreatePhotos()} disabled={organizing || generating || saving || !createColors.some((color) => color.images.length)} className="rounded-full bg-[#21463b] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{organizing ? "Grouping…" : "Group photos"}</button>
-                </div>
-              </div>
               </>
             ) : (
               <div className="space-y-4">
@@ -1211,7 +1212,7 @@ export default function PortalProductsPage() {
                 <ColorVariantEditor
                   value={createColors}
                   onChange={setCreateColors}
-                  disabled={saving || generating}
+                  disabled={saving || generating || organizing}
                   showSizes={categoryHasSizes(form.categorySlug)}
                 />
 
@@ -1249,8 +1250,8 @@ export default function PortalProductsPage() {
                   className="portal-button-primary flex-[1.4] disabled:opacity-50"
                 >
                   {createStep === 1
-                    ? generating
-                      ? "Creating draft…"
+                    ? generating || organizing
+                      ? organizing ? "Grouping photos…" : "Creating draft…"
                       : "Generate listing"
                     : saving
                       ? "Publishing…"
