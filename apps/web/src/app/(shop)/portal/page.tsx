@@ -177,7 +177,7 @@ export default function PortalOverviewPage() {
 
       {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <section>
           <div className="mb-3 flex items-center justify-between">
             <div><p className="portal-eyebrow">Priority queue</p><h2 className="mt-1 text-lg font-semibold text-[#1d2925]">What needs your attention</h2></div>
