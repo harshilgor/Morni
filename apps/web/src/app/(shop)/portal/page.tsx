@@ -137,6 +137,7 @@ export default function PortalOverviewPage() {
 
   return (
     <div className="space-y-7">
+      <ReturnRequestsPanel storeId={store.id} />
       <div className="lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -161,7 +162,6 @@ export default function PortalOverviewPage() {
           reviews={reviews}
           orders={orders}
           wishlistRows={wishlistRows}
-          storeId={store.id}
         />
       </div>
 
@@ -177,7 +177,6 @@ export default function PortalOverviewPage() {
 
       {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
       <InventoryNotifications storeId={store.id} />
-      <ReturnRequestsPanel storeId={store.id} />
 
         <section>
           <div className="mb-3 flex items-center justify-between">
@@ -222,7 +221,6 @@ function MobileOverview({
   reviews,
   orders,
   wishlistRows,
-  storeId,
 }: {
   store: Store;
   setupComplete: boolean;
@@ -243,7 +241,6 @@ function MobileOverview({
   reviews: ProductReview[];
   orders: OrderWithItems[];
   wishlistRows: WishRow[];
-  storeId: string;
 }) {
   const attentionCount = insights.newOrders.length + insights.lowStock.length + insights.unreplied.length;
   const checklistComplete = checklist.filter((item) => item.done).length;
@@ -251,7 +248,6 @@ function MobileOverview({
   return (
     <div className="space-y-4">
       {!setupComplete || !store.is_active ? <MobileLaunchCard storeActive={store.is_active} complete={setupComplete} /> : null}
-      <ReturnRequestsPanel storeId={storeId} />
 
       <section className="overflow-hidden rounded-2xl bg-[#21342e] text-white shadow-[0_18px_40px_-28px_rgba(33,52,46,0.75)]">
         <div className="flex items-start justify-between gap-3 px-4 py-5">

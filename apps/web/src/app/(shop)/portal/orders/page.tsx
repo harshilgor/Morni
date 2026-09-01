@@ -4,7 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import Image from "next/image";
 import { PortalIcon } from "@/components/portal-icons";
 import { PortalEmpty, PortalMetric, PortalPageHeader, StatusBadge } from "@/components/portal-ui";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 import { formatAed, orderStatusLabel } from "@/lib/format";
 import { formatDeliverySlotShort } from "@/lib/delivery-slots";
 import { useOwnerStore } from "@/lib/use-owner-store";
@@ -114,7 +114,7 @@ export default function PortalOrdersPage() {
   useEffect(() => {
     if (!store) return;
     const supabase = createClient();
-    const channel = supabase.channel(`portal-orders-${store.id}`).on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${store.id}` }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_handoffs" }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_proofs" }, () => void loadOrders(store.id)).subscribe();
+    const channel = supabase.channel(createRealtimeChannelName("portal-orders", store.id)).on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${store.id}` }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_handoffs" }, () => void loadOrders(store.id)).on("postgres_changes", { event: "*", schema: "public", table: "delivery_proofs" }, () => void loadOrders(store.id)).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [loadOrders, store]);
 

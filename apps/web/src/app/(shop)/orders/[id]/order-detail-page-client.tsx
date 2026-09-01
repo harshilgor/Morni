@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 import { emirateLabel, formatAed, orderStatusLabel } from "@/lib/format";
 import { formatDeliverySlotWindow } from "@/lib/delivery-slots";
 import type { Order, OrderItem, ProductReview } from "@/lib/types";
@@ -149,7 +149,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel(`order-tracking-${orderId}`)
+      .channel(createRealtimeChannelName("order-tracking", orderId))
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` }, () => setReloadKey((value) => value + 1))
       .on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" }, () => setReloadKey((value) => value + 1))
       .on("postgres_changes", { event: "*", schema: "public", table: "return_requests", filter: `order_id=eq.${orderId}` }, () => setReloadKey((value) => value + 1))

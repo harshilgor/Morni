@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 
 /** Keeps order-navigation badges in sync with orders awaiting acceptance. */
 export function useNewOrderCount(storeId?: string, channelScope = "portal") {
@@ -28,7 +28,7 @@ export function useNewOrderCount(storeId?: string, channelScope = "portal") {
 
     const supabase = createClient();
     const channel = supabase
-      .channel(`portal-new-order-count-${channelScope}-${storeId}`)
+      .channel(createRealtimeChannelName(`portal-new-order-count-${channelScope}`, storeId))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${storeId}` },

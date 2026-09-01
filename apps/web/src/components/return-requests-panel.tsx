@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PortalIcon } from "@/components/portal-icons";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 
 type ReturnItem = { id: string; title: string; size: string | null; quantity: number };
@@ -37,7 +37,39 @@ export function ReturnRequestsPanel({ storeId }: { storeId: string }) {
     setLoading(false);
   }, [storeId]);
 
-  useEffect(() => { const requestLoad = () => void load(); if (typeof queueMicrotask === "function") queueMicrotask(requestLoad); else window.setTimeout(requestLoad, 0); const supabase = createClient(); const channel = supabase.channel(`store-returns-${storeId}`).on("postgres_changes", { event: "*", schema: "public", table: "return_requests", filter: `store_id=eq.${storeId}` }, () => void load()).on("postgres_changes", { event: "*", schema: "public", table: "return_handoffs" }, () => void load()).on("postgres_changes", { event: "*", schema: "public", table: "return_refunds" }, () => void load()).subscribe(); return () => { void supabase.removeChannel(channel); }; }, [load, storeId]);
+  useEffect(() => {
+    let active = true;
+    const requestLoad = () => {
+      if (active) void load();
+    };
+    if (typeof queueMicrotask === "function") queueMicrotask(requestLoad);
+    else window.setTimeout(requestLoad, 0);
+
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(createRealtimeChannelName("store-returns", storeId))
+        .on("postgres_changes", { event: "*", schema: "public", table: "return_requests", filter: `store_id=eq.${storeId}` }, () => void load())
+        .on("postgres_changes", { event: "*", schema: "public", table: "return_handoffs" }, () => void load())
+        .on("postgres_changes", { event: "*", schema: "public", table: "return_refunds" }, () => void load())
+        .subscribe((status, subscriptionError) => {
+          if (!active) return;
+          if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && subscriptionError) {
+            setError("Live return updates are temporarily unavailable. Refresh to retry.");
+          }
+        });
+    } catch {
+      queueMicrotask(() => {
+        if (active) setError("Live return updates are temporarily unavailable. Refresh to retry.");
+      });
+    }
+
+    return () => {
+      active = false;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [load, storeId]);
 
   async function review(id: string, decision: "approve" | "reject") {
     setBusy(id); setError(null);
