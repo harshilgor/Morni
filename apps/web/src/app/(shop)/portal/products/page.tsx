@@ -162,6 +162,21 @@ function SheetShell({
   );
 }
 
+function ListingGenerationOverlay({ organizing }: { organizing: boolean }) {
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-[#14251f]/45 p-4 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Generating product listing">
+      <div className="w-full max-w-md rounded-[2rem] border border-white/70 bg-[#f7fbf8] p-8 text-center shadow-[0_30px_100px_-35px_rgba(12,35,28,0.8)]">
+        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#dceee7]">
+          <span className="h-10 w-10 animate-spin rounded-full border-4 border-[#b6d7c8] border-t-[#2f6f66]" />
+        </div>
+        <h2 className="mt-6 font-display text-3xl tracking-tight text-[#17362b]">Generating your listing</h2>
+        <p className="mt-2 text-sm leading-6 text-[#60746b]">{organizing ? "Sorting your photos into colour groups…" : "Writing the title and description from your photos…"}</p>
+        <div className="mt-6 flex justify-center gap-1.5" aria-hidden="true">{[0, 1, 2].map((item) => <span key={item} className="h-2 w-2 animate-bounce rounded-full bg-[#5d9a78]" style={{ animationDelay: `${item * 150}ms` }} />)}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function PortalProductsPage() {
   const searchParams = useSearchParams();
   const requestedEditId = searchParams.get("edit");
@@ -1415,6 +1430,7 @@ export default function PortalProductsPage() {
           onClose={() => setPreview(null)}
         />
       ) : null}
+      {addProductOpen && (organizing || generating) ? <ListingGenerationOverlay organizing={organizing} /> : null}
     </div>
   );
 }

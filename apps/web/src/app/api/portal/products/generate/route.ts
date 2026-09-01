@@ -8,7 +8,7 @@ const MAX_IMAGES = 3;
 const MAX_IMAGE_DATA_LENGTH = 5_500_000;
 
 const requestSchema = z.object({
-  storeId: z.string().uuid(),
+  storeId: z.string().trim().min(1).max(200),
   priceAed: z.number().finite().nonnegative(),
   stock: z.number().int().nonnegative(),
   sizes: z.array(z.string().trim().min(1).max(24)).max(20),
