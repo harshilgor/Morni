@@ -173,12 +173,12 @@ export default function PortalOverviewPage() {
         >
           <button type="button" onClick={handleRefresh} disabled={refreshing} className="portal-button-secondary disabled:opacity-55"><PortalIcon name="refresh" className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />{refreshing ? "Refreshing" : "Refresh"}</button>
           <Link href={setupComplete && store.is_active ? `/stores/${store.slug}` : "/portal/settings"} className="portal-button-primary">{setupComplete && store.is_active ? "View storefront" : "Finish setup"}<PortalIcon name="external" className="h-3.5 w-3.5" /></Link>
-        </PortalPageHeader>
+      </PortalPageHeader>
 
       {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
-      <InventoryNotifications storeId={store.id} />
 
-        <section>
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <section>
           <div className="mb-3 flex items-center justify-between">
             <div><p className="portal-eyebrow">Priority queue</p><h2 className="mt-1 text-lg font-semibold text-[#1d2925]">What needs your attention</h2></div>
             <Link href="/portal/orders" className="portal-text-link">Open orders<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link>
@@ -189,6 +189,8 @@ export default function PortalOverviewPage() {
             <AttentionCard icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} description={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
             <AttentionCard icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} description={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
           </div>
+          </section>
+          <InventoryNotifications storeId={store.id} />
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
