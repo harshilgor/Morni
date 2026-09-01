@@ -136,7 +136,7 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
   featuredCategory(
     "Gifting",
     "gifting",
-    "/categories/gifting.jpg",
+    "/categories/gifting-cover.png",
     ["gift", "gifting", "present", "celebration", "occasion"],
     16,
   ),

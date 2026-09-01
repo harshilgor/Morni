@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 
 const MAX_IMAGES = 3;
 const MAX_IMAGE_DATA_LENGTH = 5_500_000;
-const MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
 
 const requestSchema = z.object({
   storeId: z.string().uuid(),
@@ -39,28 +38,17 @@ function getCategories(rows: BrowseCategory[]) {
   return mergeBrowseCategories(rows).map(({ name, slug }) => ({ name, slug }));
 }
 
-type GeminiResponse = {
-  candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
-  }>;
-};
+type OpenAIResponse = { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
 
-async function generateWithGemini(options: {
+async function generateWithOpenAI(options: {
   priceAed: number;
   stock: number;
   sizes: string[];
   categories: Array<{ name: string; slug: string }>;
   images: string[];
 }) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
-
-  const imageParts = options.images.map((image) => {
-    const [, mediaType = "image/jpeg", base64 = ""] = image.match(
-      /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i,
-    ) ?? [];
-    return { inline_data: { mime_type: mediaType, data: base64 } };
-  });
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
 
   const prompt = [
     "You create draft product listings for a UAE fashion marketplace.",
@@ -79,45 +67,24 @@ async function generateWithGemini(options: {
     }),
   ].join("\n");
 
-  let lastError = "Gemini did not return a response.";
-
-  for (const model of MODELS) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }, ...imageParts] }],
-        generationConfig: {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(45_000),
+        body: JSON.stringify({
+          model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
+          input: [{ role: "user", content: [{ type: "input_text", text: prompt }, ...options.images.map((image) => ({ type: "input_image", image_url: image, detail: "high" }))] }],
           temperature: 0.2,
-          responseMimeType: "application/json",
-        },
-      }),
-      },
-    );
-
-    if (response.status === 404) {
-      lastError = `Gemini model ${model} is unavailable for this API key.`;
-      continue;
-    }
-    if (!response.ok) {
-      throw new Error(`Gemini request failed with status ${response.status}.`);
-    }
-
-    const payload = (await response.json()) as GeminiResponse;
-    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Gemini returned an empty listing.");
-
-    const parsed = suggestionSchema.safeParse(JSON.parse(text));
-    if (!parsed.success) throw new Error("Gemini returned an invalid listing format.");
-    return parsed.data;
-  }
-
-  throw new Error(lastError);
+          text: { format: { type: "json_schema", name: "product_listing", strict: true, schema: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, description: { type: "string" }, categorySlug: { type: ["string", "null"] }, colorName: { type: ["string", "null"] } }, required: ["title", "description", "categorySlug", "colorName"] } } },
+        }),
+      });
+  if (!response.ok) throw new Error(`OpenAI request failed with status ${response.status}.`);
+  const payload = (await response.json()) as OpenAIResponse;
+  const text = payload.output_text ?? payload.output?.flatMap((item) => item.content ?? []).map((item) => item.text ?? "").join("");
+  if (!text) throw new Error("OpenAI returned an empty listing.");
+  const parsed = suggestionSchema.safeParse(JSON.parse(text));
+  if (!parsed.success) throw new Error("OpenAI returned an invalid listing format.");
+  return parsed.data;
 }
 
 export async function POST(request: NextRequest) {
@@ -172,7 +139,7 @@ export async function POST(request: NextRequest) {
   const categorySlugs = new Set(categories.map((category) => category.slug));
 
   try {
-    const output = await generateWithGemini({
+    const output = await generateWithOpenAI({
       priceAed,
       stock,
       sizes,
