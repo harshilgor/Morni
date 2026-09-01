@@ -72,7 +72,13 @@ export function QuickProductFields({
             min="0"
             step="1"
             value={draft.stock}
-            onChange={(event) => onChange({ ...draft, stock: event.target.value })}
+            onChange={(event) => onChange({
+              ...draft,
+              stock: event.target.value,
+              // The quick step only knows the aggregate. The colour editor
+              // switches this back to exact mode when size quantities are entered.
+              inventory_mode: draft.sizes.length > 0 ? "legacy" : draft.inventory_mode,
+            })}
             disabled={disabled}
             placeholder="0"
           />

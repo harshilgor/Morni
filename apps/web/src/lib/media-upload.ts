@@ -4,10 +4,15 @@ export const MEDIA_MAX_BYTES = 8 * 1024 * 1024;
 export const MEDIA_ACCEPT = "image/jpeg,image/png,image/webp";
 export const MEDIA_ACCEPT_LABEL = "JPG, PNG or WebP · max 8 MB";
 export const PRODUCT_IMAGE_LIMIT = 5;
+export const PRODUCT_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+export const PRODUCT_VIDEO_ACCEPT = "video/mp4,video/webm";
+export const PRODUCT_VIDEO_ACCEPT_LABEL = "MP4 or WebM · max 50 MB";
+export const PRODUCT_VIDEO_LIMIT = 2;
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_VIDEO_TYPES = new Set(["video/mp4", "video/webm"]);
 
-export type MediaBucket = "store-logos" | "product-images" | "delivery-proofs";
+export type MediaBucket = "store-logos" | "product-images" | "product-videos" | "delivery-proofs";
 
 export type ValidatedImage = {
   file: File;
@@ -29,14 +34,24 @@ export function validateImageFile(file: File | null | undefined): string | null 
   return null;
 }
 
+export function validateVideoFile(file: File | null | undefined): string | null {
+  if (!file) return "Choose a video.";
+  if (!ALLOWED_VIDEO_TYPES.has(file.type)) return "Use an MP4 or WebM video.";
+  if (file.size > PRODUCT_VIDEO_MAX_BYTES) return "Videos must be smaller than 50 MB.";
+  return null;
+}
+
 export async function uploadStoreMedia(options: {
   bucket: MediaBucket;
   storeId: string;
   file: File;
   prefix: string;
   productId?: string;
+  mediaType?: "image" | "video";
 }) {
-  const error = validateImageFile(options.file);
+  const error = options.mediaType === "video"
+    ? validateVideoFile(options.file)
+    : validateImageFile(options.file);
   if (error) throw new Error(error);
 
   const supabase = createClient();
@@ -48,7 +63,7 @@ export async function uploadStoreMedia(options: {
     throw new Error(`Could not verify your session: ${userError.message}`);
   }
   if (!user) {
-    throw new Error("Sign in before uploading store images.");
+    throw new Error("Sign in before uploading store media.");
   }
 
   const { data: membership, error: membershipError } = await supabase
@@ -76,7 +91,7 @@ export async function uploadStoreMedia(options: {
   }
 
   if (!canUpload) {
-    throw new Error("You do not have permission to upload images for this store.");
+    throw new Error("You do not have permission to upload media for this store.");
   }
 
   const safeName = sanitizeFileName(options.file.name);
@@ -118,6 +133,24 @@ export async function uploadProductImages(options: {
     urls.push(url);
   }
   return urls;
+}
+
+export async function uploadProductVideo(options: {
+  storeId: string;
+  productId: string;
+  file: File;
+  prefix: string;
+}) {
+  const error = validateVideoFile(options.file);
+  if (error) throw new Error(error);
+  return uploadStoreMedia({
+    bucket: "product-videos",
+    storeId: options.storeId,
+    file: options.file,
+    prefix: options.prefix,
+    productId: options.productId,
+    mediaType: "video",
+  });
 }
 
 export async function uploadDeliveryProof(options: { deliveryJobId: string; file: File }) {

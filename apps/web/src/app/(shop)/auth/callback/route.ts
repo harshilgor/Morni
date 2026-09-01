@@ -13,7 +13,13 @@ export async function GET(request: Request) {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   const flow = searchParams.get("flow");
-  const next = safeNextPath(searchParams.get("next"), searchParams.get("flow") === "driver" ? "/driver" : "/");
+  // Recovery links can arrive with either our explicit flow marker or
+  // Supabase's standard `type=recovery` marker. Never let either form fall
+  // through to the normal homepage/sign-in destination.
+  const isPasswordRecovery = flow === "password-reset" || type === "recovery";
+  const next = isPasswordRecovery
+    ? "/auth/reset-password"
+    : safeNextPath(searchParams.get("next"), flow === "driver" ? "/driver" : "/");
 
   if (code || (tokenHash && type)) {
     const supabase = await createClient();
@@ -24,7 +30,7 @@ export async function GET(request: Request) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (user && flow !== "password-reset") {
+      if (user && !isPasswordRecovery) {
         try {
           await sendWelcomeEmail(user.id);
         } catch (emailError) {

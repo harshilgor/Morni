@@ -101,7 +101,9 @@ export type ProductVariant = {
   color_name: string;
   color_hex: string | null;
   image_urls: string[];
+  video_urls?: string[] | null;
   sizes: string[];
+  size_stock?: Record<string, number> | null;
   stock: number;
   sort_order: number;
 };

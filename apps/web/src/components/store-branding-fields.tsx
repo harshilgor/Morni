@@ -36,7 +36,7 @@ export function StoreBrandingFields({
       />
       <ImageUploadField
         label="Size chart"
-        hint="Upload a clear JPG, PNG or WebP chart shoppers can open from your product pages."
+        hint="Optional. Shoppers will see this when they are choosing sizes for your products."
         aspect="product"
         valueUrl={value.sizeChartUrl}
         file={value.sizeChartFile ?? null}

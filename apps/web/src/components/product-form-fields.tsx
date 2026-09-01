@@ -13,6 +13,8 @@ import {
 } from "@/lib/product-customization";
 import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 import type { SizeStock } from "@/lib/size-inventory";
+import { ColorVariantEditor } from "@/components/color-variant-editor";
+import { createColorDraft, type ColorDraft } from "@/lib/product-variants";
 
 export type ProductFormValue = {
   title: string;
@@ -26,6 +28,7 @@ export type ProductFormValue = {
   sizeStock?: SizeStock;
   customization: ProductCustomizationConfig;
   images: ProductImageItem[];
+  colors?: ColorDraft[];
 };
 
 export type CategoryOption = {
@@ -172,6 +175,9 @@ export function ProductFormFields({
                     sizes: selected
                       ? value.sizes.filter((item) => item !== size)
                       : [...value.sizes, size],
+                    colors: value.colors?.length
+                      ? [{ ...value.colors[0], sizes: selected ? value.sizes.filter((item) => item !== size) : [...value.sizes, size] }, ...value.colors.slice(1)]
+                      : value.colors,
                   })
                 }
                 className={`min-w-11 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
@@ -195,7 +201,7 @@ export function ProductFormFields({
       </fieldset> : null}
 
       {!( ["gifting", "hamper", "hampers"].includes(value.categorySlug)) ? (
-        <SizeInventoryEditor sizes={value.sizes} sizeStock={value.sizeStock ?? {}} onChange={(sizes, sizeStock) => patch({ sizes, sizeStock, stock: String(Object.values(sizeStock).reduce((sum, quantity) => sum + quantity, 0)) })} />
+        <SizeInventoryEditor sizes={value.sizes} sizeStock={value.sizeStock ?? {}} onChange={(sizes, sizeStock) => patch({ sizes, sizeStock, stock: String(Object.values(sizeStock).reduce((sum, quantity) => sum + quantity, 0)), colors: value.colors?.length ? [{ ...value.colors[0], sizes, size_stock: sizeStock, inventory_mode: "exact", stock: String(Object.values(sizeStock).reduce((sum, quantity) => sum + quantity, 0)) }, ...value.colors.slice(1)] : value.colors })} />
       ) : null}
 
       {!(["gifting", "hamper", "hampers"].includes(value.categorySlug)) ? (
@@ -207,9 +213,19 @@ export function ProductFormFields({
 
       <ProductImagesField
         items={value.images}
-        onChange={(images) => patch({ images })}
+        onChange={(images) => patch({
+          images,
+          colors: value.colors?.length
+            ? [{ ...value.colors[0], images: images.map((image) => ({ id: image.id, url: image.url ?? "", ...(image.file ? { file: image.file } : {}) })) }, ...value.colors.slice(1)]
+            : value.colors,
+        })}
         required={requireImages}
         error={fieldErrors?.images}
+      />
+      <ColorVariantEditor
+        value={value.colors?.length ? value.colors : [createColorDraft({ color_name: "Default" })]}
+        onChange={(colors) => patch({ colors, images: colors[0]?.images ?? [] })}
+        showSizes={!(["gifting", "hamper", "hampers"].includes(value.categorySlug))}
       />
     </div>
   );
@@ -228,5 +244,6 @@ export function emptyProductForm(): ProductFormValue {
     sizeStock: { S: 0, M: 0, L: 0 },
     customization: defaultCustomizationConfig(),
     images: [],
+    colors: [createColorDraft({ color_name: "Default" })],
   };
 }

@@ -7,6 +7,7 @@ import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CustomizationEditor } from "@/components/customization-editor";
+import { ColorVariantEditor } from "@/components/color-variant-editor";
 import { QuickProductFields } from "@/components/quick-product-fields";
 import type { CategoryOption } from "@/components/product-form-fields";
 import {
@@ -26,6 +27,7 @@ import { formatAed } from "@/lib/format";
 import {
   aggregateFromColorDrafts,
   colorDraftFromProduct,
+  colorDraftFromVariant,
   createColorDraft,
   validateColorDrafts,
   type ColorDraft,
@@ -99,6 +101,11 @@ async function compressImageForListing(file: File) {
 }
 
 function draftsFromVariants(product: ProductWithVariants): ColorDraft[] {
+  if (product.product_variants?.length) {
+    return [...product.product_variants]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(colorDraftFromVariant);
+  }
   return [colorDraftFromProduct(product)];
 }
 
@@ -490,7 +497,7 @@ export default function PortalProductsPage() {
         price_aed: Number(form.price_aed),
         stock: aggregate.stock,
         sizes: aggregate.sizes,
-        size_stock: hasSizes ? createColors[0]?.size_stock ?? {} : {},
+        size_stock: hasSizes ? aggregate.size_stock : {},
         customization_enabled:
           categoryHasSizes(form.categorySlug) && form.customization.enabled,
         customization_instructions:
@@ -578,6 +585,7 @@ export default function PortalProductsPage() {
     setSavingEdits(true);
     setEditMessage(null);
     const supabase = createClient();
+    const aggregate = aggregateFromColorDrafts(editColors, hasSizes);
     const category = categories.find(
       (item) => item.slug === editDraft.categorySlug,
     );
@@ -603,9 +611,9 @@ export default function PortalProductsPage() {
         title: editDraft.title.trim(),
         product_tag: editDraft.product_tag.trim().toUpperCase() || null,
         price_aed: price,
-        stock: editColors[0]?.stock ? Number(editColors[0].stock) : editingProduct.stock,
-        sizes: hasSizes ? editColors[0]?.sizes ?? [] : [],
-        size_stock: hasSizes ? editColors[0]?.size_stock ?? {} : {},
+        stock: aggregate.stock,
+        sizes: hasSizes ? aggregate.sizes : [],
+        size_stock: hasSizes ? aggregate.size_stock : {},
         customization_enabled:
           categoryHasSizes(editDraft.categorySlug) &&
           editDraft.customization.enabled,
@@ -1171,6 +1179,13 @@ export default function PortalProductsPage() {
                   </p>
                 </div>
 
+                <ColorVariantEditor
+                  value={createColors}
+                  onChange={setCreateColors}
+                  disabled={saving || generating}
+                  showSizes={categoryHasSizes(form.categorySlug)}
+                />
+
                 <details className="rounded-2xl border border-line bg-white p-4">
                   <summary className="cursor-pointer text-sm font-semibold text-[#40534d]">
                     Advanced options
@@ -1184,7 +1199,7 @@ export default function PortalProductsPage() {
                         }
                       />
                     ) : null}
-                    {categoryHasSizes(form.categorySlug) ? <SizeInventoryEditor sizes={createColors[0]?.sizes ?? []} sizeStock={createColors[0]?.size_stock ?? {}} onChange={(sizes, size_stock) => updatePrimaryColorDraft({ ...(createColors[0] ?? createColorDraft({ color_name: "Default" })), sizes, size_stock, stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) })} disabled={saving} /> : null}
+                    {categoryHasSizes(form.categorySlug) ? <SizeInventoryEditor sizes={createColors[0]?.sizes ?? []} sizeStock={createColors[0]?.size_stock ?? {}} onChange={(sizes, size_stock) => updatePrimaryColorDraft({ ...(createColors[0] ?? createColorDraft({ color_name: "Default" })), sizes, size_stock, inventory_mode: "exact", stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) })} disabled={saving} /> : null}
                   </div>
                 </details>
               </div>
@@ -1339,6 +1354,12 @@ export default function PortalProductsPage() {
                   {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
                 </select>
               </label>
+              <ColorVariantEditor
+                value={editColors}
+                onChange={setEditColors}
+                disabled={savingEdits}
+                showSizes={categoryHasSizes(editDraft.categorySlug)}
+              />
               {categoryHasSizes(editDraft.categorySlug) ? (
                 <CustomizationEditor
                   compact
@@ -1350,7 +1371,7 @@ export default function PortalProductsPage() {
                   }
                 />
               ) : null}
-              {categoryHasSizes(editDraft.categorySlug) ? <SizeInventoryEditor sizes={editColors[0]?.sizes ?? []} sizeStock={editColors[0]?.size_stock ?? {}} onChange={(sizes, size_stock) => setEditColors((current) => current.length ? [{ ...current[0], sizes, size_stock, stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) }, ...current.slice(1)] : current)} disabled={savingEdits} /> : null}
+              {categoryHasSizes(editDraft.categorySlug) ? <SizeInventoryEditor sizes={editColors[0]?.sizes ?? []} sizeStock={editColors[0]?.size_stock ?? {}} onChange={(sizes, size_stock) => setEditColors((current) => current.length ? [{ ...current[0], sizes, size_stock, inventory_mode: "exact", stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) }, ...current.slice(1)] : current)} disabled={savingEdits} /> : null}
             </div>
 
             {editMessage ? (

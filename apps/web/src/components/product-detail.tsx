@@ -324,9 +324,21 @@ export function ProductDetail({
     () => (selectedVariant?.sizes?.length ? selectedVariant.sizes : product.sizes ?? []),
     [product, selectedVariant],
   );
-  const hasSizeInventory = Object.keys(product.size_stock ?? {}).length > 0;
-  const sizeQuantity = (size: string) => hasSizeInventory ? Math.max(0, Number(product.size_stock?.[size] ?? 0)) : null;
-  const availableStock = selectedVariant?.stock ?? (selectedSize && hasSizeInventory ? product.size_stock?.[selectedSize] ?? 0 : product.stock ?? 0);
+  const selectedVariantSizeStock = selectedVariant?.size_stock ?? {};
+  const hasVariantSizeInventory = Object.keys(selectedVariantSizeStock).length > 0;
+  const hasSizeInventory = hasVariantSizeInventory || Object.keys(product.size_stock ?? {}).length > 0;
+  const sizeQuantity = (size: string) => hasVariantSizeInventory
+    ? Math.max(0, Number(selectedVariantSizeStock[size] ?? 0))
+    : Object.keys(product.size_stock ?? {}).length > 0
+      ? Math.max(0, Number(product.size_stock?.[size] ?? 0))
+      : null;
+  const availableStock = selectedVariant
+    ? selectedSize && hasVariantSizeInventory
+      ? sizeQuantity(selectedSize) ?? 0
+      : selectedVariant.stock
+    : selectedSize && hasSizeInventory
+      ? sizeQuantity(selectedSize) ?? 0
+      : product.stock ?? 0;
   const customizationConfig = useMemo(() => customizationConfigFromProduct(product), [product]);
   const ratingSummary = useMemo(() => {
     if (!reviews.length) return null;
@@ -447,6 +459,15 @@ export function ProductDetail({
               ))}
             </div>
           ) : null}
+          {selectedVariant?.video_urls?.length ? (
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {selectedVariant.video_urls.map((url, index) => (
+                <div key={`${url}-${index}`} className="overflow-hidden rounded-xl border border-line bg-[#f4f2ef]">
+                  <video src={url} controls muted preload="metadata" className="aspect-video w-full object-cover" aria-label={`${selectedVariant.color_name} video ${index + 1}`} />
+                </div>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <section className="min-w-0 lg:sticky lg:top-20">
@@ -506,7 +527,7 @@ export function ProductDetail({
                 <div className="mt-3 grid grid-cols-4 gap-2">
                   {availableSizes.map((size) => {
                     const quantity = sizeQuantity(size);
-                    const sizeAvailable = selectedVariant ? selectedVariant.stock > 0 : quantity !== null ? quantity > 0 : product.stock > 0;
+                    const sizeAvailable = quantity !== null ? quantity > 0 : selectedVariant ? selectedVariant.stock > 0 : product.stock > 0;
                     return <button key={size} type="button" onClick={() => { setSelectedSize(size); setAdded(false); }} disabled={!sizeAvailable} aria-pressed={selectedSize === size} className={`min-h-10 rounded-md border px-2 text-sm font-semibold transition lg:min-h-9 lg:text-[13px] ${selectedSize === size ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"} disabled:cursor-not-allowed disabled:opacity-35`}>
                       {sizeAvailable ? <span>{size}{quantity !== null ? <span className="ml-1 text-xs font-normal opacity-75">({quantity})</span> : null}</span> : <span aria-label="Not available">{size} ×</span>}
                     </button>;
@@ -533,7 +554,7 @@ export function ProductDetail({
           </div>
 
           <p className={`mt-4 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>
-            {availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}` : hasSizeInventory && selectedSize ? ` in size ${selectedSize}` : product.sizes?.length ? " total across sizes · size quantities pending" : ""}` : "This piece is currently out of stock"}
+            {availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}${selectedSize ? ` · size ${selectedSize}` : ""}` : hasSizeInventory && selectedSize ? ` in size ${selectedSize}` : product.sizes?.length ? " total across sizes · size quantities pending" : ""}` : "This piece is currently out of stock"}
           </p>
           <div className="mt-4 hidden gap-3 sm:flex">
             <div className="relative min-w-0 flex-1">

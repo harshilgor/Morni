@@ -9,8 +9,12 @@ import { PortalIcon } from "@/components/portal-icons";
 import {
   MEDIA_ACCEPT,
   MEDIA_ACCEPT_LABEL,
+  PRODUCT_VIDEO_ACCEPT,
+  PRODUCT_VIDEO_ACCEPT_LABEL,
   PRODUCT_IMAGE_LIMIT,
+  PRODUCT_VIDEO_LIMIT,
   validateImageFile,
+  validateVideoFile,
 } from "@/lib/media-upload";
 import { PRODUCT_SIZES } from "@/lib/product-sizes";
 import {
@@ -18,6 +22,7 @@ import {
   createColorDraft,
   type ColorDraft,
   type ColorDraftImage,
+  type ColorDraftVideo,
 } from "@/lib/product-variants";
 
 function newImageId() {
@@ -43,6 +48,7 @@ export function ColorVariantEditor({
   const [imageErrors, setImageErrors] = useState<Record<string, string | null>>(
     {},
   );
+  const [videoErrors, setVideoErrors] = useState<Record<string, string | null>>({});
   const [preview, setPreview] = useState<{
     images: PreviewImage[];
     startIndex: number;
@@ -50,6 +56,7 @@ export function ColorVariantEditor({
   } | null>(null);
   const libraryInputs = useRef<Record<string, HTMLInputElement | null>>({});
   const cameraInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const videoInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   function updateDraft(key: string, patch: Partial<ColorDraft>) {
     onChange(
@@ -113,6 +120,39 @@ export function ColorVariantEditor({
           : item,
       ),
     );
+  }
+
+  function addVideos(key: string, files: FileList | File[] | null) {
+    if (!files) return;
+    const draft = value.find((item) => item.key === key);
+    if (!draft) return;
+    const remaining = PRODUCT_VIDEO_LIMIT - draft.videos.length;
+    if (remaining <= 0) {
+      setVideoErrors((current) => ({ ...current, [key]: `You can add up to ${PRODUCT_VIDEO_LIMIT} videos per color.` }));
+      return;
+    }
+    const accepted: ColorDraftVideo[] = [];
+    let rejection: string | null = null;
+    for (const file of Array.from(files)) {
+      if (accepted.length >= remaining) break;
+      const validationError = validateVideoFile(file);
+      if (validationError) {
+        rejection = `${file.name}: ${validationError}`;
+        continue;
+      }
+      accepted.push({ id: newImageId(), url: URL.createObjectURL(file), file });
+    }
+    setVideoErrors((current) => ({ ...current, [key]: rejection }));
+    if (accepted.length) updateDraft(key, { videos: [...draft.videos, ...accepted] });
+  }
+
+  function removeVideo(key: string, videoId: string) {
+    onChange(value.map((draft) => {
+      if (draft.key !== key) return draft;
+      const target = draft.videos.find((video) => video.id === videoId);
+      if (target?.file) URL.revokeObjectURL(target.url);
+      return { ...draft, videos: draft.videos.filter((video) => video.id !== videoId) };
+    }));
   }
 
   function makeMainImage(key: string, imageId: string) {
@@ -532,6 +572,27 @@ export function ColorVariantEditor({
                   ) : null}
                 </div>
 
+                <div className="space-y-2 rounded-xl border border-line bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-medium text-muted">Videos for {draft.color_name.trim() || "this color"}</p>
+                      <p className="mt-1 text-[11px] text-muted">Optional · shoppers can watch these on the product page</p>
+                    </div>
+                    <button type="button" disabled={disabled || draft.videos.length >= PRODUCT_VIDEO_LIMIT} onClick={() => videoInputs.current[draft.key]?.click()} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-40">
+                      Add video ({draft.videos.length}/{PRODUCT_VIDEO_LIMIT})
+                    </button>
+                  </div>
+                  {draft.videos.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {draft.videos.map((video, videoIndex) => <div key={video.id} className="relative overflow-hidden rounded-xl border border-line bg-[#f2f2f3]">
+                      <video src={video.url} controls muted preload="metadata" className="aspect-video w-full object-cover" aria-label={`${draft.color_name || "Color"} video ${videoIndex + 1}`} />
+                      <button type="button" disabled={disabled} onClick={() => removeVideo(draft.key, video.id)} className="absolute right-1.5 top-1.5 rounded-full bg-ink/90 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-50">Remove</button>
+                    </div>)}
+                  </div> : null}
+                  <input ref={(node) => { videoInputs.current[draft.key] = node; }} type="file" accept={PRODUCT_VIDEO_ACCEPT} multiple className="sr-only" disabled={disabled} onChange={(event) => { addVideos(draft.key, event.target.files); event.currentTarget.value = ""; }} />
+                  <p className="text-[11px] text-muted">{PRODUCT_VIDEO_ACCEPT_LABEL}</p>
+                  {videoErrors[draft.key] ? <p className="text-xs text-accent-deep">{videoErrors[draft.key]}</p> : null}
+                </div>
+
                 <div
                   className={
                     showSizes
@@ -575,26 +636,17 @@ export function ColorVariantEditor({
                       </div>
                     </div>
                   ) : null}
-                  <label className="block space-y-1.5 text-xs text-muted">
+                  {!showSizes ? <label className="block space-y-1.5 text-xs text-muted">
                     Total stock
-                    <input
-                      type="number"
-                      min="0"
-                      disabled={disabled}
-                      value={draft.stock}
-                      onChange={(event) =>
-                        updateDraft(draft.key, { stock: event.target.value })
-                      }
-                      className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent"
-                    />
-                  </label>
+                    <input type="number" min="0" disabled={disabled} value={draft.stock} onChange={(event) => updateDraft(draft.key, { stock: event.target.value })} className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-accent" />
+                  </label> : <p className="self-end text-xs text-muted">Total stock is calculated from the quantities below.</p>}
                 </div>
                 {showSizes ? (
                   <div className="grid grid-cols-3 gap-2 rounded-xl border border-line bg-white p-3">
                     {draft.sizes.map((size) => (
                       <label key={size} className="text-xs font-medium text-muted">
                         {size}
-                        <input type="number" min="0" value={draft.size_stock[size] ?? 0} disabled={disabled} onChange={(event) => { const size_stock = { ...draft.size_stock, [size]: Math.max(0, Number(event.target.value) || 0) }; updateDraft(draft.key, { size_stock, stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) }); }} className="mt-1 w-full rounded-xl border border-line bg-background px-2 py-2 text-sm text-ink" />
+                        <input type="number" min="0" value={draft.size_stock[size] ?? 0} disabled={disabled} onChange={(event) => { const size_stock = { ...draft.size_stock, [size]: Math.max(0, Number(event.target.value) || 0) }; updateDraft(draft.key, { size_stock, inventory_mode: "exact", stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) }); }} className="mt-1 w-full rounded-xl border border-line bg-background px-2 py-2 text-sm text-ink" />
                       </label>
                     ))}
                   </div>

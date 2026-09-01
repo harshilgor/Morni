@@ -195,15 +195,14 @@ export default function PortalOverviewPage() {
             <AttentionCard icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} description={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
             <AttentionCard icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} description={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
           </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="Excludes cancelled orders" icon="analytics" />
+            <PortalMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} detail={`${insights.activeOrders.length} active order${insights.activeOrders.length === 1 ? "" : "s"}`} icon="orders" />
+            <PortalMetric label="Average order" value={formatAed(insights.averageOrder)} detail="Across non-cancelled orders" icon="sparkle" />
+            <PortalMetric label="Catalog health" value={`${products.length} products`} detail={`${insights.lowStock.length} low stock and ${products.filter((product) => !product.is_available).length} hidden`} icon="products" tone={insights.lowStock.length ? "urgent" : "default"} />
+          </div>
           </section>
           <InventoryNotifications storeId={store.id} />
-        </section>
-
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="Excludes cancelled orders" icon="analytics" />
-          <PortalMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} detail={`${insights.activeOrders.length} active order${insights.activeOrders.length === 1 ? "" : "s"}`} icon="orders" />
-          <PortalMetric label="Average order" value={formatAed(insights.averageOrder)} detail="Across non-cancelled orders" icon="sparkle" />
-          <PortalMetric label="Catalog health" value={`${products.length} products`} detail={`${insights.lowStock.length} low stock and ${products.filter((product) => !product.is_available).length} hidden`} icon="products" tone={insights.lowStock.length ? "urgent" : "default"} />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">

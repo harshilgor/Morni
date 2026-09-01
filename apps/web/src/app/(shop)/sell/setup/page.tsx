@@ -23,6 +23,13 @@ import {
   uploadStoreMedia,
 } from "@/lib/media-upload";
 import {
+  aggregateFromColorDrafts,
+  colorDraftFromProduct,
+  createColorDraft,
+  validateColorDrafts,
+} from "@/lib/product-variants";
+import { replaceProductVariants } from "@/lib/save-product-variants";
+import {
   getOnboardingChecklist,
 } from "@/lib/onboarding";
 import {
@@ -41,7 +48,7 @@ import {
 const STEPS = [
   { n: 1 as const, label: "Basics", title: "Boutique basics" },
   { n: 2 as const, label: "Brand", title: "Brand identity" },
-  { n: 3 as const, label: "Product", title: "First product" },
+  { n: 3 as const, label: "Product", title: "Add Your First Product!" },
   { n: 4 as const, label: "Launch", title: "Review and launch" },
 ];
 
@@ -64,6 +71,7 @@ export default function SellSetupPage() {
     Partial<Record<keyof ProductFormValue, string>>
   >({});
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [sizeChartError, setSizeChartError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -121,6 +129,8 @@ export default function SellSetupPage() {
         setBranding({
           logoFile: null,
           logoUrl: store.logo_url,
+          sizeChartFile: null,
+          sizeChartUrl: store.size_chart_url,
         });
         setStep(getResumeOnboardingStep(store) as Step);
         void loadProducts(store.id).then((loaded) => {
@@ -142,6 +152,7 @@ export default function SellSetupPage() {
               id: `existing-${index}`,
               url,
             })),
+            colors: [colorDraftFromProduct(first)],
           });
         });
       }
@@ -255,6 +266,7 @@ export default function SellSetupPage() {
     }
 
     setLogoError(null);
+    setSizeChartError(null);
     const nextLogo = branding.logoFile
       ? null
       : branding.logoUrl ?? store.logo_url;
@@ -268,6 +280,7 @@ export default function SellSetupPage() {
 
     try {
       let logo_url = nextLogo;
+      let size_chart_url = branding.sizeChartUrl ?? store.size_chart_url ?? null;
 
       if (branding.logoFile) {
         logo_url = await uploadStoreMedia({
@@ -277,11 +290,20 @@ export default function SellSetupPage() {
           prefix: "logo",
         });
       }
+      if (branding.sizeChartFile) {
+        size_chart_url = await uploadStoreMedia({
+          bucket: "store-logos",
+          storeId: store.id,
+          file: branding.sizeChartFile,
+          prefix: "size-chart",
+        });
+      }
       const supabase = createClient();
       const { error: updateError } = await supabase
         .from("stores")
         .update({
           logo_url,
+          size_chart_url,
           onboarding_step: Math.max(store.onboarding_step ?? 2, 3),
         })
         .eq("id", store.id);
@@ -291,6 +313,8 @@ export default function SellSetupPage() {
       setBranding({
         logoFile: null,
         logoUrl: logo_url,
+        sizeChartFile: null,
+        sizeChartUrl: size_chart_url,
       });
       await refresh();
       flashSaved();
@@ -326,14 +350,17 @@ export default function SellSetupPage() {
     if (!Number.isFinite(price) || price <= 0) {
       errors.price_aed = "Enter a valid price.";
     }
-    const stock = Number(productForm.stock);
-    if (!Number.isFinite(stock) || stock < 0) {
-      errors.stock = "Enter a valid stock count.";
-    }
-    if (productForm.categorySlug !== "gifting" && productForm.sizes.length === 0) {
-      errors.sizes = "Select at least one size.";
-    }
-    if (productForm.images.length === 0) {
+    const hasSizes = !["gifting", "hamper", "hampers"].includes(productForm.categorySlug);
+    const colors = productForm.colors?.length ? productForm.colors : [createColorDraft({
+      color_name: "Default",
+      sizes: productForm.sizes,
+      stock: productForm.stock,
+      size_stock: productForm.sizeStock ?? {},
+      images: productForm.images.map((image) => ({ id: image.id, url: image.url ?? "", file: image.file })),
+    })];
+    const colorError = validateColorDrafts(colors, { requireSizes: hasSizes });
+    if (colorError) errors.images = colorError;
+    if (colors.every((color) => color.images.length === 0)) {
       errors.images = "Add at least one product photo.";
     }
 
@@ -354,25 +381,6 @@ export default function SellSetupPage() {
         categoryName: category?.name,
       });
 
-      const image_urls: string[] = [];
-      for (const item of productForm.images) {
-        if (item.file) {
-          const uploaded = await uploadStoreMedia({
-            bucket: "product-images",
-            storeId: store.id,
-            file: item.file,
-            prefix: `product-${image_urls.length + 1}`,
-          });
-          image_urls.push(uploaded);
-        } else if (item.url) {
-          image_urls.push(item.url);
-        }
-      }
-
-      if (image_urls.length === 0) {
-        throw new Error("Add at least one product photo.");
-      }
-
       const compareAt = productForm.compare_at_price_aed.trim()
         ? Number(productForm.compare_at_price_aed)
         : null;
@@ -384,6 +392,7 @@ export default function SellSetupPage() {
           product.description?.trim() &&
           (product.image_urls?.length ?? 0) > 0,
       );
+      const aggregate = aggregateFromColorDrafts(colors, hasSizes);
 
       if (existingComplete) {
         const { error: updateError } = await supabase
@@ -396,8 +405,9 @@ export default function SellSetupPage() {
             price_aed: price,
             compare_at_price_aed:
               compareAt && Number.isFinite(compareAt) ? compareAt : null,
-            stock,
-            sizes: productForm.sizes,
+            stock: aggregate.stock,
+            sizes: aggregate.sizes,
+            size_stock: hasSizes ? aggregate.size_stock : {},
             customization_enabled: productForm.customization.enabled,
             customization_instructions: productForm.customization.enabled
               ? productForm.customization.instructions.trim()
@@ -405,14 +415,15 @@ export default function SellSetupPage() {
             customization_fields: productForm.customization.enabled
               ? productForm.customization.fields
               : [],
-            image_urls,
+            image_urls: [],
             is_available: true,
           })
           .eq("id", existingComplete.id)
           .eq("store_id", store.id);
         if (updateError) throw new Error(updateError.message);
+        await replaceProductVariants({ storeId: store.id, productId: existingComplete.id, drafts: hasSizes ? colors : colors.map((color) => ({ ...color, sizes: [] })) });
       } else {
-        const { error: insertError } = await supabase.from("products").insert({
+        const { data: created, error: insertError } = await supabase.from("products").insert({
           store_id: store.id,
           category_id: categoryId,
           title: productForm.title.trim(),
@@ -421,8 +432,9 @@ export default function SellSetupPage() {
           price_aed: price,
           compare_at_price_aed:
             compareAt && Number.isFinite(compareAt) ? compareAt : null,
-          stock,
-          sizes: productForm.sizes,
+          stock: aggregate.stock,
+          sizes: aggregate.sizes,
+          size_stock: hasSizes ? aggregate.size_stock : {},
           customization_enabled: productForm.customization.enabled,
           customization_instructions: productForm.customization.enabled
             ? productForm.customization.instructions.trim()
@@ -430,10 +442,12 @@ export default function SellSetupPage() {
           customization_fields: productForm.customization.enabled
             ? productForm.customization.fields
             : [],
-          image_urls,
+          image_urls: [],
           is_available: true,
-        });
+        }).select("id").single();
         if (insertError) throw new Error(insertError.message);
+        if (!created) throw new Error("Could not create the product.");
+        await replaceProductVariants({ storeId: store.id, productId: created.id, drafts: hasSizes ? colors : colors.map((color) => ({ ...color, sizes: [] })) });
       }
 
       await persistStep(store.id, Math.max(store.onboarding_step ?? 4, 5));
@@ -695,6 +709,7 @@ export default function SellSetupPage() {
                 onChange={setBranding}
                 required
                 logoError={logoError}
+                sizeChartError={sizeChartError}
               />
               {message ? <p className="text-sm text-accent-deep">{message}</p> : null}
               <WizardNav

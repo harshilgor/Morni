@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
-import { validateImageFile } from "@/lib/media-upload";
+import { uploadProductVideo, validateImageFile } from "@/lib/media-upload";
 import type { ColorDraft } from "@/lib/product-variants";
 import type { ProductVariant } from "@/lib/types";
+
+function newUploadId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 async function uploadVariantImages(
   storeId: string,
@@ -17,7 +23,7 @@ async function uploadVariantImages(
       const validationError = validateImageFile(image.file);
       if (validationError) throw new Error(validationError);
       const safeName = image.file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-      const path = `${storeId}/${productId}/${colorKey}/${Date.now()}-${safeName}`;
+      const path = `${storeId}/${productId}/${colorKey}/${newUploadId()}-${safeName}`;
       const { error } = await supabase.storage
         .from("product-images")
         .upload(path, image.file, { upsert: false, contentType: image.file.type });
@@ -30,6 +36,19 @@ async function uploadVariantImages(
     }
   }
 
+  return urls;
+}
+
+async function uploadVariantVideos(storeId: string, productId: string, colorKey: string, draft: ColorDraft) {
+  const urls: string[] = [];
+  for (let index = 0; index < draft.videos.length; index += 1) {
+    const video = draft.videos[index];
+    if (video.file) {
+      urls.push(await uploadProductVideo({ storeId, productId, file: video.file, prefix: `${colorKey}-video-${index + 1}` }));
+    } else if (video.existing || video.url.startsWith("http")) {
+      urls.push(video.url);
+    }
+  }
   return urls;
 }
 
@@ -71,13 +90,20 @@ export async function replaceProductVariants(options: {
       draft.key,
       draft,
     );
+    const videoUrls = await uploadVariantVideos(storeId, productId, draft.key, draft);
     const payload = {
       product_id: productId,
       color_name: draft.color_name.trim(),
       color_hex: draft.color_hex || null,
       image_urls: imageUrls,
+      video_urls: videoUrls,
       sizes: draft.sizes,
-      stock: Number(draft.stock) || 0,
+      size_stock: draft.inventory_mode === "exact"
+        ? Object.fromEntries(draft.sizes.map((size) => [size, Math.max(0, Number(draft.size_stock[size] ?? 0))]))
+        : {},
+      stock: draft.sizes.length > 0 && draft.inventory_mode === "exact"
+        ? draft.sizes.reduce((sum, size) => sum + Math.max(0, Number(draft.size_stock[size] ?? 0)), 0)
+        : Number(draft.stock) || 0,
       sort_order: index,
     };
 
