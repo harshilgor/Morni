@@ -204,6 +204,18 @@ export function ColorVariantEditor({
     );
   }
 
+  function assignImage(key: string, imageId: string, targetKey: string) {
+    if (disabled || key === targetKey) return;
+    const source = value.find((draft) => draft.key === key);
+    const image = source?.images.find((item) => item.id === imageId);
+    if (!image) return;
+    onChange(value.map((draft) => draft.key === key
+      ? { ...draft, images: draft.images.filter((item) => item.id !== imageId) }
+      : draft.key === targetKey
+        ? { ...draft, images: [...draft.images, image] }
+        : draft));
+  }
+
   function moveDraft(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= value.length) return;
@@ -441,6 +453,7 @@ export function ColorVariantEditor({
                             </span>
                           ) : null}
                           <div className="flex flex-wrap gap-1 border-t border-line bg-white p-1.5">
+                            {value.length > 1 ? <select aria-label={`Assign photo ${imageIndex + 1} to a color`} value={draft.key} onChange={(event) => assignImage(draft.key, image.id, event.target.value)} className="w-full rounded-full border border-line px-2 py-1 text-[10px] text-ink"><option value={draft.key}>Assign to {draft.color_name || "this color"}</option>{value.filter((option) => option.key !== draft.key).map((option) => <option key={option.key} value={option.key}>{option.color_name || "Unnamed color"}</option>)}</select> : null}
                             <button
                               type="button"
                               disabled={disabled || imageIndex === 0}

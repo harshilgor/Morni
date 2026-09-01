@@ -46,7 +46,6 @@ import {
 } from "@/lib/product-customization";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
-import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 
 type ProductWithVariants = Product & {
   product_variants?: ProductVariant[] | null;
@@ -1173,10 +1172,7 @@ export default function PortalProductsPage() {
                       {createColors[0]?.images.length ?? 0} photos
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-muted">
-                    Need custom sizing or other advanced options?
-                    Expand below.
-                  </p>
+                  <p className="mt-1 text-xs text-muted">Add colour photos and inventory above, then optionally offer custom measurements below.</p>
                 </div>
 
                 <ColorVariantEditor
@@ -1186,22 +1182,7 @@ export default function PortalProductsPage() {
                   showSizes={categoryHasSizes(form.categorySlug)}
                 />
 
-                <details className="rounded-2xl border border-line bg-white p-4">
-                  <summary className="cursor-pointer text-sm font-semibold text-[#40534d]">
-                    Advanced options
-                  </summary>
-                  <div className="mt-4 space-y-4">
-                    {categoryHasSizes(form.categorySlug) ? (
-                      <CustomizationEditor
-                        value={form.customization}
-                        onChange={(customization) =>
-                          setForm((current) => ({ ...current, customization }))
-                        }
-                      />
-                    ) : null}
-                    {categoryHasSizes(form.categorySlug) ? <SizeInventoryEditor sizes={createColors[0]?.sizes ?? []} sizeStock={createColors[0]?.size_stock ?? {}} onChange={(sizes, size_stock) => updatePrimaryColorDraft({ ...(createColors[0] ?? createColorDraft({ color_name: "Default" })), sizes, size_stock, inventory_mode: "exact", stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) })} disabled={saving} /> : null}
-                  </div>
-                </details>
+                {categoryHasSizes(form.categorySlug) ? <CustomizationEditor value={form.customization} onChange={(customization) => setForm((current) => ({ ...current, customization }))} /> : null}
               </div>
             )}
 
@@ -1360,18 +1341,7 @@ export default function PortalProductsPage() {
                 disabled={savingEdits}
                 showSizes={categoryHasSizes(editDraft.categorySlug)}
               />
-              {categoryHasSizes(editDraft.categorySlug) ? (
-                <CustomizationEditor
-                  compact
-                  value={editDraft.customization}
-                  onChange={(customization) =>
-                    setEditDraft((current) =>
-                      current ? { ...current, customization } : current,
-                    )
-                  }
-                />
-              ) : null}
-              {categoryHasSizes(editDraft.categorySlug) ? <SizeInventoryEditor sizes={editColors[0]?.sizes ?? []} sizeStock={editColors[0]?.size_stock ?? {}} onChange={(sizes, size_stock) => setEditColors((current) => current.length ? [{ ...current[0], sizes, size_stock, inventory_mode: "exact", stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)) }, ...current.slice(1)] : current)} disabled={savingEdits} /> : null}
+              {categoryHasSizes(editDraft.categorySlug) ? <CustomizationEditor compact value={editDraft.customization} onChange={(customization) => setEditDraft((current) => current ? { ...current, customization } : current)} /> : null}
             </div>
 
             {editMessage ? (

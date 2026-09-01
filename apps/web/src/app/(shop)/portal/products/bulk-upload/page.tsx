@@ -7,12 +7,20 @@ import { PRODUCT_SIZES } from "@/lib/product-sizes";
 import { uploadProductImages, validateImageFile } from "@/lib/media-upload";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { PortalIcon } from "@/components/portal-icons";
-import { colorDistance, fingerprintImage } from "@/lib/image-similarity";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 
 type Photo = { id: string; file: File; preview: string };
+type ColorGroup = {
+  id: string;
+  colorName: string;
+  photos: Photo[];
+  confidence?: number;
+  needsReview?: boolean;
+  sizeStock: Record<string, number>;
+  stock: string;
+};
 type Draft = {
   id: string;
   photos: Photo[];
@@ -28,7 +36,12 @@ type Draft = {
   sizeStock: Record<string, number>;
   confidence?: number;
   needsReview?: boolean;
+  colors: ColorGroup[];
 };
+
+function createColorGroup(colorName = "") : ColorGroup {
+  return { id: uid(), colorName, photos: [], sizeStock: { S: 0, M: 0, L: 0 }, stock: "0", needsReview: true };
+}
 
 function PhotoStack({
   draft,
@@ -138,6 +151,57 @@ function PhotoStack({
   );
 }
 
+function ColorGroupingPanel({
+  draft,
+  onAssign,
+  onRename,
+  onAdd,
+  onStockChange,
+  noSize,
+}: {
+  draft: Draft;
+  onAssign: (photoId: string, colorId: string) => void;
+  onRename: (colorId: string, colorName: string) => void;
+  onAdd: () => void;
+  onStockChange: (colorId: string, sizeStock: Record<string, number>, stock: string) => void;
+  noSize: boolean;
+}) {
+  const colors = draft.colors.length ? draft.colors : [{ ...createColorGroup("Unassigned colour"), photos: draft.photos }];
+  return (
+    <section className="mt-4 rounded-2xl border border-[#dfe8e3] bg-[#f8fbf9] p-3" aria-label="Colour grouping">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#34594d]">Colour groups</p>
+          <p className="mt-1 text-xs text-muted">Click an image and choose the colour it belongs to.</p>
+        </div>
+        <button type="button" onClick={onAdd} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink">+ Add colour</button>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {colors.map((color) => (
+          <div key={color.id} className="rounded-xl border border-line bg-white p-2.5">
+            <div className="flex items-center gap-2">
+              <input value={color.colorName} onChange={(event) => onRename(color.id, event.target.value)} placeholder="Colour name" className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm font-semibold text-ink" />
+              <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${color.needsReview ? "bg-[#fff1d8] text-[#98621b]" : "bg-[#e8f5ef] text-[#2f765e]"}`}>{color.needsReview ? "Review" : "Matched"}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-4 gap-1.5">
+              {color.photos.map((photo) => (
+                <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-lg bg-[#edf3ef]">
+                  <img src={photo.preview} alt={`${color.colorName || "Colour"} product photo`} className="h-full w-full object-cover" />
+                  <select aria-label={`Assign photo to colour`} value={color.id} onChange={(event) => onAssign(photo.id, event.target.value)} className="absolute inset-x-1 bottom-1 min-w-0 rounded bg-white/95 px-1 py-1 text-[10px] text-ink opacity-100 shadow transition sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100">
+                    {colors.map((option) => <option key={option.id} value={option.id}>{option.colorName || "Unnamed"}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            {noSize ? <label className="mt-3 block text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">Colour stock<input type="number" min="0" value={color.stock} onChange={(event) => onStockChange(color.id, color.sizeStock, event.target.value)} className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm font-normal normal-case tracking-normal" /></label> : <div className="mt-3"><SizeInventoryEditor sizes={draft.sizes} sizeStock={color.sizeStock} onChange={(_, stock) => onStockChange(color.id, stock, color.stock)} /></div>}
+            <p className="mt-2 text-[11px] text-muted">{color.photos.length} image{color.photos.length === 1 ? "" : "s"} · quantities can be entered before publishing</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function AiProcessingOverlay({
   phase,
   photoCount,
@@ -196,18 +260,6 @@ const productKey = (name: string) =>
     .replace(/[-_]+/g, " ")
     .trim()
     .toLowerCase();
-
-function colorFamily(value: string) {
-  const color = value.toLowerCase().trim();
-  if (!color) return "";
-  if (/black|charcoal|ebony|onyx/.test(color)) return "black";
-  if (/white|ivory|cream|off[- ]?white|beige|nude|tan|camel|mustard|yellow|gold/.test(color)) return "warm-light";
-  if (/pink|rose|blush|fuchsia|magenta|coral|peach|orange|red|maroon|burgundy/.test(color)) return "warm-color";
-  if (/blue|navy|teal|turquoise|cyan|aqua|green|olive|sage|mint/.test(color)) return "cool-color";
-  if (/purple|violet|lilac|plum/.test(color)) return "purple";
-  if (/grey|gray|silver|brown|mocha|coffee/.test(color)) return "neutral-dark";
-  return color;
-}
 
 async function imageDataForAnalysis(file: File) {
   try {
@@ -330,6 +382,7 @@ export default function BulkUploadPage() {
         stock: "",
         sizes: ["S", "M", "L"],
         sizeStock: { S: 0, M: 0, L: 0 },
+        colors: [{ ...createColorGroup("Unassigned colour"), photos }],
       })),
     ];
     setDrafts(nextDrafts);
@@ -342,6 +395,28 @@ export default function BulkUploadPage() {
         draft.id === draftId ? { ...draft, ...changes } : draft,
       ),
     );
+  }
+  function assignColor(draftId: string, photoId: string, colorId: string) {
+    setDrafts((current) => current.map((draft) => {
+      if (draft.id !== draftId || !draft.colors.length) return draft;
+      const photo = draft.photos.find((item) => item.id === photoId);
+      if (!photo) return draft;
+      return { ...draft, colors: draft.colors.map((color) => ({ ...color, photos: color.id === colorId ? [...color.photos.filter((item) => item.id !== photoId), photo] : color.photos.filter((item) => item.id !== photoId) })) };
+    }));
+  }
+  function renameColor(draftId: string, colorId: string, colorName: string) {
+    setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: draft.colors.map((color) => color.id === colorId ? { ...color, colorName, needsReview: !colorName.trim() } : color) } : draft));
+  }
+  function addColor(draftId: string) {
+    setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: [...(draft.colors.length ? draft.colors : [{ ...createColorGroup("Unassigned colour"), photos: draft.photos }]), createColorGroup()] } : draft));
+  }
+  function updateColorStock(draftId: string, colorId: string, sizeStock: Record<string, number>, stock: string) {
+    setDrafts((current) => current.map((draft) => {
+      if (draft.id !== draftId) return draft;
+      const colors = draft.colors.map((color) => color.id === colorId ? { ...color, sizeStock, stock } : color);
+      const total = noSizes(draft.categorySlug) ? colors.reduce((sum, color) => sum + Number(color.stock || 0), 0) : colors.reduce((sum, color) => sum + Object.values(color.sizeStock).reduce((inner, quantity) => inner + quantity, 0), 0);
+      return { ...draft, colors, stock: String(total), sizeStock: draft.sizes.reduce((result, size) => ({ ...result, [size]: colors.reduce((sum, color) => sum + Number(color.sizeStock[size] || 0), 0) }), {}) };
+    }));
   }
   function hasValidationError(draftId: string, field: string) {
     return validationErrors[draftId]?.includes(field) ?? false;
@@ -419,6 +494,7 @@ export default function BulkUploadPage() {
         stock: "",
         sizes: ["S", "M", "L"],
         sizeStock: { S: 0, M: 0, L: 0 },
+        colors: [createColorGroup()],
       },
     ]);
   }
@@ -428,18 +504,6 @@ export default function BulkUploadPage() {
     setBusyPhase("reading");
     setMessage("Preparing photos securely…");
     try {
-      const localFingerprintEntries = await Promise.all(
-        draftsToAnalyze.flatMap((draft) =>
-          draft.photos.map(async (photo) => {
-            try {
-              return [photo.id, await fingerprintImage(photo.file)] as const;
-            } catch {
-              return [photo.id, null] as const;
-            }
-          }),
-        ),
-      );
-      const localFingerprints = Object.fromEntries(localFingerprintEntries);
       const images = await Promise.all(
         draftsToAnalyze.flatMap((draft) =>
           draft.photos.map(async (photo) => ({
@@ -478,6 +542,7 @@ export default function BulkUploadPage() {
             colorName: string;
             confidence: number;
             needsReview: boolean;
+            colorGroups?: Array<{ imageIds: string[]; colorName: string; confidence: number; needsReview: boolean }>;
           }) => ({
             id: uid(),
             photos: group.imageIds
@@ -495,34 +560,22 @@ export default function BulkUploadPage() {
             sizeStock: { S: 0, M: 0, L: 0 },
             confidence: group.confidence,
             needsReview: group.needsReview,
+            colors: (group.colorGroups?.length ? group.colorGroups : [{ imageIds: group.imageIds, colorName: group.colorName, confidence: group.confidence, needsReview: true }]).map((colorGroup: { imageIds: string[]; colorName: string; confidence: number; needsReview: boolean }) => ({
+              id: uid(),
+              colorName: colorGroup.colorName || "Unassigned colour",
+              photos: colorGroup.imageIds.map((imageId) => photoMap.get(imageId)).filter(Boolean),
+              confidence: colorGroup.confidence,
+              needsReview: colorGroup.needsReview,
+              sizeStock: { S: 0, M: 0, L: 0 },
+              stock: "0",
+            })),
           }),
         )
         .filter((draft: Draft) => draft.photos.length);
-      // Never merge AI groups locally. The old grayscale merge ignored color
-      // and combined different colorways. Split only when pixels clearly prove
-      // that a returned group contains distinct color families.
-      const safeGroups = grouped.flatMap((draft) => {
-        const groups: Draft[] = [];
-        for (const photo of draft.photos) {
-          const fingerprint = localFingerprints[photo.id];
-          const compatible = groups.find((candidate) => {
-            const cover = candidate.photos[0];
-            const coverFingerprint = cover ? localFingerprints[cover.id] : undefined;
-            const aiColorsMatch =
-              !colorFamily(draft.colorName) ||
-              !colorFamily(candidate.colorName) ||
-              colorFamily(draft.colorName) === colorFamily(candidate.colorName);
-            return Boolean(aiColorsMatch && fingerprint && coverFingerprint && colorDistance(fingerprint, coverFingerprint) < 0.42);
-          });
-          if (compatible) compatible.photos.push(photo);
-          else groups.push({ ...draft, id: uid(), photos: [photo], needsReview: true });
-        }
-        return groups.map((group) => ({
-          ...group,
-          colorName: group.colorName,
-          needsReview: draft.needsReview || groups.length > 1,
-        }));
-      });
+      const safeGroups = grouped.map((draft) => ({
+        ...draft,
+        needsReview: draft.needsReview || draft.colors.some((color) => color.needsReview),
+      }));
       setDrafts(safeGroups);
       setMessage(
         result.warning ??
@@ -594,11 +647,15 @@ export default function BulkUploadPage() {
           throw new Error(
             `Complete the photos, name, category, price, and stock for ${draft.title || "a draft"}.`,
           );
-        const images = await uploadProductImages({
-          storeId: store.id,
-          files: draft.photos.map((photo) => photo.file),
-        });
-        uploadedUrls.push(...images);
+        const colors = draft.colors.length ? draft.colors : [{ ...createColorGroup(draft.colorName || "Default"), photos: draft.photos, sizeStock: draft.sizeStock, stock: draft.stock }];
+        if (colors.some((color) => !color.photos.length || !color.colorName.trim())) throw new Error(`Assign every photo and name each colour for ${draft.title}.`);
+        const variants = [];
+        for (const color of colors) {
+          const images = await uploadProductImages({ storeId: store.id, files: color.photos.map((photo) => photo.file) });
+          uploadedUrls.push(...images);
+          const colorStock = noSizes(draft.categorySlug) ? Number(color.stock || 0) : Object.values(color.sizeStock).reduce((sum, quantity) => sum + quantity, 0);
+          variants.push({ colorName: color.colorName.trim(), colorHex: null, sizes: noSizes(draft.categorySlug) ? [] : draft.sizes, sizeStock: noSizes(draft.categorySlug) ? {} : color.sizeStock, stock: colorStock, images });
+        }
         items.push({
           title: draft.title,
           productTag: draft.productTag,
@@ -609,7 +666,8 @@ export default function BulkUploadPage() {
           stock: Number(draft.stock),
           sizes: noSizes(draft.categorySlug) ? [] : draft.sizes,
           sizeStock: noSizes(draft.categorySlug) ? {} : draft.sizeStock,
-          images,
+          images: variants.flatMap((variant) => variant.images).slice(0, 5),
+          variants,
         });
       }
       const response = await fetch("/api/portal/products/bulk-publish", {
@@ -856,6 +914,7 @@ export default function BulkUploadPage() {
                 Drop a photo here.
               </div>
             ) : null}
+            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name) => renameColor(draft.id, colorId, name)} onAdd={() => addColor(draft.id)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} /> : null}
             <div className="mt-4 grid gap-3">
               <label className={`flex items-center gap-2 border-b py-2 ${hasValidationError(draft.id, "product name") ? "border-red-400" : "border-line"}`}>
                 <input
@@ -934,9 +993,8 @@ export default function BulkUploadPage() {
                     type="number"
                     min="0"
                     value={draft.stock}
-                    onChange={(event) =>
-                      patch(draft.id, { stock: event.target.value })
-                    }
+                    onChange={(event) => patch(draft.id, { stock: event.target.value })}
+                    readOnly={draft.colors.length > 1}
                     aria-invalid={hasValidationError(draft.id, "stock")}
                     className={`mt-1 w-full rounded-lg border bg-background px-2 py-2 text-sm font-normal ${hasValidationError(draft.id, "stock") ? "border-red-400" : "border-line"}`}
                     placeholder="Stock"
