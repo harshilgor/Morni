@@ -25,6 +25,11 @@ export function FreeDeliveryNudge({ fees }: { fees: CheckoutFees }) {
         <p>
           You’ve unlocked <strong>free delivery</strong>
         </p>
+      ) : fees.progressMessage === "small_order_fee" ? (
+        <p>
+          Add <strong>{formatAed(fees.amountUntilNoSmallOrderFeeAed)}</strong> more
+          to remove the small order fee
+        </p>
       ) : (
         <p>
           Add <strong>{formatAed(fees.amountUntilFreeDeliveryAed)}</strong> more
@@ -40,7 +45,9 @@ export function FreeDeliveryNudge({ fees }: { fees: CheckoutFees }) {
         aria-label={
           unlocked
             ? "Free delivery unlocked"
-            : `Progress toward free delivery at ${formatAed(FREE_DELIVERY_THRESHOLD_AED)}`
+            : fees.progressMessage === "small_order_fee"
+              ? "Progress toward removing the small order fee at AED 99"
+              : `Progress toward free delivery at ${formatAed(FREE_DELIVERY_THRESHOLD_AED)}`
         }
       >
         <div
@@ -50,7 +57,9 @@ export function FreeDeliveryNudge({ fees }: { fees: CheckoutFees }) {
       </div>
       {!unlocked ? (
         <p className="mt-1.5 text-xs text-accent-deep/75">
-          Free delivery on orders of {formatAed(FREE_DELIVERY_THRESHOLD_AED)}+
+          {fees.progressMessage === "small_order_fee"
+            ? "Small order fee removed on orders of AED 99+"
+            : `Free delivery on orders of ${formatAed(FREE_DELIVERY_THRESHOLD_AED)}+`}
         </p>
       ) : null}
     </div>

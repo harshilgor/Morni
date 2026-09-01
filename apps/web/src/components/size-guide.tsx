@@ -95,7 +95,7 @@ function RulerIcon() {
   );
 }
 
-export function SizeGuide() {
+export function SizeGuide({ customChartUrl, storeName }: { customChartUrl?: string | null; storeName?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [unit, setUnit] = useState<Unit>("cm");
 
@@ -213,6 +213,18 @@ export function SizeGuide() {
                   </tbody>
                 </table>
               </div>
+
+              {customChartUrl ? (
+                <div className="mt-8 border border-line bg-white p-4">
+                  <h3 className="font-display text-2xl text-ink">{storeName ?? "Boutique"} size chart</h3>
+                  <p className="mt-1 text-sm text-muted">Use this boutique&apos;s own sizing reference for the item.</p>
+                  <div className="mt-4 overflow-x-auto">
+                    {/* The uploaded chart is intentionally shown at its natural ratio so measurements remain legible. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={customChartUrl} alt={`${storeName ?? "Store"} size chart`} className="mx-auto max-h-[32rem] w-auto max-w-full object-contain" />
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
                 {MEASUREMENT_HELP.map(([title, description], index) => (

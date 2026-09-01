@@ -18,6 +18,9 @@ import type { Order, OrderItem, Product, ProductReview, Store } from "@/lib/type
 import { InventoryNotifications } from "@/components/inventory-notifications";
 import { ReturnRequestsPanel } from "@/components/return-requests-panel";
 
+// Dashboard thumbnails are user-uploaded Supabase media URLs.
+/* eslint-disable @next/next/no-img-element */
+
 type OrderWithItems = Order & { order_items?: OrderItem[] | null };
 type WishRow = { product_id: string; count: number; title: string };
 
@@ -80,12 +83,12 @@ export default function PortalOverviewPage() {
     weekStart.setDate(weekStart.getDate() - 6);
     const todayOrders = activeOrders.filter((order) => new Date(order.placed_at) >= today);
     const weekOrders = activeOrders.filter((order) => new Date(order.placed_at) >= weekStart);
-    const productSales = new Map<string, { title: string; units: number; revenue: number }>();
+    const productSales = new Map<string, { productId: string | null; title: string; units: number; revenue: number }>();
 
     for (const order of activeOrders) {
       for (const item of order.order_items ?? []) {
         const key = item.product_id ?? item.title;
-        const row = productSales.get(key) ?? { title: item.title, units: 0, revenue: 0 };
+        const row = productSales.get(key) ?? { productId: item.product_id ?? null, title: item.title, units: 0, revenue: 0 };
         row.units += item.quantity;
         row.revenue += Number(item.line_total_aed);
         productSales.set(key, row);
@@ -109,7 +112,10 @@ export default function PortalOverviewPage() {
       todayRevenue: todayOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),
       weekRevenue: weekOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),
       averageOrder: activeOrders.length ? activeOrders.reduce((sum, order) => sum + Number(order.total_aed), 0) / activeOrders.length : 0,
-      topProducts: Array.from(productSales.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 4),
+      topProducts: Array.from(productSales.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 4).map((product) => ({
+        ...product,
+        imageUrl: products.find((candidate) => candidate.id === product.productId)?.image_urls?.[0] ?? null,
+      })),
       salesDays,
       maxRevenue: Math.max(...salesDays.map((day) => day.revenue), 1),
     };
@@ -177,7 +183,7 @@ export default function PortalOverviewPage() {
 
       {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
 
-        <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <section>
           <div className="mb-3 flex items-center justify-between">
             <div><p className="portal-eyebrow">Priority queue</p><h2 className="mt-1 text-lg font-semibold text-[#1d2925]">What needs your attention</h2></div>
@@ -202,7 +208,7 @@ export default function PortalOverviewPage() {
 
         <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
           <SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} />
-          <StoreHealth store={store} complete={setupComplete} checklistComplete={checklist.filter((item) => item.done).length} reviews={reviews.length} />
+          <StoreHealth store={store} complete={setupComplete} checklistComplete={checklist.filter((item) => item.done).length} reviews={reviews.length} productCount={products.length} lowStockCount={insights.lowStock.length} />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
@@ -235,7 +241,7 @@ function MobileOverview({
     todayRevenue: number;
     weekRevenue: number;
     averageOrder: number;
-    topProducts: { title: string; units: number; revenue: number }[];
+    topProducts: { title: string; units: number; revenue: number; imageUrl: string | null }[];
     salesDays: { label: string; revenue: number }[];
     maxRevenue: number;
   };
@@ -352,8 +358,8 @@ function SalesChart({ days, maxRevenue }: { days: { label: string; revenue: numb
   return <div className="portal-card p-5"><PortalSectionHeading title="Sales over the last 7 days" description="Gross order value, excluding cancelled orders." action={{ label: "Open analytics", href: "/portal/analytics" }} /><div className="mt-7 flex h-44 items-end gap-2 sm:gap-4">{days.map((day) => <div key={day.label} className="group flex min-w-0 flex-1 flex-col items-center gap-2"><span className="h-5 text-[11px] font-semibold text-[#466058] opacity-0 transition group-hover:opacity-100">{day.revenue ? formatAed(day.revenue) : ""}</span><div className="flex h-28 w-full items-end rounded-t-lg bg-[#edf3f0]"><div className="w-full rounded-t-lg bg-[#5b9183] transition-all" style={{ height: `${Math.max(day.revenue ? (day.revenue / maxRevenue) * 100 : 4, 4)}%` }} /></div><span className="text-[11px] font-semibold text-[#7b8882]">{day.label}</span></div>)}</div></div>;
 }
 
-function StoreHealth({ store, complete, checklistComplete, reviews }: { store: { is_active: boolean; opens_at: string | null; closes_at: string | null }; complete: boolean; checklistComplete: number; reviews: number }) {
-  return <div className="portal-card p-5"><PortalSectionHeading title="Store health" description="The essentials your shoppers see." action={{ label: "Store settings", href: "/portal/settings" }} /><div className="mt-5 space-y-3"><HealthRow label="Storefront" value={store.is_active ? "Live" : "Paused"} status={store.is_active ? "live" : "paused"} /><HealthRow label="Setup" value={complete ? "Complete" : `${checklistComplete}/4 complete`} status={complete ? "live" : "draft"} /><HealthRow label="Store hours" value={store.opens_at && store.closes_at ? `${store.opens_at.slice(0, 5)} - ${store.closes_at.slice(0, 5)}` : "Not set"} status={store.opens_at && store.closes_at ? "live" : "draft"} /><HealthRow label="Customer reviews" value={reviews ? `${reviews} received` : "No reviews yet"} status={reviews ? "live" : "draft"} /></div></div>;
+function StoreHealth({ store, complete, checklistComplete, reviews, productCount, lowStockCount }: { store: { is_active: boolean; opens_at: string | null; closes_at: string | null }; complete: boolean; checklistComplete: number; reviews: number; productCount: number; lowStockCount: number }) {
+  return <div className="portal-card p-5"><PortalSectionHeading title="Store health" description="Live checks from your storefront and catalogue." action={{ label: "Store settings", href: "/portal/settings" }} /><div className="mt-5 space-y-3"><HealthRow label="Storefront" value={store.is_active ? "Live" : "Paused"} status={store.is_active ? "live" : "paused"} /><HealthRow label="Setup" value={complete ? "Complete" : `${checklistComplete}/4 complete`} status={complete ? "live" : "draft"} /><HealthRow label="Store hours" value={store.opens_at && store.closes_at ? `${store.opens_at.slice(0, 5)} - ${store.closes_at.slice(0, 5)}` : "Not set"} status={store.opens_at && store.closes_at ? "live" : "draft"} /><HealthRow label="Catalogue" value={`${productCount} listed · ${lowStockCount} low stock`} status={lowStockCount ? "draft" : "live"} /><HealthRow label="Customer reviews" value={reviews ? `${reviews} received` : "No reviews yet"} status={reviews ? "live" : "draft"} /></div></div>;
 }
 
 function HealthRow({ label, value, status }: { label: string; value: string; status: "live" | "paused" | "draft" }) {
@@ -361,9 +367,9 @@ function HealthRow({ label, value, status }: { label: string; value: string; sta
 }
 
 function OrdersToFulfil({ orders, limit = 5 }: { orders: OrderWithItems[]; limit?: number }) {
-  return <div className="portal-card overflow-hidden"><div className="p-5"><PortalSectionHeading title="Orders to fulfil" description="Your latest orders, sorted by when they arrived." action={{ label: "View all orders", href: "/portal/orders" }} /></div>{orders.length ? <div className="divide-y divide-[#edf1ef]">{orders.slice(0, limit).map((order) => <Link key={order.id} href="/portal/orders" className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-[#f8faf9]"><div className="flex min-w-0 items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#f0f5f2] text-[#4d766b]"><PortalIcon name="package" className="h-4 w-4" /></span><span><span className="block text-sm font-semibold text-[#263530]">{order.order_number}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{order.delivery_area} - {relativeTime(order.placed_at)}</span></span></div><div className="flex items-center gap-3"><StatusBadge status={order.status} /><span className="text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</span></div></Link>)}</div> : <div className="px-5 pb-5"><PortalEmpty icon="orders" title="Your order queue is clear" description="New shopper orders will appear here the moment they are placed." /></div>}</div>;
+  return <div className="portal-card overflow-hidden"><div className="p-5"><PortalSectionHeading title="Orders to fulfil" description="Your latest orders, sorted by when they arrived." action={{ label: "View all orders", href: "/portal/orders" }} /></div>{orders.length ? <div className="divide-y divide-[#edf1ef]">{orders.slice(0, limit).map((order) => { const imageUrl = order.order_items?.[0]?.image_url; return <Link key={order.id} href="/portal/orders" className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-[#f8faf9]"><div className="flex min-w-0 items-center gap-3"><div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[#f0f5f2]">{imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-[#4d766b]"><PortalIcon name="package" className="h-4 w-4" /></span>}</div><span><span className="block text-sm font-semibold text-[#263530]">{order.order_number}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{order.delivery_area} - {relativeTime(order.placed_at)}</span></span></div><div className="flex items-center gap-3"><StatusBadge status={order.status} /><span className="text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</span></div></Link>; })}</div> : <div className="px-5 pb-5"><PortalEmpty icon="orders" title="Your order queue is clear" description="New shopper orders will appear here the moment they are placed." /></div>}</div>;
 }
 
-function ProductDemand({ products, wishlistRows }: { products: { title: string; units: number; revenue: number }[]; wishlistRows: WishRow[] }) {
-  return <div className="portal-card p-5"><PortalSectionHeading title="Product demand" description="What shoppers are buying and saving." action={{ label: "Manage products", href: "/portal/products" }} />{products.length || wishlistRows.length ? <div className="mt-4 space-y-3">{products.map((product, index) => <div key={product.title} className="flex items-center gap-3"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#edf3f0] text-xs font-bold text-[#3c685c]">{index + 1}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-[#34423d]">{product.title}</span><span className="block text-xs text-[#7b8882]">{product.units} sold</span></span><span className="text-sm font-semibold text-[#263530]">{formatAed(product.revenue)}</span></div>)}{wishlistRows.length ? <div className="border-t border-[#edf1ef] pt-3"><p className="portal-eyebrow">Most saved</p>{wishlistRows.slice(0, 2).map((product) => <p key={product.product_id} className="mt-2 truncate text-xs text-[#5c6d66]"><span className="font-semibold text-[#34423d]">{product.title}</span> - {product.count} shopper save{product.count === 1 ? "" : "s"}</p>)}</div> : null}</div> : <p className="mt-5 text-sm leading-6 text-[#7b8882]">Once shoppers place orders or save items, you will see their favourites here.</p>}</div>;
+function ProductDemand({ products, wishlistRows }: { products: { title: string; units: number; revenue: number; imageUrl: string | null }[]; wishlistRows: WishRow[] }) {
+  return <div className="portal-card p-5"><PortalSectionHeading title="Product demand" description="What shoppers are buying and saving." action={{ label: "Manage products", href: "/portal/products" }} />{products.length || wishlistRows.length ? <div className="mt-4 space-y-3">{products.map((product, index) => <div key={product.title} className="flex items-center gap-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#edf3f0] text-xs font-bold text-[#3c685c]">{index + 1}</span><div className="h-11 w-9 shrink-0 overflow-hidden rounded-lg bg-[#edf3f0]">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-full w-full object-cover" /> : null}</div><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-[#34423d]">{product.title}</span><span className="block text-xs text-[#7b8882]">{product.units} sold</span></span><span className="text-sm font-semibold text-[#263530]">{formatAed(product.revenue)}</span></div>)}{wishlistRows.length ? <div className="border-t border-[#edf1ef] pt-3"><p className="portal-eyebrow">Most saved</p>{wishlistRows.slice(0, 2).map((product) => <p key={product.product_id} className="mt-2 truncate text-xs text-[#5c6d66]"><span className="font-semibold text-[#34423d]">{product.title}</span> - {product.count} shopper save{product.count === 1 ? "" : "s"}</p>)}</div> : null}</div> : <p className="mt-5 text-sm leading-6 text-[#7b8882]">Once shoppers place orders or save items, you will see their favourites here.</p>}</div>;
 }

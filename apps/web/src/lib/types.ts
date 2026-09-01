@@ -53,6 +53,7 @@ export type Store = {
   lng: number | null;
   logo_url: string | null;
   cover_url: string | null;
+  size_chart_url?: string | null;
   is_active: boolean;
   delivery_eta_minutes: number;
   opens_at: string | null;

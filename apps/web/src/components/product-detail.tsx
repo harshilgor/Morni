@@ -325,6 +325,7 @@ export function ProductDetail({
     [product, selectedVariant],
   );
   const hasSizeInventory = Object.keys(product.size_stock ?? {}).length > 0;
+  const sizeQuantity = (size: string) => hasSizeInventory ? Math.max(0, Number(product.size_stock?.[size] ?? 0)) : null;
   const availableStock = selectedVariant?.stock ?? (selectedSize && hasSizeInventory ? product.size_stock?.[selectedSize] ?? 0 : product.stock ?? 0);
   const customizationConfig = useMemo(() => customizationConfigFromProduct(product), [product]);
   const ratingSummary = useMemo(() => {
@@ -500,13 +501,14 @@ export function ProductDetail({
                   <p className="text-sm font-semibold text-ink">
                     Size {selectedSize ? <span className="font-normal text-muted">— {selectedSize}</span> : null}
                   </p>
-                  <SizeGuide />
+                  <SizeGuide customChartUrl={store.size_chart_url} storeName={store.name} />
                 </div>
                 <div className="mt-3 grid grid-cols-4 gap-2">
                   {availableSizes.map((size) => {
-                    const sizeAvailable = selectedVariant ? selectedVariant.stock > 0 : hasSizeInventory ? (product.size_stock?.[size] ?? 0) > 0 : product.stock > 0;
+                    const quantity = sizeQuantity(size);
+                    const sizeAvailable = selectedVariant ? selectedVariant.stock > 0 : quantity !== null ? quantity > 0 : product.stock > 0;
                     return <button key={size} type="button" onClick={() => { setSelectedSize(size); setAdded(false); }} disabled={!sizeAvailable} aria-pressed={selectedSize === size} className={`min-h-10 rounded-md border px-2 text-sm font-semibold transition lg:min-h-9 lg:text-[13px] ${selectedSize === size ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"} disabled:cursor-not-allowed disabled:opacity-35`}>
-                      {sizeAvailable ? size : <span aria-label="Not available">{size} ×</span>}
+                      {sizeAvailable ? <span>{size}{quantity !== null ? <span className="ml-1 text-xs font-normal opacity-75">({quantity})</span> : null}</span> : <span aria-label="Not available">{size} ×</span>}
                     </button>;
                   })}
                 </div>

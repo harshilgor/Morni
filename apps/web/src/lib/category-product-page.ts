@@ -97,9 +97,15 @@ export async function getCategoryProductPage(
         return productMatchesBrowseCategory(category, product);
       })
     : results;
-  const products = hasCustomRules
-    ? matchingResults.slice(offset, offset + batchSize)
-    : matchingResults.slice(0, batchSize);
+  const uniqueMatchingResults = matchingResults.filter(
+    (product, index, list) => list.findIndex((item) => item.id === product.id) === index,
+  );
+  // Assigned categories are fetched in one candidate window so that products
+  // can be matched across stores. They still need to honour the requested
+  // offset; otherwise every "load more" request returns the first batch again.
+  const products = (hasCustomRules || hasAssignedCategories)
+    ? uniqueMatchingResults.slice(offset, offset + batchSize)
+    : uniqueMatchingResults.slice(0, batchSize);
   const ratingMap = await fetchProductRatingMap(
     supabase,
     products.map((product) => product.id),
@@ -108,8 +114,8 @@ export async function getCategoryProductPage(
   return {
     products,
     ratings: Object.fromEntries(ratingMap),
-    hasMore: hasCustomRules
-      ? matchingResults.length > offset + batchSize
-      : matchingResults.length > batchSize,
+    hasMore: hasCustomRules || hasAssignedCategories
+      ? uniqueMatchingResults.length > offset + batchSize
+      : uniqueMatchingResults.length > batchSize,
   };
 }

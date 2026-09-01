@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { ProductCard, StoreCard } from "@/components/cards";
+import { StoreCard } from "@/components/cards";
+import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
+import { getCachedBrowseCategories } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
@@ -68,7 +70,7 @@ export default async function SearchPage({
   let storesQuery = supabase.from("stores").select("*").eq("is_active", true);
   let productsQuery = supabase
     .from("storefront_products")
-    .select("*, stores!inner(slug, name, is_active)")
+    .select("*, categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)")
     .eq("is_available", true)
     .eq("stores.is_active", true);
 
@@ -151,14 +153,17 @@ export default async function SearchPage({
               ? "In stock"
               : "All products";
 
+  const categories = await getCachedBrowseCategories();
+  const browseProducts = productList as unknown as BrowsableProduct[];
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div className="square-catalog mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <h1 className="font-display text-3xl text-ink sm:text-4xl">{heading}</h1>
       <p className="mt-2 text-sm text-muted">
         Stores and products across UAE retail floors.
       </p>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-2 lg:hidden">
         {[
           { label: "All", href: "/search" },
           { label: "Under 99", href: "/search?max=99" },
@@ -197,22 +202,13 @@ export default async function SearchPage({
           ) : null}
 
           <section>
-            <h2 className="mb-5 font-display text-2xl text-ink">
+            <h2 className="mb-5 font-display text-2xl text-ink lg:hidden">
               Products ({productList.length})
             </h2>
-            {productList.length === 0 ? (
+            {browseProducts.length === 0 ? (
               <p className="text-sm text-muted">No products matched.</p>
             ) : (
-              <div className="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4">
-                {productList.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    rating={ratingRecord[product.id] ?? null}
-                    href={`/stores/${product.stores.slug}/products/${product.id}`}
-                  />
-                ))}
-              </div>
+              <ProductBrowser products={browseProducts} categories={categories} ratings={ratingRecord} showInStockFilter />
             )}
           </section>
       </div>

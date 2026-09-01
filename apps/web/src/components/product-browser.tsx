@@ -37,6 +37,7 @@ export type BrowsableProduct = {
   compare_at_price_aed: number | null;
   image_urls: string[] | null;
   sizes: string[] | null;
+  fabric?: string | null;
   stock: number;
   created_at?: string | null;
   category?: { name: string; slug: string } | null;
@@ -108,7 +109,7 @@ function annotate(
   product: BrowsableProduct,
   ratings: Record<string, ProductRatingSummary>,
 ): Annotated {
-  const text = `${product.title} ${product.description ?? ""}`;
+  const text = `${product.title} ${product.description ?? ""} ${product.fabric ?? ""}`;
   const ratingSummary = ratings[product.id];
   return {
     ...product,

@@ -48,8 +48,10 @@ export default function PortalSettingsPage() {
   });
   const [pickupLocationPublic, setPickupLocationPublic] = useState(false);
   const [branding, setBranding] = useState<StoreBrandingValue>({
-    logoFile: null,
-    logoUrl: null,
+      logoFile: null,
+      logoUrl: null,
+      sizeChartFile: null,
+      sizeChartUrl: null,
   });
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -83,6 +85,8 @@ export default function PortalSettingsPage() {
       setBranding({
         logoFile: null,
         logoUrl: store.logo_url,
+        sizeChartFile: null,
+        sizeChartUrl: store.size_chart_url,
       });
     };
     if (typeof queueMicrotask === "function") queueMicrotask(syncFromStore);
@@ -141,6 +145,7 @@ export default function PortalSettingsPage() {
 
     try {
       let logo_url = branding.logoUrl ?? store.logo_url;
+      let size_chart_url = branding.sizeChartUrl ?? store.size_chart_url ?? null;
 
       if (branding.logoFile) {
         logo_url = await uploadStoreMedia({
@@ -148,6 +153,14 @@ export default function PortalSettingsPage() {
           storeId: store.id,
           file: branding.logoFile,
           prefix: "logo",
+        });
+      }
+      if (branding.sizeChartFile) {
+        size_chart_url = await uploadStoreMedia({
+          bucket: "store-logos",
+          storeId: store.id,
+          file: branding.sizeChartFile,
+          prefix: "size-chart",
         });
       }
       const supabase = createClient();
@@ -165,6 +178,7 @@ export default function PortalSettingsPage() {
           closes_at: storeHours.closes_at,
           pause_note: form.pause_note || null,
           logo_url,
+          size_chart_url,
         })
         .eq("id", store.id);
 
@@ -197,6 +211,8 @@ export default function PortalSettingsPage() {
       setBranding({
         logoFile: null,
         logoUrl: logo_url,
+        sizeChartFile: null,
+        sizeChartUrl: size_chart_url,
       });
       setMessage("Store updated.");
       await refresh();
@@ -333,7 +349,7 @@ export default function PortalSettingsPage() {
 
           <section className="rounded-2xl border border-line bg-[#fbfdfc] p-5">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-[#263530]">Branding</h2>
+              <h2 className="text-lg font-semibold text-[#263530]">Branding & sizing</h2>
               <p className="mt-1 text-sm text-muted">Keep your storefront recognizable across Morni.</p>
             </div>
             <StoreBrandingFields value={branding} onChange={setBranding} />

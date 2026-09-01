@@ -20,7 +20,6 @@ import { formatCustomizationValues } from "@/lib/product-customization";
 import {
   FreeDeliveryNudge,
   OrderFeeLines,
-  SmallOrderNudge,
 } from "@/components/order-fee-summary";
 import { DeliverySlotPicker } from "@/components/delivery-slot-picker";
 import {
@@ -489,7 +488,6 @@ export default function CheckoutPage() {
 
           <section aria-labelledby="mobile-price-details" className="border-t border-line py-6">
             <FreeDeliveryNudge fees={fees} />
-            <SmallOrderNudge fees={fees} />
             <div className="flex items-center justify-between gap-4">
               <h2 id="mobile-price-details" className="text-base font-semibold uppercase tracking-[0.08em] text-ink">Price details</h2>
               <span className="text-sm font-semibold text-ink">{formatAed(orderTotal)}</span>
@@ -871,7 +869,6 @@ export default function CheckoutPage() {
 
       <aside className="h-fit border border-line bg-surface p-5 sm:sticky sm:top-24 sm:p-6">
         <FreeDeliveryNudge fees={fees} />
-        <SmallOrderNudge fees={fees} />
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Order total</p>
         <h2 className="mt-1 font-display text-3xl text-ink">Price details</h2>
         <div className="mt-6 border-y border-line py-5"><OrderFeeLines fees={fees} /></div>
