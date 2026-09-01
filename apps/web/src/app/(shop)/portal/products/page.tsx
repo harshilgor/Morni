@@ -184,6 +184,7 @@ export default function PortalProductsPage() {
   const [createStep, setCreateStep] = useState<CreateStep>(1);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [organizing, setOrganizing] = useState(false);
   const [aiGenerated, setAiGenerated] = useState(false);
   const [query, setQuery] = useState("");
   const [showLowStock, setShowLowStock] = useState(false);
@@ -397,6 +398,30 @@ export default function PortalProductsPage() {
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function organizeCreatePhotos() {
+    if (!store) return;
+    const photos = createColors.flatMap((color) => color.images.filter((image) => image.file));
+    if (!photos.length) { setMessage("Add product photos first."); return; }
+    setOrganizing(true);
+    setMessage("AI is grouping your photos by colour…");
+    try {
+      const images = await Promise.all(photos.map(async (image) => ({ id: image.id, name: image.file?.name ?? "product-photo", data: await compressImageForListing(image.file!) })));
+      const response = await fetch("/api/portal/products/bulk-analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId: store.id, images }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not group the photos.");
+      const photoMap = new Map(photos.map((photo) => [photo.id, photo]));
+      const groups = (payload.groups ?? []).flatMap((group: { imageIds: string[]; colorName?: string; colorGroups?: Array<{ imageIds: string[]; colorName?: string }> }) => group.colorGroups?.length ? group.colorGroups : [{ imageIds: group.imageIds, colorName: group.colorName }]);
+      const next: ColorDraft[] = groups.map((group: { imageIds: string[]; colorName?: string }) => createColorDraft({ color_name: group.colorName?.trim() || "Unassigned colour", images: group.imageIds.map((id) => photoMap.get(id)).filter((photo): photo is ColorDraft["images"][number] => Boolean(photo)) }));
+      const assigned = new Set(next.flatMap((color) => color.images.map((image) => image.id)));
+      const remainder = photos.filter((photo) => !assigned.has(photo.id));
+      if (remainder.length) next.push(createColorDraft({ color_name: "Unassigned colour", images: remainder }));
+      if (!next.length) throw new Error("AI could not group these photos. You can continue manually.");
+      setCreateColors(next);
+      setMessage(`${photos.length} photos grouped into ${next.length} colour${next.length === 1 ? "" : "s"}. Review or drag any photo to another colour.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not group the photos."); }
+    finally { setOrganizing(false); }
   }
 
   function openEdit(product: ProductWithVariants) {
@@ -1043,6 +1068,7 @@ export default function PortalProductsPage() {
             </div>
 
             {createStep === 1 ? (
+              <>
               <QuickProductFields
                 draft={
                   createColors[0] ?? createColorDraft({ color_name: "Default" })
@@ -1054,6 +1080,13 @@ export default function PortalProductsPage() {
                 onChange={updatePrimaryColorDraft}
                 disabled={generating || saving}
               />
+              <div className="rounded-2xl border border-[#c9ddd4] bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><p className="text-sm font-semibold text-[#21463b]">Organize colours automatically</p><p className="mt-1 text-xs text-muted">Upload all photos once. Morni will group matching colourways for you.</p></div>
+                  <button type="button" onClick={() => void organizeCreatePhotos()} disabled={organizing || generating || saving || !createColors.some((color) => color.images.length)} className="rounded-full bg-[#21463b] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{organizing ? "Grouping…" : "Group photos"}</button>
+                </div>
+              </div>
+              </>
             ) : (
               <div className="space-y-4">
                 {aiGenerated ? (
