@@ -29,7 +29,8 @@ export type PortalIconName =
   | "refresh"
   | "camera"
   | "close"
-  | "image";
+  | "image"
+  | "trash";
 
 export function PortalIcon({
   name,
@@ -68,6 +69,7 @@ export function PortalIcon({
     camera: <><path d="M4.5 8.5h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 10v8.5A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5V10A1.5 1.5 0 0 1 4.5 8.5Z" /><circle cx="12" cy="14" r="3.2" /></>,
     close: <path d="M6 6l12 12M18 6 6 18" />,
     image: <><rect x="3.5" y="5" width="17" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="m7.5 17 3.5-3.5L14 16l2.5-2.5L20.5 17" /></>,
+    trash: <><path d="M5 7h14M10 11v6M14 11v6" /><path d="M9 7V4h6v3M7 7l1 14h8l1-14" /></>,
   };
 
   return <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths[name]}</svg>;

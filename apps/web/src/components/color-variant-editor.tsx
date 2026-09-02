@@ -32,12 +32,14 @@ export function ColorVariantEditor({
   disabled = false,
   compact = false,
   showSizes = true,
+  highlightAddColor = false,
 }: {
   value: ColorDraft[];
   onChange: (next: ColorDraft[]) => void;
   disabled?: boolean;
   compact?: boolean;
   showSizes?: boolean;
+  highlightAddColor?: boolean;
 }) {
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<string, string | null>>(
@@ -197,10 +199,11 @@ export function ColorVariantEditor({
           </p>
         </div>
         <button
+          data-tour="add-color"
           type="button"
           disabled={disabled}
           onClick={() => onChange([...value, createColorDraft()])}
-          className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+          className={`rounded-full bg-[#21342e] px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-10px_rgba(33,52,46,0.8)] transition hover:bg-[#2f6f66] disabled:opacity-50 ${highlightAddColor ? "ring-4 ring-[#e8a5b8] ring-offset-2" : ""}`}
         >
           + Add color
         </button>
@@ -337,7 +340,8 @@ export function ColorVariantEditor({
                       }}
                       className="rounded-lg border border-line px-2 py-1 text-xs text-accent-deep disabled:opacity-40"
                     >
-                      Remove
+                      <PortalIcon name="trash" className="h-3.5 w-3.5" />
+                      <span className="sr-only">Delete color</span>
                     </button>
                   </div>
                 </div>
@@ -379,6 +383,7 @@ export function ColorVariantEditor({
                       {draft.images.map((image, imageIndex) => (
                         <div
                           key={image.id}
+                          data-tour="move-photo"
                           className="relative overflow-hidden rounded-xl border border-line bg-[#f2f2f3]"
                         >
                           <button
@@ -454,7 +459,8 @@ export function ColorVariantEditor({
                               onClick={() => removeImage(draft.key, image.id)}
                               className="flex-1 rounded-full bg-ink/90 px-1.5 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
                             >
-                              Remove
+                              <PortalIcon name="trash" className="h-3.5 w-3.5" />
+                              <span className="sr-only">Delete photo</span>
                             </button>
                           </div>
                         </div>

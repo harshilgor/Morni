@@ -78,7 +78,10 @@ async function generateWithOpenAI(options: {
           text: { format: { type: "json_schema", name: "product_listing", strict: true, schema: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, description: { type: "string" }, categorySlug: { type: ["string", "null"] }, colorName: { type: ["string", "null"] } }, required: ["title", "description", "categorySlug", "colorName"] } } },
         }),
       });
-  if (!response.ok) throw new Error(`OpenAI request failed with status ${response.status}.`);
+  if (!response.ok) {
+    const status = response.status;
+    throw new Error(status === 429 ? "OpenAI is temporarily rate-limited or has no remaining quota. Check the shared OpenAI project billing/limits, then try again." : `OpenAI request failed with status ${status}.`);
+  }
   const payload = (await response.json()) as OpenAIResponse;
   const text = payload.output_text ?? payload.output?.flatMap((item) => item.content ?? []).map((item) => item.text ?? "").join("");
   if (!text) throw new Error("OpenAI returned an empty listing.");
@@ -158,9 +161,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Product listing generation failed", error);
-    return NextResponse.json(
-      { error: "Could not generate a listing draft right now." },
-      { status: 503 },
-    );
+    const message = error instanceof Error ? error.message : "Could not generate a listing draft right now.";
+    return NextResponse.json({ error: message }, { status: message.includes("rate-limited") ? 429 : 503 });
   }
 }

@@ -46,6 +46,7 @@ import {
 } from "@/lib/product-customization";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
+import { AiProcessingOverlay } from "@/components/ai-processing-overlay";
 
 type ProductWithVariants = Product & {
   product_variants?: ProductVariant[] | null;
@@ -177,6 +178,32 @@ function ListingGenerationOverlay({ organizing }: { organizing: boolean }) {
   );
 }
 
+function ColorTour({ step, onNext, onSkip }: { step: 1 | 2; onNext: () => void; onSkip: () => void }) {
+  const addColor = step === 1;
+  const [target, setTarget] = useState<DOMRect | null>(null);
+  useEffect(() => {
+    const update = () => setTarget(document.querySelector(`[data-tour="${addColor ? "add-color" : "move-photo"}"]`)?.getBoundingClientRect() ?? null);
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => { window.removeEventListener("resize", update); window.removeEventListener("scroll", update, true); };
+  }, [addColor]);
+  const viewportWidth = typeof window === "undefined" ? 1024 : window.innerWidth;
+  const viewportHeight = typeof window === "undefined" ? 768 : window.innerHeight;
+  const bubbleWidth = Math.min(288, viewportWidth - 32);
+  const top = target ? (target.bottom + 16 + 170 < viewportHeight ? target.bottom + 16 : Math.max(16, target.top - 186)) : 24;
+  const left = target ? Math.max(16, Math.min(target.left + target.width / 2 - bubbleWidth / 2, viewportWidth - bubbleWidth - 16)) : 16;
+  const arrowLeft = target ? Math.max(20, Math.min(target.left + target.width / 2 - left - 9, bubbleWidth - 28)) : 32;
+  return <div className="fixed inset-0 z-[90] bg-[#14251f]/25" role="dialog" aria-label="Colour options guide">
+    <div className="fixed rounded-2xl border border-[#e6b4c2] bg-white/95 p-4 text-sm text-[#21463b] shadow-xl" style={{ top, left, width: bubbleWidth }}>
+      <div className="absolute -top-3 h-6 w-6 rotate-45 border-l border-t border-[#e6b4c2] bg-white/95" style={{ left: arrowLeft }} />
+      <p className="relative font-semibold">{addColor ? "Create a colour variant" : "Organise your photos"}</p>
+      <p className="relative mt-1 leading-5 text-muted">{addColor ? "Click Add color to create another colour for this product." : "Drag a product photo from one colour section to another to organise it."}</p>
+      <div className="relative mt-3 flex items-center justify-between gap-2"><button type="button" onClick={onSkip} className="text-xs text-muted underline">Skip</button><button type="button" onClick={onNext} className="rounded-full bg-[#21342e] px-3 py-1.5 text-xs font-semibold text-white">{addColor ? "Next" : "Done"}</button></div>
+    </div>
+  </div>;
+}
+
 export default function PortalProductsPage() {
   const searchParams = useSearchParams();
   const requestedEditId = searchParams.get("edit");
@@ -201,6 +228,7 @@ export default function PortalProductsPage() {
   const [generating, setGenerating] = useState(false);
   const [organizing, setOrganizing] = useState(false);
   const [aiGenerated, setAiGenerated] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<{ title: string; description: string } | null>(null);
   const [query, setQuery] = useState("");
   const [showLowStock, setShowLowStock] = useState(false);
   const [showHiddenOnly, setShowHiddenOnly] = useState(false);
@@ -219,6 +247,7 @@ export default function PortalProductsPage() {
     title: string;
   } | null>(null);
   const [addProductOpen, setAddProductOpen] = useState(false);
+  const [colorTourStep, setColorTourStep] = useState(0);
   const [uploadCelebrationKey, setUploadCelebrationKey] = useState(0);
 
   async function loadProducts(storeId: string) {
@@ -307,6 +336,8 @@ export default function PortalProductsPage() {
     });
     setCreateColors([createColorDraft({ color_name: "Default" })]);
     setAiGenerated(false);
+    setAiSuggestions(null);
+    setColorTourStep(0);
     setAddProductOpen(true);
   }
 
@@ -330,13 +361,10 @@ export default function PortalProductsPage() {
 
   async function generateListing() {
     if (!store) return;
-    let workingColors = createColors;
-    if (createColors.length <= 1 && createColors[0]?.images.length) {
-      const organized = await organizeCreatePhotos();
-      if (!organized) return;
-      workingColors = organized;
-    }
-    const primary = workingColors[0];
+    // AI generation is intentionally paused while the OpenAI project is out
+    // of credits. Keep the AI routes/components in place for re-enabling it
+    // later, but let sellers finish a listing with a local draft for now.
+    const primary = createColors[0];
     if (!primary || primary.images.length === 0) {
       setMessage("Add at least one product photo to generate a listing.");
       return;
@@ -345,10 +373,8 @@ export default function PortalProductsPage() {
       setMessage("Enter a valid price before generating the listing.");
       return;
     }
-    if (primary.sizes.length === 0 && categoryHasSizes(form.categorySlug)) {
-      setMessage("Choose at least one available size.");
-      return;
-    }
+    // Size selection happens on the review step. Do not block the seller
+    // from reaching it just because no sizes are selected yet.
     const stock = Number(primary.stock);
     if (!Number.isFinite(stock) || stock < 0) {
       setMessage("Enter a valid stock count.");
@@ -356,66 +382,20 @@ export default function PortalProductsPage() {
     }
 
     setGenerating(true);
-    setMessage("Creating a draft from your product photos…");
+    setMessage("Preparing your listing…");
 
     try {
-      const files = primary.images
-        .map((image) => image.file)
-        .filter((file): file is File => Boolean(file))
-        .slice(0, 3);
-      const images = await Promise.all(files.map(compressImageForListing));
-      if (images.length === 0) {
-        throw new Error(
-          "Please choose a new product photo to generate a listing.",
-        );
-      }
-
-      const response = await fetch("/api/portal/products/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          storeId: store.id,
-          priceAed: Number(form.price_aed),
-          stock,
-          sizes: primary.sizes,
-          images,
-        }),
-      });
-      const payload = (await response.json()) as {
-        suggestion?: ProductListingSuggestion;
-        error?: string;
-      };
-      if (!response.ok || !payload.suggestion) {
-        throw new Error(payload.error ?? "Could not generate a product draft.");
-      }
-
-      const suggestion = payload.suggestion;
-      const gifting = suggestion.categorySlug === "gifting";
       setForm((current) => ({
         ...current,
-        title: suggestion.title,
-        description: suggestion.description,
-        categorySlug: suggestion.categorySlug ?? "",
-        ...(gifting ? { customization: defaultCustomizationConfig() } : {}),
+        title: current.title,
+        description: current.description || "Please add a product description.",
       }));
-      updatePrimaryColorDraft({
-        ...primary,
-        color_name: suggestion.colorName || "Default",
-        ...(gifting ? { sizes: [] } : {}),
-      });
-      setAiGenerated(true);
-      setMessage(
-        "Review the suggested listing, then publish when it looks right.",
-      );
-      setCreateStep(2);
-    } catch (error) {
+      setAiSuggestions(null);
       setAiGenerated(false);
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not generate a listing draft right now.",
-      );
+      setMessage("Review your listing, then publish when it looks right.");
       setCreateStep(2);
+      setColorTourStep(1);
+      setColorTourStep(1);
     } finally {
       setGenerating(false);
     }
@@ -429,7 +409,7 @@ export default function PortalProductsPage() {
     setMessage("AI is grouping your photos by colour…");
     try {
       const images = await Promise.all(photos.map(async (image) => ({ id: image.id, name: image.file?.name ?? "product-photo", data: await compressImageForListing(image.file!) })));
-      const response = await fetch("/api/portal/products/bulk-analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId: store.id, images }) });
+      const response = await fetch("/api/portal/products/bulk-analyze", { method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(60000), body: JSON.stringify({ storeId: store.id, images }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Could not group the photos.");
       const photoMap = new Map(photos.map((photo) => [photo.id, photo]));
@@ -442,7 +422,7 @@ export default function PortalProductsPage() {
       setCreateColors(next);
       setMessage(`${photos.length} photos grouped into ${next.length} colour${next.length === 1 ? "" : "s"}. Review or drag any photo to another colour.`);
       return next;
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not group the photos."); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not group the photos."); return createColors; }
     finally { setOrganizing(false); }
   }
 
@@ -1078,6 +1058,7 @@ export default function PortalProductsPage() {
             }}
             className="mx-auto flex min-h-full w-full max-w-5xl flex-col"
           >
+            {createStep === 2 && (colorTourStep === 1 || colorTourStep === 2) ? <ColorTour step={colorTourStep as 1 | 2} onNext={() => setColorTourStep((current) => current === 1 ? 2 : 0)} onSkip={() => setColorTourStep(0)} /> : null}
             <div className="mb-4 flex gap-2">
               {[1, 2].map((step) => (
                 <div
@@ -1133,6 +1114,7 @@ export default function PortalProductsPage() {
                     autoFocus
                   />
                 </label>
+                {aiSuggestions ? <div className="-mt-2 rounded-xl border border-[#c9ddd4] bg-[#f4faf7] p-3"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#2f6f66]">AI-generated title</span><div className="flex gap-2"><button type="button" onClick={() => { setForm((current) => ({ ...current, title: aiSuggestions.title })); setAiSuggestions((current) => current ? { ...current, title: "" } : current); }} className="rounded-full bg-[#2f6f66] px-3 py-1 text-[11px] font-semibold text-white">Accept</button><button type="button" onClick={() => setAiSuggestions((current) => current ? { ...current, title: "" } : current)} className="rounded-full border border-line bg-white px-3 py-1 text-[11px] font-semibold text-ink">Deny</button></div></div>{aiSuggestions.title ? <p className="mt-2 text-sm text-[#21463b]">{aiSuggestions.title}</p> : <p className="mt-2 text-xs text-muted">Suggestion denied. You can write your own title.</p>}</div> : null}
                 <label className="block space-y-1.5 text-sm">
                   <span className="font-medium text-[#40534d]">
                     Product tag
@@ -1154,6 +1136,7 @@ export default function PortalProductsPage() {
                     Internal inventory reference. Shoppers will not see this.
                   </span>
                 </label>
+                {aiSuggestions ? <div className="-mt-2 rounded-xl border border-[#c9ddd4] bg-[#f4faf7] p-3"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#2f6f66]">AI-generated description</span><div className="flex gap-2"><button type="button" onClick={() => { setForm((current) => ({ ...current, description: aiSuggestions.description })); setAiSuggestions((current) => current ? { ...current, description: "" } : current); }} className="rounded-full bg-[#2f6f66] px-3 py-1 text-[11px] font-semibold text-white">Accept</button><button type="button" onClick={() => setAiSuggestions((current) => current ? { ...current, description: "" } : current)} className="rounded-full border border-line bg-white px-3 py-1 text-[11px] font-semibold text-ink">Deny</button></div></div>{aiSuggestions.description ? <p className="mt-2 line-clamp-4 text-sm leading-6 text-[#21463b]">{aiSuggestions.description}</p> : <p className="mt-2 text-xs text-muted">Suggestion denied. You can write your own description.</p>}</div> : null}
                 <label className="block space-y-1.5 text-sm">
                   <span className="font-medium text-[#40534d]">Category *</span>
                   <select
@@ -1210,23 +1193,10 @@ export default function PortalProductsPage() {
                   />
                 </label>
 
-                <div className="rounded-2xl border border-line bg-white p-4 text-sm text-[#40534d]">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">Essentials saved</span>
-                    <span className="text-xs text-muted">
-                      {createColors[0]?.stock ?? 0} in stock ·{" "}
-                      {categoryHasSizes(form.categorySlug)
-                        ? `${createColors[0]?.sizes.length ?? 0} sizes · `
-                        : ""}
-                      {createColors[0]?.images.length ?? 0} photos
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted">Add colour photos and inventory above, then optionally offer custom measurements below.</p>
-                </div>
-
                 <ColorVariantEditor
                   value={createColors}
                   onChange={setCreateColors}
+                  highlightAddColor={colorTourStep === 1}
                   disabled={saving || generating || organizing}
                   showSizes={categoryHasSizes(form.categorySlug)}
                 />
@@ -1430,7 +1400,7 @@ export default function PortalProductsPage() {
           onClose={() => setPreview(null)}
         />
       ) : null}
-      {addProductOpen && (organizing || generating) ? <ListingGenerationOverlay organizing={organizing} /> : null}
+      {addProductOpen && (organizing || generating) ? <AiProcessingOverlay phase={organizing ? "analyzing" : "reading"} photoCount={createColors.reduce((sum, color) => sum + color.images.length, 0)} productCount={createColors.length} /> : null}
     </div>
   );
 }

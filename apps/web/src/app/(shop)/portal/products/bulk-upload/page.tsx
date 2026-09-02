@@ -10,6 +10,7 @@ import { PortalIcon } from "@/components/portal-icons";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { SizeInventoryEditor } from "@/components/size-inventory-editor";
+import { AiProcessingOverlay as SimpleAiProcessingOverlay } from "@/components/ai-processing-overlay";
 
 type Photo = { id: string; file: File; preview: string };
 type ColorGroup = {
@@ -894,7 +895,7 @@ export default function BulkUploadPage() {
                 }
                 className="text-xs text-accent-deep"
               >
-                Remove
+                <span className="inline-flex items-center gap-1.5"><PortalIcon name="trash" className="h-3.5 w-3.5" /><span>Delete product</span></span>
               </button>
             </div>
             {draft.photos.length ? (
@@ -1093,7 +1094,7 @@ export default function BulkUploadPage() {
         )}
       </section>
       {busy ? (
-        <AiProcessingOverlay
+        <SimpleAiProcessingOverlay
           phase={busyPhase === "idle" ? "reading" : busyPhase}
           photoCount={drafts.reduce((sum, draft) => sum + draft.photos.length, 0)}
           productCount={drafts.length}
