@@ -740,9 +740,13 @@ export default function BulkUploadPage() {
         ...draft,
         needsReview: draft.needsReview || draft.colors.some((color) => color.needsReview),
       }));
+      const incompleteCount = safeGroups.reduce(
+        (count, draft) => count + (!draft.title.trim() || draft.title === "New product" ? 1 : 0) + (!draft.description.trim() ? 1 : 0) + (!draft.categorySlug ? 1 : 0),
+        0,
+      );
       setDrafts(safeGroups);
       setMessage(
-        `${warnings[0] ? `${warnings[0]} ` : ""}AI grouped ${images.length} photos into ${safeGroups.length} product candidates.${batches.length > 1 ? " Photos were analyzed in separate batches, so review any matching product views that landed in different batches." : ""} Review flagged groups before publishing.`,
+        `${warnings[0] ? `${warnings[0]} ` : ""}AI grouped ${images.length} photos into ${safeGroups.length} product candidates.${batches.length > 1 ? " Photos were analyzed in separate batches, so review any matching product views that landed in different batches." : ""}${incompleteCount ? ` ${incompleteCount} required listing field${incompleteCount === 1 ? " is" : "s are"} incomplete—fill them in before publishing.` : " Review flagged groups before publishing."}`,
       );
     } catch (error) {
       setMessage(

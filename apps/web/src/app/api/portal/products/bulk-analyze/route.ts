@@ -13,12 +13,13 @@ const suggestionSchema = z.object({ groups: z.array(z.object({ imageIds: z.array
 type Suggestion = z.infer<typeof suggestionSchema>["groups"][number];
 
 function fallbackTitle(fileName: string) {
-  return fileName
+  const candidate = fileName
     .replace(/\.[^.]+$/, "")
     .replace(/[-_]+/g, " ")
     .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "New product";
+    .trim();
+  if (!candidate || /^[0-9a-f]{8}(?:[-\s][0-9a-f]{4}){2,4}$/i.test(candidate) || /^[0-9a-f]{16,}$/.test(candidate)) return "New product";
+  return candidate.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function fallbackGroups(images: Array<{ label: string; name: string }>): Suggestion[] {
@@ -246,10 +247,11 @@ export async function POST(request: Request) {
     ...group,
     imageIds: group.imageIds.map((label) => labelToId.get(label)).filter((id): id is string => Boolean(id)),
   }));
+  const incompleteFields = groups.reduce((count, group) => count + (!group.title.trim() || group.title === "New product" ? 1 : 0) + (!group.description.trim() ? 1 : 0) + (!group.categorySlug.trim() ? 1 : 0), 0);
   return NextResponse.json({
     groups,
-    warning: missing.length > 0 || colourReviewCount > 0
-      ? "Some photos needed a quick review. Every photo was kept in a product and colour group."
+    warning: missing.length > 0 || colourReviewCount > 0 || incompleteFields > 0
+      ? "AI grouping finished, but some listing fields still need your review. Add a clear product name, description, and category before publishing."
       : undefined,
   });
 }
