@@ -70,7 +70,7 @@ export default async function SearchPage({
   let storesQuery = supabase.from("stores").select("*").eq("is_active", true);
   let productsQuery = supabase
     .from("storefront_products")
-    .select("*, categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)")
+    .select("*, category:categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)")
     .eq("is_available", true)
     .eq("stores.is_active", true);
 

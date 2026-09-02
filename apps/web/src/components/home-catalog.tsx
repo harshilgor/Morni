@@ -15,7 +15,7 @@ export async function HomeCatalog({
 }: {
   initialEmirate?: UaeEmirate;
 }) {
-  const { stores, storeRecommendationStats, featured, products, megaSale, under99, under199, luxuryPicks, ratings } =
+  const { stores, storeRecommendationStats, featured, products, megaSale, under99, under149, luxuryPicks, ratings } =
     await getCachedHomeCatalog();
   const ratingRecord = ratings as Record<string, ProductRatingSummary>;
 
@@ -33,7 +33,7 @@ export async function HomeCatalog({
 
   const under99Rail = under99.slice(0, 10).map((product) => toRailProduct(product));
 
-  const under199Rail = under199.slice(0, 10).map((product) => toRailProduct(product));
+  const under149Rail = under149.slice(0, 10).map((product) => toRailProduct(product));
 
   const luxuryPicksRail = luxuryPicks
     .slice(0, 10)
@@ -73,12 +73,12 @@ export async function HomeCatalog({
       products: under99Rail,
     },
     {
-      id: "under-199",
-      label: "Under AED 199",
-      title: "Under AED 199",
+      id: "under-149",
+      label: "Under AED 149",
+      title: "Under AED 149",
       subtitle: "More to love, still easy on the budget.",
-      href: "/collection/under-199",
-      products: under199Rail,
+      href: "/under-149",
+      products: under149Rail,
     },
     {
       id: "luxury",

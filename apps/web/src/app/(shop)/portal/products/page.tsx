@@ -194,7 +194,7 @@ function ColorTour({ step, onNext, onSkip }: { step: 1 | 2; onNext: () => void; 
   const top = target ? (target.bottom + 16 + 170 < viewportHeight ? target.bottom + 16 : Math.max(16, target.top - 186)) : 24;
   const left = target ? Math.max(16, Math.min(target.left + target.width / 2 - bubbleWidth / 2, viewportWidth - bubbleWidth - 16)) : 16;
   const arrowLeft = target ? Math.max(20, Math.min(target.left + target.width / 2 - left - 9, bubbleWidth - 28)) : 32;
-  return <div className="fixed inset-0 z-[90] bg-[#14251f]/25" role="dialog" aria-label="Colour options guide">
+  return <div className="hidden fixed inset-0 z-[90] bg-[#14251f]/25 sm:block" role="dialog" aria-label="Colour options guide">
     <div className="fixed rounded-2xl border border-[#e6b4c2] bg-white/95 p-4 text-sm text-[#21463b] shadow-xl" style={{ top, left, width: bubbleWidth }}>
       <div className="absolute -top-3 h-6 w-6 rotate-45 border-l border-t border-[#e6b4c2] bg-white/95" style={{ left: arrowLeft }} />
       <p className="relative font-semibold">{addColor ? "Create a colour variant" : "Organise your photos"}</p>
@@ -735,6 +735,25 @@ export default function PortalProductsPage() {
     if (store) await loadProducts(store.id);
   }
 
+  async function bulkDeleteProducts() {
+    if (!selectedIds.length) return;
+    const count = selectedIds.length;
+    if (!window.confirm(`Delete ${count} selected product${count === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    const supabase = createClient();
+    const { error: deleteError } = await supabase
+      .from("products")
+      .delete()
+      .in("id", selectedIds);
+    if (deleteError) {
+      setMessage("Some products could not be deleted. Please try again.");
+      return;
+    }
+    setSelectedIds([]);
+    setMessage(`${count} product${count === 1 ? "" : "s"} deleted.`);
+    void revalidatePublicCatalog();
+    if (store) await loadProducts(store.id);
+  }
+
   async function bulkSetStock() {
     if (!selectedIds.length || !bulkStock.trim() || !store) return;
     const stock = Number(bulkStock);
@@ -943,10 +962,10 @@ export default function PortalProductsPage() {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setSelectedIds(visibleProducts.map((p) => p.id))}
+            onClick={() => setSelectedIds((current) => current.length === visibleProducts.length ? [] : visibleProducts.map((p) => p.id))}
             className="rounded-full border border-line px-3 py-1.5 text-xs text-muted"
           >
-            Select visible
+            {selectedIds.length === visibleProducts.length && visibleProducts.length > 0 ? "Deselect all" : "Select all"}
           </button>
           <button
             type="button"
@@ -968,6 +987,14 @@ export default function PortalProductsPage() {
             className="rounded-full border border-line px-3 py-1.5 text-xs text-muted"
           >
             Show selected
+          </button>
+          <button
+            type="button"
+            onClick={() => void bulkDeleteProducts()}
+            disabled={selectedIds.length === 0}
+            className="rounded-full border border-[#e7b8b8] px-3 py-1.5 text-xs text-[#a34242] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Delete selected
           </button>
           <input
             type="number"

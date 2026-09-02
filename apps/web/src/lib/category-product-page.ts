@@ -13,7 +13,7 @@ export const CATEGORY_PRODUCT_BATCH_SIZE = 10;
 const MAX_CATEGORY_CANDIDATES = 500;
 
 const CATEGORY_PRODUCT_SELECT =
-  "id, category_id, title, description, price_aed, compare_at_price_aed, image_urls, sizes, stock, created_at, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)";
+  "id, category_id, title, description, price_aed, compare_at_price_aed, image_urls, sizes, stock, created_at, category:categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)";
 
 export type CategoryProduct = {
   id: string;
@@ -93,6 +93,9 @@ export async function getCategoryProductPage(
   const results = (data ?? []) as unknown as CategoryProduct[];
   const matchingResults = hasCustomRules || hasAssignedCategories
     ? results.filter((product) => {
+        if (category.slug === "jewelry-accessories") {
+          return productMatchesBrowseCategory(category, product);
+        }
         if (product.category_id) return assignedCategoryIds.has(product.category_id);
         return productMatchesBrowseCategory(category, product);
       })

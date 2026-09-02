@@ -98,18 +98,19 @@ const CATEGORY_MENU_GROUPS = [
   },
   {
     title: "More to explore",
-    links: [["Party wear", "/categories/party-wear"], ["Indo-western", "/categories/indo-western"], ["Dresses", "/categories/dresses"], ["Evening edit", "/categories/evening"]],
+    links: [["Party wear", "/categories/party-wear"], ["Casual wear", "/categories/casual-wear"], ["Office wear", "/categories/office-wear"], ["Anarkalis", "/categories/anarkalis"]],
   },
   {
     title: "Complete the look",
-    links: [["Bags", "/categories/bags"], ["Shoes", "/categories/shoes"], ["Jewelry", "/categories/jewelry"], ["Accessories", "/categories/accessories"]],
+    links: [["Bags", "/categories/bags"], ["Shoes", "/categories/shoes"], ["Jewelry", "/categories/jewelry"], ["Accessories", "/categories/accessories"], ["Gifting", "/categories/gifting"]],
   },
 ] as const;
 
 const CATEGORY_MENU_FEATURES = [
   { name: "Lehengas", href: "/categories/lehengas", image: "/categories/lehengas.png" },
-  { name: "Party wear", href: "/categories/party-wear", image: "/categories/party-wear.jpg" },
-  { name: "Kurtis", href: "/categories/kurtis", image: "/categories/kurtis.jpg" },
+  { name: "Kaftan", href: "/categories/kaftan", image: "/categories/kaftan.jpg" },
+  { name: "Gifting", href: "/categories/gifting", image: "/categories/gifting-cover.png" },
+  { name: "Jewelry / Accessories", href: "/categories/jewelry-accessories", image: "/categories/jewelry-accessories.png" },
 ] as const;
 
 const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI";
@@ -572,6 +573,9 @@ export function SiteHeader() {
           <Link href="/stores" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/stores"))}>
             Stores
           </Link>
+          <Link href="/collection/under-55" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/collection/under-55"))}>
+            Under AED 55
+          </Link>
           <Link href="/under-99" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/under-99"))}>
             Under AED 99
           </Link>
@@ -596,16 +600,16 @@ export function SiteHeader() {
         {categoriesOpen ? (
           <div
             id="categories-menu"
-            className="absolute inset-x-0 top-full z-50 hidden border-b border-line bg-surface text-ink shadow-[0_24px_48px_-30px_rgba(28,20,24,0.7)] md:block"
+            className="absolute inset-x-0 top-full z-50 hidden border-b border-line bg-[#fffdfb] text-ink shadow-[0_28px_60px_-28px_rgba(28,20,24,0.45)] md:block"
             onMouseEnter={openCategories}
             role="menu"
             aria-label="Shop by category"
           >
-            <div className="mx-auto grid max-w-7xl grid-cols-[repeat(3,minmax(0,1fr))_1.25fr] gap-8 px-5 py-7">
+            <div className="mx-auto grid max-w-7xl grid-cols-[repeat(3,minmax(0,1fr))_1.35fr] gap-8 px-5 py-7">
               {CATEGORY_MENU_GROUPS.map((group) => (
                 <div key={group.title}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-deep">{group.title}</p>
-                  <div className="mt-3 space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-deep">{group.title}</p>
+                  <div className="mt-4 space-y-2.5">
                     {group.links.map(([label, href]) => (
                       <Link key={href} href={href} role="menuitem" onClick={() => setCategoriesOpen(false)} className="block w-fit text-sm text-ink/80 transition hover:text-accent-deep hover:underline">
                         {label}
@@ -614,7 +618,8 @@ export function SiteHeader() {
                   </div>
                 </div>
               ))}
-              <div className="border-l border-line pl-7">
+              <div className="rounded-2xl border border-[#eadfe2] bg-[#fbf4f5] p-3.5">
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-accent-deep">Trending now</p>
                 <div className="grid grid-cols-3 gap-3">
                   {CATEGORY_MENU_FEATURES.map((feature) => (
                     <Link key={feature.href} href={feature.href} role="menuitem" onClick={() => setCategoriesOpen(false)} className="group">

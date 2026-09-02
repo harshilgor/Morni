@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/cards";
 import { emirateLabel } from "@/lib/format";
@@ -312,6 +313,7 @@ export function ProductBrowser({
 }) {
   const isStore = variant === "store";
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const [loadedProducts, setLoadedProducts] = useState(products);
   const [loadedRatings, setLoadedRatings] = useState(ratings);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -552,7 +554,9 @@ export function ProductBrowser({
     }
   }, [activeSlug, filtered, forYouActive, sort, tasteProfile]);
 
-  const categoryIsPreferred = Boolean(tasteProfile && tasteProfile.likes > 0);
+  const hasTasteProfile = Boolean(
+    tasteProfile && tasteProfile.likes + tasteProfile.passes > 0,
+  );
   const currentSort = SORTS.find((option) => option.id === sort) ?? SORTS[0];
   const activeCount =
     (Object.keys(EMPTY_FILTERS) as (keyof Filters)[]).reduce((sum, key) => {
@@ -661,31 +665,29 @@ export function ProductBrowser({
 
   const panel = (
     <div>
-      {categoryIsPreferred ? (
-        <div className="border-b border-line/70 pb-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-deep">
-            Your taste
-          </p>
-          <p className="mt-1 text-sm text-muted">
-            {forYouActive
-              ? "Showing the pieces that best match your choices."
-              : "See this category in the order that suits you."}
-          </p>
-          <button
-            type="button"
-            onClick={toggleForYou}
-            className={`mt-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-              forYouActive
-                ? "bg-ink text-white hover:bg-accent-deep"
-                : "border border-line bg-surface text-ink hover:border-ink/40"
-            }`}
-            aria-pressed={forYouActive}
-          >
-            {forYouActive ? "Showing for you" : "For you"}
-          </button>
-        </div>
-      ) : null}
-
+      <div className="border-b border-line/70 pb-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-deep">
+          Your taste
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            if (!hasTasteProfile) {
+              router.push("/for-you");
+              return;
+            }
+            toggleForYou();
+          }}
+          className={`mt-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+            forYouActive
+              ? "bg-ink text-white hover:bg-accent-deep"
+              : "border border-line bg-surface text-ink hover:border-ink/40"
+          }`}
+          aria-pressed={hasTasteProfile ? forYouActive : undefined}
+        >
+          {forYouActive ? "Showing for you" : hasTasteProfile ? "For you" : "For you · Set your preferences"}
+        </button>
+      </div>
       {categoryOptions.length > 1 && !isStore ? (
         <FilterSection
           title="Category"
@@ -981,31 +983,6 @@ export function ProductBrowser({
                 Filters{activeCount > 0 ? ` (${activeCount})` : ""}
               </button>
             ) : null}
-            <label className="relative inline-flex h-8 min-w-0 max-w-[9.5rem] items-center gap-1 overflow-hidden rounded-full border border-line bg-surface px-2.5 text-[11px] text-ink lg:max-w-none lg:h-auto lg:overflow-visible lg:px-3 lg:py-1.5 lg:text-xs">
-              <span className="hidden shrink-0 text-muted lg:inline">Sort</span>
-              <span className="min-w-0 flex-1 truncate font-semibold lg:hidden">
-                {currentSort.mobileLabel}
-              </span>
-              <select
-                value={sort}
-                onChange={(e) => {
-                  setSort(e.target.value);
-                  if (isStore && (storeTab === "bestselling" || storeTab === "new")) {
-                    setStoreTab("all");
-                    setFilters((prev) => ({ ...prev, category: [] }));
-                  }
-                }}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 lg:static lg:h-auto lg:w-auto lg:flex-1 lg:cursor-default lg:opacity-100"
-                aria-label="Sort products"
-              >
-                {SORTS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <span aria-hidden="true" className="shrink-0 text-muted lg:hidden">&#8964;</span>
-            </label>
             <p className="ml-auto shrink-0 text-[11px] text-muted lg:text-sm">
               {forYouActive ? "Picked for you · " : ""}
               {sorted.length} {sorted.length === 1 ? "piece" : "pieces"}
@@ -1041,20 +1018,6 @@ export function ProductBrowser({
                 active: filters.onSale,
                 onClick: () => toggleFlag("onSale"),
               },
-              {
-                label: "Under AED 199",
-                active: filters.price.includes("99-199"),
-                onClick: () => toggle("price", "99-199"),
-              },
-              ...(showInStockFilter
-                ? [
-                    {
-                      label: "In stock",
-                      active: filters.inStock,
-                      onClick: () => toggleFlag("inStock"),
-                    },
-                  ]
-                : []),
             ].map((chip) => (
               <button
                 key={chip.label}
@@ -1069,6 +1032,34 @@ export function ProductBrowser({
                 {chip.label}
               </button>
             ))}
+            <label className="relative inline-flex h-8 min-w-0 max-w-[9.5rem] shrink-0 items-center gap-1 overflow-hidden rounded-full border border-line bg-surface px-2.5 text-[11px] text-ink lg:max-w-none lg:h-auto lg:overflow-visible lg:px-3 lg:py-1.5 lg:text-xs">
+              <span className="hidden shrink-0 text-muted lg:inline">Sort</span>
+              <span className="min-w-0 flex-1 truncate font-semibold lg:hidden">{currentSort.mobileLabel}</span>
+              <select
+                value={sort}
+                onChange={(e) => {
+                  setSort(e.target.value);
+                  if (isStore && (storeTab === "bestselling" || storeTab === "new")) {
+                    setStoreTab("all");
+                    setFilters((prev) => ({ ...prev, category: [] }));
+                  }
+                }}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 outline-none ring-0 focus:outline-none focus:ring-0 lg:static lg:h-auto lg:w-auto lg:flex-1 lg:cursor-default lg:opacity-100"
+                aria-label="Sort products"
+              >
+                {SORTS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+              </select>
+              <span aria-hidden="true" className="shrink-0 text-muted lg:hidden">&#8964;</span>
+            </label>
+            {showInStockFilter ? (
+              <button
+                type="button"
+                onClick={() => toggleFlag("inStock")}
+                className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-medium transition ${filters.inStock ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/40"}`}
+              >
+                In stock
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -1104,7 +1095,7 @@ export function ProductBrowser({
           </div>
         ) : (
           <>
-            <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
+            <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
               {sorted.slice(0, visible).map((product) => (
                 <ProductCard
                   key={product.id}

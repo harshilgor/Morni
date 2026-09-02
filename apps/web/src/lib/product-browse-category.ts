@@ -3,6 +3,7 @@ import type { BrowseCategory } from "@/lib/browse-categories";
 type CategoryMatchProduct = {
   title: string;
   description?: string | null;
+  category?: { slug: string } | null;
 };
 
 type CategoryMatchInput = Pick<BrowseCategory, "slug"> & {
@@ -47,6 +48,9 @@ export function productMatchesBrowseCategory(
   const matchesSearchTerms = includesAny(text, category.search_terms ?? []);
 
   switch (category.slug) {
+    case "jewelry-accessories":
+      return product.category?.slug === "jewelry" || product.category?.slug === "accessories";
+
     case "sarees":
       return (
         matchesSearchTerms &&

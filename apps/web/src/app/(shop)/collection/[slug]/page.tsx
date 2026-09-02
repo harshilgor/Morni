@@ -16,11 +16,6 @@ const COLLECTIONS = {
   "best-rated": "Best rated",
 } as const;
 
-const COLLECTION_LINKS = Object.entries(COLLECTIONS).map(([slug, label]) => ({
-  href: `/collection/${slug}`,
-  label,
-}));
-
 export default async function CollectionPage({
   params,
 }: {
@@ -61,10 +56,6 @@ export default async function CollectionPage({
           showInStockFilter={false}
           sharp
           square
-          collectionLinks={COLLECTION_LINKS.map((link) => ({
-            ...link,
-            active: link.href === `/collection/${slug}`,
-          }))}
         />
       </div>
     </div>

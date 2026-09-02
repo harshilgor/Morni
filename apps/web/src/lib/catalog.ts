@@ -140,7 +140,7 @@ async function fetchHomeProductBand(options: {
   const supabase = createPublicClient();
   let query = supabase
     .from("storefront_products")
-    .select("*, stores!inner(slug, name, is_active)")
+    .select("*, category:categories(name, slug), stores!inner(slug, name, is_active)")
     .eq("is_available", true)
     .eq("stores.is_active", true)
     .order("created_at", { ascending: false })
@@ -200,14 +200,14 @@ export async function getCachedHomePriceBand(options: {
 }
 
 export async function getCachedHomeCatalog() {
-  const [stores, featured, homeProducts, megaSale, under99, under199, luxuryPicks] =
+  const [stores, featured, homeProducts, megaSale, under99, under149, luxuryPicks] =
     await Promise.all([
       getCachedActiveStores(),
       getCachedFeaturedCategories(),
       getCachedHomeProducts(48),
       getCachedHomePriceBand({ maxPrice: 55, limit: 12, tag: "home-price-max:55" }),
       getCachedHomePriceBand({ maxPrice: 99, limit: 12, tag: "home-price-max:99" }),
-      getCachedHomePriceBand({ maxPrice: 199, limit: 12, tag: "home-price-max:199" }),
+      getCachedHomePriceBand({ maxPrice: 149, limit: 12, tag: "home-price-max:149" }),
       getCachedHomePriceBand({ minPrice: 500, limit: 12, tag: "home-luxury" }),
     ]);
 
@@ -220,7 +220,7 @@ export async function getCachedHomeCatalog() {
     products: homeProducts.products,
     megaSale,
     under99,
-    under199,
+    under149,
     luxuryPicks,
     ratings: homeProducts.ratings,
   };
@@ -355,7 +355,7 @@ export async function getCachedPriceRailProducts(maxPrice: number) {
     supabase
       .from("storefront_products")
       .select(
-        "*, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
+        "*, category:categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
       )
       .eq("is_available", true)
       .eq("stores.is_active", true)

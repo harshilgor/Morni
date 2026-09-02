@@ -134,11 +134,18 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
     15,
   ),
   featuredCategory(
+    "Kaftan",
+    "kaftan",
+    "/categories/kaftan.jpg",
+    ["kaftan", "kaftans", "abaya", "modest dress", "flowy dress"],
+    16,
+  ),
+  featuredCategory(
     "Gifting",
     "gifting",
     "/categories/gifting-cover.png",
     ["gift", "gifting", "present", "celebration", "occasion"],
-    16,
+    17,
   ),
   featuredCategory(
     "Jewelry / Accessories",
@@ -156,13 +163,6 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
       "clutch",
       "scarf",
     ],
-    17,
-  ),
-  featuredCategory(
-    "Kaftan",
-    "kaftan",
-    "/categories/kaftan.jpg",
-    ["kaftan", "kaftans", "abaya", "modest dress", "flowy dress"],
     18,
   ),
 ];

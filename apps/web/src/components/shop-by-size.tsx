@@ -14,7 +14,7 @@ const SIZE_OPTIONS = [
 export function ShopBySize() {
   return (
     <section className="border-y border-[#e4d9dc] bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">
             <h2 className="shop-section-title">Shop by size</h2>
@@ -42,7 +42,7 @@ export function ShopBySize() {
                 aria-hidden
                 className="absolute -bottom-10 -left-8 h-20 w-20 rounded-full bg-white/35"
               />
-              <span className="relative flex min-h-[7.8rem] items-center justify-center">
+                <span className="relative flex min-h-[9rem] items-center justify-center">
                 <span className={`block font-display text-4xl font-bold leading-none tracking-[-0.06em] ${size.accent}`}>
                   {size.label}
                 </span>
