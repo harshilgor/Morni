@@ -169,7 +169,7 @@ function ColorGroupingPanel({
 }) {
   const colors = draft.colors.length ? draft.colors : [{ ...createColorGroup("Unassigned colour"), photos: draft.photos }];
   return (
-    <section className="mt-4 rounded-2xl border border-[#dfe8e3] bg-[#f8fbf9] p-3" aria-label="Colour grouping">
+    <section className="mt-5 rounded-2xl border border-[#dfe8e3] bg-[#f8fbf9] p-5 sm:p-6" aria-label="Colour grouping">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#34594d]">Colour groups</p>
@@ -177,14 +177,14 @@ function ColorGroupingPanel({
         </div>
         <button type="button" onClick={onAdd} className="rounded-full border-2 border-[#245448] bg-[#245448] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#173d34]">+ Add colour</button>
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {colors.map((color) => (
-          <div key={color.id} className="rounded-xl border border-line bg-white p-2.5">
+          <div key={color.id} className="rounded-xl border border-line bg-white p-4 sm:p-5">
             <div className="flex items-center gap-2">
               <input value={color.colorName} onChange={(event) => onRename(color.id, event.target.value)} placeholder="Colour name" className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm font-semibold text-ink" />
               <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${color.needsReview ? "bg-[#fff1d8] text-[#98621b]" : "bg-[#e8f5ef] text-[#2f765e]"}`}>{color.needsReview ? "Review" : "Matched"}</span>
             </div>
-            <div className="mt-2 grid grid-cols-4 gap-1.5">
+            <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
               {color.photos.map((photo) => (
                 <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-lg bg-[#edf3ef]">
                   <img src={photo.preview} alt={`${color.colorName || "Colour"} product photo`} className="h-full w-full object-cover" />
@@ -629,6 +629,7 @@ export default function BulkUploadPage() {
         .map(([draftId, fields]) => `Product ${drafts.findIndex((draft) => draft.id === draftId) + 1}: ${fields.join(", ")}`)
         .join(" · ");
       setMessage(`Complete the highlighted fields before publishing. ${summary}`);
+      window.setTimeout(() => document.querySelector("[data-upload-message]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
       return;
     }
     setValidationErrors({});
@@ -842,7 +843,7 @@ export default function BulkUploadPage() {
         </div>
       ) : null}
       {message ? (
-        <p className={`mt-5 rounded-xl px-4 py-3 text-sm ${Object.keys(validationErrors).length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length ? "alert" : "status"}>
+        <p data-upload-message className={`mt-5 rounded-xl px-4 py-3 text-sm ${Object.keys(validationErrors).length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length ? "alert" : "status"}>
           {message}
         </p>
       ) : null}
@@ -868,7 +869,7 @@ export default function BulkUploadPage() {
           </button>
         </div>
       ) : null}
-      <div className="mt-8 grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+      <div className={`mt-8 grid gap-6 ${drafts.length === 1 ? "grid-cols-1" : "lg:grid-cols-2"}`}>
         {drafts.map((draft, index) => (
           <article
             key={draft.id}
@@ -1047,7 +1048,7 @@ export default function BulkUploadPage() {
         ))}
       </div>
       {drafts.length ? (
-        <div className="sticky bottom-0 mt-8 flex items-center justify-between border-t border-line bg-background/95 py-4 backdrop-blur">
+        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mt-8 flex items-center justify-between gap-4 border-t border-line bg-background/95 py-4 backdrop-blur lg:bottom-0">
           <span className="text-sm text-muted">
             {drafts.length} products ·{" "}
             {drafts.reduce((sum, draft) => sum + draft.photos.length, 0)} photos
