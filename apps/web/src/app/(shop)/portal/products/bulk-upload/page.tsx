@@ -304,7 +304,7 @@ function ColorGroupingPanel({
               <button type="button" aria-label={`Remove ${color.colorName || "colour"} group`} onClick={() => onRemove(color.id)} className="rounded-lg p-2 text-accent-deep hover:bg-[#fff1f4]"><PortalIcon name="trash" className="h-4 w-4" /></button>
               <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${color.needsReview ? "bg-[#fff1d8] text-[#98621b]" : "bg-[#e8f5ef] text-[#2f765e]"}`}>{color.needsReview ? "Review" : "Matched"}</span>
             </div>
-            <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
               {color.photos.map((photo) => (
                 <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="group relative aspect-square cursor-grab overflow-hidden rounded-lg bg-[#edf3ef] active:cursor-grabbing">
                   <img src={photo.preview} alt={`${color.colorName || "Colour"} product photo`} className="h-full w-full object-cover" />
@@ -991,14 +991,14 @@ export default function BulkUploadPage() {
           ? "Publishing products…"
           : "Analyze and group with AI";
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+    <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 sm:py-12">
       <UploadSuccessConfetti celebrationKey={uploadCelebrationKey} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">
             Store owner portal
           </p>
-          <h1 className="mt-2 font-display text-4xl text-ink">
+          <h1 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
             Bulk upload studio
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-muted">
@@ -1026,7 +1026,7 @@ export default function BulkUploadPage() {
           setDragging(false);
           addFiles(event.dataTransfer.files);
         }}
-        className={`mt-8 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center ${dragging ? "border-accent bg-[#fff0f4]" : "border-line bg-surface"}`}
+        className={`mt-6 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-4 text-center sm:mt-8 sm:min-h-36 sm:p-6 ${dragging ? "border-accent bg-[#fff0f4]" : "border-line bg-surface"}`}
       >
         <span className="text-3xl text-accent-deep">+</span>
         <span className="mt-2 font-semibold text-ink">
@@ -1108,7 +1108,7 @@ export default function BulkUploadPage() {
           </button>
         </div>
       ) : null}
-      <div className={`mt-8 grid gap-6 ${drafts.length === 1 ? "grid-cols-1" : "lg:grid-cols-2"}`}>
+      <div className={`mt-6 grid gap-4 sm:gap-6 ${drafts.length === 1 ? "grid-cols-1" : "lg:grid-cols-2"}`}>
         {drafts.map((draft, index) => (
           <article
             key={draft.id}
@@ -1117,7 +1117,7 @@ export default function BulkUploadPage() {
               event.preventDefault();
               move(event.dataTransfer.getData("photo-id"), draft.id);
             }}
-            className={`rounded-2xl border bg-surface p-4 ${hasValidationError(draft.id, "photos") ? "border-red-400" : "border-line"}`}
+            className={`rounded-2xl border bg-surface p-3 sm:p-4 ${hasValidationError(draft.id, "photos") ? "border-red-400" : "border-line"}`}
           >
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep">
@@ -1195,7 +1195,7 @@ export default function BulkUploadPage() {
                 rows={2}
                 placeholder="Description"
               />
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <select
                   value={draft.categorySlug}
                   onChange={(event) =>
@@ -1299,8 +1299,8 @@ export default function BulkUploadPage() {
         ))}
       </div>
       {drafts.length ? (
-        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mt-8 flex items-center justify-between gap-4 border-t border-line bg-background/95 py-4 backdrop-blur lg:bottom-0">
-          <span className="text-sm text-muted">
+        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mt-6 flex flex-col items-stretch gap-3 border-t border-line bg-background/95 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-4 lg:bottom-0">
+          <span className="text-center text-xs text-muted sm:text-left sm:text-sm">
             {drafts.length} products ·{" "}
             {drafts.reduce((sum, draft) => sum + draft.photos.length, 0)} photos
           </span>
@@ -1308,7 +1308,7 @@ export default function BulkUploadPage() {
             type="button"
             onClick={() => void publish()}
             disabled={busy}
-            className="bg-ink px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            className="w-full bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto sm:px-6"
           >
             {busy ? "Publishing…" : "Publish all products"}
           </button>
