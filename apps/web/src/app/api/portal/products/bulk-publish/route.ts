@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePublicCatalog } from "@/lib/revalidate-catalog";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 
-const variantSchema = z.object({ colorName: z.string().trim().min(1).max(80), colorHex: z.string().nullable().optional(), sizes: z.array(z.string().trim().min(1).max(24)).max(20).default([]), sizeStock: z.record(z.string(), z.number().int().nonnegative()).default({}), stock: z.number().int().nonnegative(), images: z.array(z.string().url()).min(1).max(5) });
-const itemSchema = z.object({ title: z.string().trim().min(3).max(120), productTag: z.union([z.string().trim().regex(/^[A-Za-z][A-Za-z0-9-]{0,39}$/), z.literal("")]).default(""), description: z.string().trim().max(2000).default(""), fabric: z.enum(PRODUCT_FABRICS).nullable().optional(), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)), sizeStock: z.record(z.string(), z.number().int().nonnegative()).default({}), images: z.array(z.string().url()).min(1).max(5), variants: z.array(variantSchema).max(20).default([]) });
+const MAX_PHOTOS_PER_COLOUR = 10;
+const variantSchema = z.object({ colorName: z.string().trim().min(1).max(80), colorHex: z.string().nullable().optional(), sizes: z.array(z.string().trim().min(1).max(24)).max(20).default([]), sizeStock: z.record(z.string(), z.number().int().nonnegative()).default({}), stock: z.number().int().nonnegative(), images: z.array(z.string().url()).min(1).max(MAX_PHOTOS_PER_COLOUR) });
+const itemSchema = z.object({ title: z.string().trim().min(3).max(120), productTag: z.union([z.string().trim().regex(/^[A-Za-z][A-Za-z0-9-]{0,39}$/), z.literal("")]).default(""), description: z.string().trim().max(2000).default(""), fabric: z.enum(PRODUCT_FABRICS).nullable().optional(), categorySlug: z.string().trim().min(1).max(80), priceAed: z.number().finite().nonnegative(), stock: z.number().int().nonnegative(), sizes: z.array(z.string().trim().min(1).max(24)), sizeStock: z.record(z.string(), z.number().int().nonnegative()).default({}), images: z.array(z.string().url()).min(1).max(MAX_PHOTOS_PER_COLOUR), variants: z.array(variantSchema).max(20).default([]) });
 // Validate store ownership against the authenticated membership below rather
 // than assuming every deployed database formats store IDs as UUIDs.
 const schema = z.object({ storeId: z.string().trim().min(1).max(200), items: z.array(itemSchema).min(1).max(100).optional(), importId: z.string().uuid().optional() });
@@ -18,12 +19,29 @@ export async function POST(request: Request) {
   const requestBody = await request.json().catch(() => null);
   const parsed = schema.safeParse(requestBody);
   if (!parsed.success) {
+    const rawItems = typeof requestBody === "object" && requestBody !== null && "items" in requestBody && Array.isArray(requestBody.items)
+      ? requestBody.items
+      : [];
+    const productTitle = (index: number) => {
+      const item = rawItems[index];
+      return typeof item === "object" && item !== null && "title" in item && typeof item.title === "string" && item.title.trim()
+        ? `“${item.title.trim()}”`
+        : `Product ${index + 1}`;
+    };
+    const colourName = (productIndex: number, colorIndex: number) => {
+      const item = rawItems[productIndex];
+      const variants = typeof item === "object" && item !== null && "variants" in item && Array.isArray(item.variants) ? item.variants : [];
+      const variant = variants[colorIndex];
+      return typeof variant === "object" && variant !== null && "colorName" in variant && typeof variant.colorName === "string" && variant.colorName.trim()
+        ? `“${variant.colorName.trim()}”`
+        : `colour ${colorIndex + 1}`;
+    };
     const issues = parsed.error.issues.map((issue) => {
       const [scope, productIndex, variantKey, colorIndex, field] = issue.path;
       if (scope === "items" && typeof productIndex === "number" && variantKey === "variants" && typeof colorIndex === "number" && field === "images" && issue.code === "too_big")
-        return `Product ${productIndex + 1}, colour ${colorIndex + 1}: a colour can have a maximum of 5 photos.`;
+        return `${productTitle(productIndex)} → ${colourName(productIndex, colorIndex)}: a colour can have a maximum of ${MAX_PHOTOS_PER_COLOUR} photos.`;
       if (scope === "items" && typeof productIndex === "number" && field === "images" && issue.code === "too_big")
-        return `Product ${productIndex + 1}: a product without colourways can have a maximum of 5 photos.`;
+        return `${productTitle(productIndex)}: a product without colourways can have a maximum of ${MAX_PHOTOS_PER_COLOUR} photos.`;
       return `Review ${issue.path.join(" → ") || "the bulk-upload details"}: ${issue.message}`;
     });
     return NextResponse.json({ error: issues[0] ?? "Review the product fields and try again.", issues }, { status: 400 });

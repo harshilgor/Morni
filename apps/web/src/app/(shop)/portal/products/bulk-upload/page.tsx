@@ -49,8 +49,9 @@ type PublishProgress = {
   stage: "uploading" | "saving";
 };
 
-const BULK_UPLOAD_MAX_PHOTOS = 500;
+const BULK_UPLOAD_MAX_PHOTOS = 1_000;
 const AI_ANALYSIS_MAX_PHOTOS = 30;
+const MAX_PHOTOS_PER_COLOUR = 10;
 const BULK_UPLOAD_DRAFT_DB = "morni-bulk-upload-drafts";
 const BULK_UPLOAD_DRAFT_STORE = "drafts";
 
@@ -305,7 +306,7 @@ function ColorGroupingPanel({
               ))}
             </div>
             {noSize ? <label className="mt-3 block text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">Colour stock<input type="number" min="0" value={color.stock} onChange={(event) => onStockChange(color.id, color.sizeStock, event.target.value)} className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm font-normal normal-case tracking-normal" /></label> : <div className="mt-3"><SizeInventoryEditor sizes={draft.sizes} sizeStock={color.sizeStock} onChange={(_, stock) => onStockChange(color.id, stock, color.stock)} /></div>}
-            <p className={`mt-2 text-[11px] ${hasColorError ? "font-semibold text-red-600" : "text-muted"}`}>{color.photos.length} / 5 photos · quantities can be entered before publishing</p>
+            <p className={`mt-2 text-[11px] ${hasColorError ? "font-semibold text-red-600" : "text-muted"}`}>{color.photos.length} / {MAX_PHOTOS_PER_COLOUR} photos · quantities can be entered before publishing</p>
             {hasColorError ? <p className="mt-2 text-xs font-medium text-red-600">Fix: {colorErrors.join(", ")}.</p> : null}
           </div>
         )})}
@@ -313,7 +314,7 @@ function ColorGroupingPanel({
       {colors.length ? (
         <div className="mt-5 rounded-xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8b641f]">Unassigned photos</p>
-          <p className="mt-1 text-xs text-[#8b641f]">Assign each photo to a colour, or delete photos that should not be published. Each colour supports up to five photos.</p>
+          <p className="mt-1 text-xs text-[#8b641f]">Assign each photo to a colour, or delete photos that should not be published. Each colour supports up to {MAX_PHOTOS_PER_COLOUR} photos.</p>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             {unassignedPhotos.map((photo) => (
               <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="group relative overflow-hidden rounded-lg border border-[#ead8a8] bg-white">
@@ -321,7 +322,7 @@ function ColorGroupingPanel({
                 <button type="button" onClick={() => onDeletePhoto(photo.id)} className="absolute right-1 top-1 rounded bg-white/95 p-1 text-accent-deep shadow opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100" title="Delete this photo from the upload"><PortalIcon name="trash" className="h-3.5 w-3.5" /></button>
                 <select aria-label="Assign unassigned photo to colour" defaultValue="" onChange={(event) => { if (event.target.value) onAssign(photo.id, event.target.value); }} className="w-full border-t border-[#ead8a8] bg-white px-2 py-2 text-xs text-ink">
                   <option value="">Choose colour…</option>
-                  {colors.map((color) => <option key={color.id} value={color.id} disabled={color.photos.length >= 5}>{color.colorName || "Unnamed colour"}{color.photos.length >= 5 ? " · full (5/5)" : ` (${color.photos.length}/5)`}</option>)}
+                  {colors.map((color) => <option key={color.id} value={color.id} disabled={color.photos.length >= MAX_PHOTOS_PER_COLOUR}>{color.colorName || "Unnamed colour"}{color.photos.length >= MAX_PHOTOS_PER_COLOUR ? ` · full (${MAX_PHOTOS_PER_COLOUR}/${MAX_PHOTOS_PER_COLOUR})` : ` (${color.photos.length}/${MAX_PHOTOS_PER_COLOUR})`}</option>)}
                 </select>
               </div>
             ))}
@@ -403,6 +404,7 @@ export default function BulkUploadPage() {
   const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null);
   const [showCoach, setShowCoach] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [publishIssues, setPublishIssues] = useState<string[]>([]);
   const [uploadCelebrationKey, setUploadCelebrationKey] = useState(0);
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   const [colorValidationErrors, setColorValidationErrors] = useState<Record<string, string[]>>({});
@@ -495,7 +497,7 @@ export default function BulkUploadPage() {
         stock: "",
         sizes: ["S", "M", "L"],
         sizeStock: { S: 0, M: 0, L: 0 },
-        colors: [{ ...createColorGroup("Unassigned colour"), photos }],
+        colors: [],
       })),
     ];
     setDrafts(nextDrafts);
@@ -511,8 +513,8 @@ export default function BulkUploadPage() {
   }
   function assignColor(draftId: string, photoId: string, colorId: string) {
     const target = drafts.find((draft) => draft.id === draftId)?.colors.find((color) => color.id === colorId);
-    if (target && !target.photos.some((photo) => photo.id === photoId) && target.photos.length >= 5) {
-      setMessage(`${target.colorName || "This colour"} already has 5 photos. Remove or unassign a photo before adding another.`);
+    if (target && !target.photos.some((photo) => photo.id === photoId) && target.photos.length >= MAX_PHOTOS_PER_COLOUR) {
+      setMessage(`${target.colorName || "This colour"} already has ${MAX_PHOTOS_PER_COLOUR} photos. Remove or unassign a photo before adding another.`);
       return;
     }
     setDrafts((current) => current.map((draft) => {
@@ -746,19 +748,20 @@ export default function BulkUploadPage() {
         .filter(([, missing]) => missing.length),
     ) as Record<string, string[]>;
     const nextColorValidationErrors: Record<string, string[]> = {};
-    drafts.forEach((draft) => {
+    drafts.forEach((draft, draftIndex) => {
+      const productTitle = draft.title.trim() || `Product ${draftIndex + 1}`;
       const assignedPhotoIds = new Set(draft.colors.flatMap((color) => color.photos.map((photo) => photo.id)));
       if (draft.colors.length && draft.photos.some((photo) => !assignedPhotoIds.has(photo.id)))
         missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "assign every photo to a colour or delete it"];
-      if (!draft.colors.length && draft.photos.length > 5)
-        missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "maximum 5 photos without colourways"];
-      draft.colors.forEach((color) => {
+      if (!draft.colors.length && draft.photos.length > MAX_PHOTOS_PER_COLOUR)
+        missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), `maximum ${MAX_PHOTOS_PER_COLOUR} photos without colourways`];
+      draft.colors.forEach((color, colorIndex) => {
         const errors = [
           !color.colorName.trim() ? "colour name" : null,
           !color.photos.length ? "at least one photo" : null,
-          color.photos.length > 5 ? `maximum 5 photos (currently ${color.photos.length})` : null,
+          color.photos.length > MAX_PHOTOS_PER_COLOUR ? `maximum ${MAX_PHOTOS_PER_COLOUR} photos (currently ${color.photos.length})` : null,
         ].filter((error): error is string => Boolean(error));
-        if (errors.length) nextColorValidationErrors[color.id] = errors;
+        if (errors.length) nextColorValidationErrors[color.id] = errors.map((error) => `${productTitle} → ${color.colorName.trim() || `Colour ${colorIndex + 1}`}: ${error}`);
       });
     });
     const tags = drafts.map((draft) => draft.productTag.trim().toUpperCase()).filter(Boolean);
@@ -777,20 +780,25 @@ export default function BulkUploadPage() {
     if (Object.keys(missingByDraft).length || Object.keys(nextColorValidationErrors).length) {
       setValidationErrors(missingByDraft);
       setColorValidationErrors(nextColorValidationErrors);
-      const productSummary = Object.entries(missingByDraft)
-        .map(([draftId, fields]) => `Product ${drafts.findIndex((draft) => draft.id === draftId) + 1}: ${fields.join(", ")}`)
-        .join(" · ");
-      const colorSummary = drafts
+      const productIssues = Object.entries(missingByDraft)
+        .map(([draftId, fields]) => {
+          const draft = drafts.find((item) => item.id === draftId);
+          const title = draft?.title.trim() || `Product ${drafts.findIndex((item) => item.id === draftId) + 1}`;
+          return `${title}: ${fields.join(", ")}`;
+        });
+      const colorIssues = drafts
         .flatMap((draft, draftIndex) => draft.colors.map((color, colorIndex) => ({ draftIndex, colorIndex, errors: nextColorValidationErrors[color.id] })))
         .filter((color): color is { draftIndex: number; colorIndex: number; errors: string[] } => Boolean(color.errors))
-        .map((color) => `Product ${color.draftIndex + 1}, colour ${color.colorIndex + 1}: ${color.errors.join(", ")}`)
-        .join(" · ");
-      setMessage(`Fix the highlighted fields before publishing. ${[productSummary, colorSummary].filter(Boolean).join(" · ")}`);
+        .flatMap((color) => color.errors);
+      const issues = [...productIssues, ...colorIssues];
+      setPublishIssues(issues);
+      setMessage(`Fix ${issues.length} highlighted issue${issues.length === 1 ? "" : "s"} before publishing.`);
       window.setTimeout(() => document.querySelector("[data-upload-message]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
       return;
     }
     setValidationErrors({});
     setColorValidationErrors({});
+    setPublishIssues([]);
     setBusy(true);
     setBusyPhase("publishing");
     setMessage(null);
@@ -819,23 +827,28 @@ export default function BulkUploadPage() {
           colorName: color.colorName.trim() || (colorIndex === 0 ? draft.colorName.trim() : "Default"),
           photos: color.photos,
         }));
-        if (unassignedPhotos.length || colors.some((color) => !color.photos.length || !color.colorName || color.photos.length > 5)) throw new Error(`Fix the highlighted colour assignments for ${draft.title} before publishing.`);
+        if (unassignedPhotos.length || colors.some((color) => !color.photos.length || !color.colorName || color.photos.length > MAX_PHOTOS_PER_COLOUR)) throw new Error(`Fix the highlighted colour assignments for ${draft.title} before publishing.`);
         const aggregateSizeStock = noSizes(draft.categorySlug) ? {} : aggregateBulkSizeStock(colors, draft.sizes);
         const variants = [];
         for (const color of colors) {
-          const images = await uploadProductImages({
-            storeId: store.id,
-            files: color.photos.map((photo) => photo.file),
-            onFileUploaded: () => {
-              uploadedPhotoCount += 1;
-              setPublishProgress({
-                completed: uploadedPhotoCount,
-                total: totalPhotoCount,
-                currentProduct: draft.title,
-                stage: "uploading",
-              });
-            },
-          });
+          let images: string[];
+          try {
+            images = await uploadProductImages({
+              storeId: store.id,
+              files: color.photos.map((photo) => photo.file),
+              onFileUploaded: () => {
+                uploadedPhotoCount += 1;
+                setPublishProgress({
+                  completed: uploadedPhotoCount,
+                  total: totalPhotoCount,
+                  currentProduct: draft.title,
+                  stage: "uploading",
+                });
+              },
+            });
+          } catch (error) {
+            throw new Error(`${draft.title || "Untitled product"} → ${color.colorName}: ${error instanceof Error ? error.message : "image upload failed"}`);
+          }
           uploadedUrls.push(...images);
           const colorStock = noSizes(draft.categorySlug) ? Number(color.stock || 0) : Object.values(color.sizeStock).reduce((sum, quantity) => sum + quantity, 0);
           variants.push({ colorName: color.colorName.trim(), colorHex: color.colorHex ?? null, sizes: noSizes(draft.categorySlug) ? [] : draft.sizes, sizeStock: noSizes(draft.categorySlug) ? {} : color.sizeStock, stock: colorStock, images });
@@ -850,7 +863,7 @@ export default function BulkUploadPage() {
           stock: Number(draft.stock),
           sizes: noSizes(draft.categorySlug) ? [] : draft.sizes,
           sizeStock: aggregateSizeStock,
-          images: variants.flatMap((variant) => variant.images).slice(0, 5),
+          images: variants.flatMap((variant) => variant.images).slice(0, MAX_PHOTOS_PER_COLOUR),
           variants,
         });
       }
@@ -865,14 +878,15 @@ export default function BulkUploadPage() {
         body: JSON.stringify({ storeId: store.id, items }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Bulk publish failed.");
+      if (!response.ok) throw new Error((result.issues ?? [result.error ?? "Bulk publish failed."]).join(" · "));
       if (result.failed) {
         if (result.created > 0) setUploadCelebrationKey(Date.now());
         const failures = (result.results ?? [])
           .filter((item: { ok: boolean }) => !item.ok)
           .map((item: { title: string; error?: string }) => `${item.title}: ${item.error ?? "could not be published"}`)
-          .join(" · ");
-        setMessage(`${result.created} products published, ${result.failed} failed. ${failures}`);
+          .filter(Boolean);
+        setPublishIssues(failures);
+        setMessage(`${result.created} products published, ${result.failed} need attention.`);
         return;
       }
       setMessage(
@@ -889,9 +903,9 @@ export default function BulkUploadPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ storeId: store.id, urls: uploadedUrls }),
         });
-      setMessage(
-        error instanceof Error ? error.message : "Bulk publish failed.",
-      );
+      const issue = error instanceof Error ? error.message : "Bulk publish failed.";
+      setPublishIssues(issue.split(" · "));
+      setMessage("Publishing stopped. Fix the issue below and try again.");
     } finally {
       setBusy(false);
       setBusyPhase("idle");
@@ -913,7 +927,7 @@ export default function BulkUploadPage() {
         body: JSON.stringify({ storeId: store.id, importId }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Retry failed.");
+      if (!response.ok) throw new Error((result.issues ?? [result.error ?? "Retry failed."]).join(" · "));
       setMessage(
         `${result.created} products published${result.failed ? `, ${result.failed} still failed` : ""}.`,
       );
@@ -928,7 +942,9 @@ export default function BulkUploadPage() {
         .limit(10);
       setHistory((data ?? []) as typeof history);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Retry failed.");
+      const issue = error instanceof Error ? error.message : "Retry failed.";
+      setPublishIssues(issue.split(" · "));
+      setMessage("Retry stopped. Fix the issue below and try again.");
     } finally {
       setBusy(false);
       setBusyPhase("idle");
@@ -987,7 +1003,7 @@ export default function BulkUploadPage() {
           Drop product photos here
         </span>
         <span className="mt-1 text-sm text-muted">
-          JPG, PNG or WebP · up to 30 images for AI analysis
+          JPG, PNG or WebP · up to {BULK_UPLOAD_MAX_PHOTOS.toLocaleString()} photos per upload · AI reviews groups of {AI_ANALYSIS_MAX_PHOTOS}
         </span>
         <input
           type="file"
@@ -1027,8 +1043,16 @@ export default function BulkUploadPage() {
           </div>
         </div>
       ) : null}
+      {publishIssues.length ? (
+        <section data-upload-message className="mt-5 rounded-xl border border-red-200 bg-[#fff1f1] px-4 py-3 text-sm text-red-800" role="alert">
+          <p className="font-semibold">Fix these issues before publishing:</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {publishIssues.map((issue, index) => <li key={`${issue}-${index}`}>{issue}</li>)}
+          </ul>
+        </section>
+      ) : null}
       {message ? (
-        <p data-upload-message className={`mt-5 rounded-xl px-4 py-3 text-sm ${Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length ? "alert" : "status"}>
+        <p data-upload-message className={`mt-5 rounded-xl px-4 py-3 text-sm ${Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length || publishIssues.length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length || publishIssues.length ? "alert" : "status"}>
           {message}
         </p>
       ) : null}
