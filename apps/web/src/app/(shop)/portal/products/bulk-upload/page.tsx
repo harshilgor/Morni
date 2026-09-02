@@ -11,6 +11,7 @@ import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 import { AiProcessingOverlay as SimpleAiProcessingOverlay } from "@/components/ai-processing-overlay";
+import { aggregateBulkSizeStock } from "@/lib/product-variants";
 
 type Photo = { id: string; file: File; preview: string };
 type ColorGroup = {
@@ -172,6 +173,7 @@ function ColorGroupingPanel({
   onAssign,
   onRename,
   onAdd,
+  onRemove,
   onStockChange,
   noSize,
 }: {
@@ -179,18 +181,19 @@ function ColorGroupingPanel({
   onAssign: (photoId: string, colorId: string) => void;
   onRename: (colorId: string, colorName: string, colorHex?: string) => void;
   onAdd: () => void;
+  onRemove: (colorId: string) => void;
   onStockChange: (colorId: string, sizeStock: Record<string, number>, stock: string) => void;
   noSize: boolean;
 }) {
-  const colors = draft.colors.length ? draft.colors : [{ ...createColorGroup("Unassigned colour"), photos: draft.photos }];
+  const colors = draft.colors;
   const assignedPhotoIds = new Set(colors.flatMap((color) => color.photos.map((photo) => photo.id)));
   const unassignedPhotos = draft.photos.filter((photo) => !assignedPhotoIds.has(photo.id));
   return (
     <section className="mt-5 rounded-2xl border border-[#dfe8e3] bg-[#f8fbf9] p-5 sm:p-6" aria-label="Colour grouping">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#34594d]">Colour groups</p>
-          <p className="mt-1 text-xs text-muted">Click an image and choose the colour it belongs to.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#34594d]">Colours (optional)</p>
+          <p className="mt-1 text-xs text-muted">AI groups products only. Add colours manually if this product has colourways.</p>
         </div>
         <button type="button" onClick={onAdd} className="rounded-full border-2 border-[#245448] bg-[#245448] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#173d34]">+ Add colour</button>
       </div>
@@ -202,6 +205,7 @@ function ColorGroupingPanel({
                 <input aria-label="Colour swatch" type="color" value={color.colorHex || colourHexForName(color.colorName)} onChange={(event) => onRename(color.id, color.colorName, event.target.value)} className="absolute -inset-2 h-14 w-14 cursor-pointer" />
               </label>
               <input value={color.colorName} onChange={(event) => onRename(color.id, event.target.value)} placeholder="Colour name" className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm font-semibold text-ink" />
+              <button type="button" aria-label={`Remove ${color.colorName || "colour"} group`} onClick={() => onRemove(color.id)} className="rounded-lg p-2 text-accent-deep hover:bg-[#fff1f4]"><PortalIcon name="trash" className="h-4 w-4" /></button>
               <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${color.needsReview ? "bg-[#fff1d8] text-[#98621b]" : "bg-[#e8f5ef] text-[#2f765e]"}`}>{color.needsReview ? "Review" : "Matched"}</span>
             </div>
             <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
@@ -219,7 +223,7 @@ function ColorGroupingPanel({
           </div>
         ))}
       </div>
-      {unassignedPhotos.length ? (
+      {unassignedPhotos.length && colors.length ? (
         <div className="mt-5 rounded-xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8b641f]">Unassigned photos</p>
           <p className="mt-1 text-xs text-[#8b641f]">Click a photo, then choose the colour group it belongs to.</p>
@@ -448,6 +452,9 @@ export default function BulkUploadPage() {
   function addColor(draftId: string) {
     setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: [...(draft.colors.length ? draft.colors : [{ ...createColorGroup("Unassigned colour"), photos: draft.photos }]), createColorGroup()] } : draft));
   }
+  function removeColor(draftId: string, colorId: string) {
+    setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: draft.colors.filter((color) => color.id !== colorId) } : draft));
+  }
   function updateColorStock(draftId: string, colorId: string, sizeStock: Record<string, number>, stock: string) {
     setDrafts((current) => current.map((draft) => {
       if (draft.id !== draftId) return draft;
@@ -599,15 +606,8 @@ export default function BulkUploadPage() {
             sizeStock: { S: 0, M: 0, L: 0 },
             confidence: group.confidence,
             needsReview: group.needsReview,
-            colors: (group.colorGroups?.length ? group.colorGroups : [{ imageIds: group.imageIds, colorName: group.colorName, confidence: group.confidence, needsReview: true }]).map((colorGroup: { imageIds: string[]; colorName: string; confidence: number; needsReview: boolean }) => ({
-              id: uid(),
-              colorName: colorGroup.colorName || "Unassigned colour",
-              photos: colorGroup.imageIds.map((imageId) => photoMap.get(imageId)).filter(Boolean),
-              confidence: colorGroup.confidence,
-              needsReview: colorGroup.needsReview,
-              sizeStock: { S: 0, M: 0, L: 0 },
-              stock: "0",
-            })),
+            // Colourways are intentionally manual; AI only groups photos into products.
+            colors: [],
           }),
         )
         .filter((draft: Draft) => draft.photos.length);
@@ -696,6 +696,7 @@ export default function BulkUploadPage() {
           photos: colorIndex === 0 ? [...color.photos, ...unassignedPhotos] : color.photos,
         }));
         if (colors.some((color) => !color.photos.length || !color.colorName)) throw new Error(`Assign every photo and name each colour for ${draft.title}.`);
+        const aggregateSizeStock = noSizes(draft.categorySlug) ? {} : aggregateBulkSizeStock(colors, draft.sizes);
         const variants = [];
         for (const color of colors) {
           setMessage(`Uploading images for ${draft.title}…`);
@@ -713,7 +714,7 @@ export default function BulkUploadPage() {
           priceAed: Number(draft.priceAed),
           stock: Number(draft.stock),
           sizes: noSizes(draft.categorySlug) ? [] : draft.sizes,
-          sizeStock: noSizes(draft.categorySlug) ? {} : draft.sizeStock,
+          sizeStock: aggregateSizeStock,
           images: variants.flatMap((variant) => variant.images).slice(0, 5),
           variants,
         });
@@ -963,7 +964,7 @@ export default function BulkUploadPage() {
                 Drop a photo here.
               </div>
             ) : null}
-            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} /> : null}
+            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onRemove={(colorId) => removeColor(draft.id, colorId)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} /> : null}
             <div className="mt-4 grid gap-3">
               <label className={`flex items-center gap-2 border-b py-2 ${hasValidationError(draft.id, "product name") ? "border-red-400" : "border-line"}`}>
                 <input
@@ -1057,7 +1058,7 @@ export default function BulkUploadPage() {
                   {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
                 </select>
               </label>
-              {!noSizes(draft.categorySlug) ? (
+              {!noSizes(draft.categorySlug) && !draft.colors.length ? (
                 <>
                 <SizeInventoryEditor
                   sizes={draft.sizes}
@@ -1084,6 +1085,8 @@ export default function BulkUploadPage() {
                   ))}
                 </div>
                 </>
+              ) : draft.colors.length ? (
+                <p className="rounded-lg bg-[#eef8f1] px-3 py-2 text-xs text-[#245448]">Inventory is managed per colour above.</p>
               ) : (
                 <p className="text-xs text-muted">
                   No clothing sizes for this category.

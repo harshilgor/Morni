@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aggregateFromColorDrafts,
+  aggregateBulkSizeStock,
   colorDraftFromVariant,
   createColorDraft,
   quantityForVariantSize,
@@ -18,6 +19,10 @@ describe("colour variants", () => {
       sizes: ["S", "M", "L"],
       size_stock: { S: 2, M: 7, L: 1 },
     });
+  });
+
+  it("merges bulk-upload colour quantities into main inventory", () => {
+    expect(aggregateBulkSizeStock([{ sizeStock: { S: 2, M: 3, L: 0 } }, { sizeStock: { S: 1, M: 0, L: 4 } }], ["S", "M", "L"])).toEqual({ S: 3, M: 3, L: 4 });
   });
 
   it("rejects negative or fractional per-size quantities", () => {

@@ -18,7 +18,13 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Review the product fields and try again." }, { status: 400 });
   const { storeId } = parsed.data;
-  const admin = createAdminClient();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    console.error("Bulk publish server credentials are not configured", { name: error instanceof Error ? error.name : "unknown" });
+    return NextResponse.json({ error: "Product publishing is not configured on this server yet. Add the new Supabase service-role key and try again." }, { status: 503 });
+  }
   const [{ data: member }, { data: profile }] = await Promise.all([admin.from("store_members").select("store_id").eq("store_id", storeId).eq("user_id", user.id).maybeSingle(), admin.from("profiles").select("role").eq("id", user.id).maybeSingle()]);
   if (!member && profile?.role !== "admin") return NextResponse.json({ error: "You do not have access to this store." }, { status: 403 });
   let importId = parsed.data.importId;

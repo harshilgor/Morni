@@ -141,6 +141,14 @@ export function aggregateFromColorDrafts(drafts: ColorDraft[], includeSizes = tr
   };
 }
 
+/** Merge per-colour quantities into the product-level inventory payload. */
+export function aggregateBulkSizeStock(colors: Array<{ sizeStock: Record<string, number> }>, sizes: string[]) {
+  return sizes.reduce<Record<string, number>>((result, size) => {
+    result[size] = colors.reduce((sum, color) => sum + Math.max(0, Number(color.sizeStock[size] ?? 0)), 0);
+    return result;
+  }, {});
+}
+
 export function quantityForVariantSize(
   variant: Pick<ProductVariantLike, "size_stock" | "stock">,
   size: string,
