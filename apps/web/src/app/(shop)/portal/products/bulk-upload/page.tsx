@@ -42,7 +42,8 @@ type Draft = {
   colors: ColorGroup[];
 };
 
-const BULK_UPLOAD_MAX_PHOTOS = 30;
+const BULK_UPLOAD_MAX_PHOTOS = 500;
+const AI_ANALYSIS_MAX_PHOTOS = 30;
 const BULK_UPLOAD_DRAFT_DB = "morni-bulk-upload-drafts";
 const BULK_UPLOAD_DRAFT_STORE = "drafts";
 
@@ -495,11 +496,11 @@ export default function BulkUploadPage() {
       return;
     }
     if (valid.length > remainingPhotoSlots) {
-      setMessage(`You can analyze up to ${BULK_UPLOAD_MAX_PHOTOS} photos per batch. The first ${remainingPhotoSlots} valid photo${remainingPhotoSlots === 1 ? "" : "s"} were added; select the remaining photos again as a new batch after this one.`);
+      setMessage(`A bulk upload can contain up to ${BULK_UPLOAD_MAX_PHOTOS} photos. The first ${remainingPhotoSlots} valid photo${remainingPhotoSlots === 1 ? "" : "s"} were added; add the remaining photos in a new upload.`);
     }
     const accepted = valid.slice(0, remainingPhotoSlots);
     if (!accepted.length) {
-      setMessage("Upload up to 30 valid JPG, PNG, or WebP images.");
+      setMessage(`Upload up to ${BULK_UPLOAD_MAX_PHOTOS} valid JPG, PNG, or WebP images.`);
       return;
     }
     const grouped = new Map<string, Photo[]>();
@@ -667,27 +668,38 @@ export default function BulkUploadPage() {
         ),
       );
       setBusyPhase("analyzing");
-      setMessage(
-        `Analyzing ${images.length} photos and grouping matching product views…`,
-      );
-      const response = await fetch("/api/portal/products/bulk-analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(60_000),
-        body: JSON.stringify({ storeId: store.id, images }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(
-          result.error ?? "AI grouping failed. You can continue manually.",
-        );
       const photoMap = new Map(
         draftsToAnalyze.flatMap((draft) =>
           draft.photos.map((photo) => [photo.id, photo]),
         ),
       );
-      const grouped: Draft[] = result.groups
-        .map(
+      const batches = Array.from(
+        { length: Math.ceil(images.length / AI_ANALYSIS_MAX_PHOTOS) },
+        (_, index) => images.slice(index * AI_ANALYSIS_MAX_PHOTOS, (index + 1) * AI_ANALYSIS_MAX_PHOTOS),
+      );
+      const grouped: Draft[] = [];
+      const warnings: string[] = [];
+      for (const [batchIndex, batch] of batches.entries()) {
+        setBusyPhase("analyzing");
+        setMessage(
+          batches.length > 1
+            ? `Analyzing batch ${batchIndex + 1} of ${batches.length} (${batch.length} photos)…`
+            : `Analyzing ${batch.length} photos and grouping matching product views…`,
+        );
+        const response = await fetch("/api/portal/products/bulk-analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(60_000),
+          body: JSON.stringify({ storeId: store.id, images: batch }),
+        });
+        const result = await response.json();
+        if (!response.ok)
+          throw new Error(
+            result.error ?? "AI grouping failed. You can continue manually.",
+          );
+        if (result.warning) warnings.push(result.warning);
+        grouped.push(
+          ...result.groups.map(
           (group: {
             imageIds: string[];
             title: string;
@@ -717,16 +729,16 @@ export default function BulkUploadPage() {
             // Colourways are intentionally manual; AI only groups photos into products.
             colors: [],
           }),
-        )
-        .filter((draft: Draft) => draft.photos.length);
+          ).filter((draft: Draft) => draft.photos.length),
+        );
+      }
       const safeGroups = grouped.map((draft) => ({
         ...draft,
         needsReview: draft.needsReview || draft.colors.some((color) => color.needsReview),
       }));
       setDrafts(safeGroups);
       setMessage(
-        result.warning ??
-          `AI grouped ${images.length} photos into ${safeGroups.length} product candidates. Review flagged groups before publishing.`,
+        `${warnings[0] ? `${warnings[0]} ` : ""}AI grouped ${images.length} photos into ${safeGroups.length} product candidates.${batches.length > 1 ? " Photos were analyzed in separate batches, so review any matching product views that landed in different batches." : ""} Review flagged groups before publishing.`,
       );
     } catch (error) {
       setMessage(

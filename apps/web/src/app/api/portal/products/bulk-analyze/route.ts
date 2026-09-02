@@ -4,9 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { mergeBrowseCategories, type BrowseCategory } from "@/lib/browse-categories";
 
 const imageSchema = z.object({ id: z.string().max(100), name: z.string().max(200), data: z.string().regex(/^data:image\/(jpeg|png|webp);base64,/i).max(6_000_000) });
+const MAX_ANALYSIS_IMAGES = 30;
 // Store identifiers are validated against the authenticated membership below.
 // Do not assume every deployed database uses UUID-formatted identifiers.
-const schema = z.object({ storeId: z.string().trim().min(1).max(200), images: z.array(imageSchema).min(1).max(30) });
+const schema = z.object({ storeId: z.string().trim().min(1).max(200), images: z.array(imageSchema).min(1).max(MAX_ANALYSIS_IMAGES) });
 const suggestionSchema = z.object({ groups: z.array(z.object({ imageIds: z.array(z.string().max(100)).min(1), title: z.string().max(120), description: z.string().max(600), categorySlug: z.string().max(80), colorName: z.string().max(40), confidence: z.number().min(0).max(1), needsReview: z.boolean(), colorGroups: z.array(z.object({ imageIds: z.array(z.string().max(100)).min(1), colorName: z.string().max(40), confidence: z.number().min(0).max(1), needsReview: z.boolean() })).max(20).default([]) }).passthrough()).max(30) });
 
 type Suggestion = z.infer<typeof suggestionSchema>["groups"][number];
@@ -50,8 +51,19 @@ export async function POST(request: Request) {
     console.error("Bulk photo grouping Supabase client failed", { requestId, name: error instanceof Error ? error.name : "unknown" });
     return NextResponse.json({ error: "Supabase session verification failed. Please try again." }, { status: 503 });
   }
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  const requestBody = await request.json().catch(() => null);
+  const parsed = schema.safeParse(requestBody);
   if (!parsed.success) {
+    const imageCount =
+      typeof requestBody === "object" && requestBody !== null && "images" in requestBody && Array.isArray(requestBody.images)
+        ? requestBody.images.length
+        : 0;
+    if (imageCount > MAX_ANALYSIS_IMAGES) {
+      return NextResponse.json(
+        { error: `AI can analyze up to ${MAX_ANALYSIS_IMAGES} photos at a time. Your product drafts remain safe; split the AI analysis into smaller batches, then publish all products together.` },
+        { status: 413 },
+      );
+    }
     console.error("Bulk photo grouping payload validation failed", { requestId, issueCount: parsed.error.issues.length, paths: parsed.error.issues.map((issue) => issue.path.join(".")) });
     return NextResponse.json({ error: "The photo request could not be validated. Please try selecting the images again." }, { status: 400 });
   }
