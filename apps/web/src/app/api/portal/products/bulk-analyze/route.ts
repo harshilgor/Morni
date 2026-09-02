@@ -89,8 +89,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Supabase could not load the store details. Please try again." }, { status: 503 });
   }
   if (!member && profile?.role !== "admin") return NextResponse.json({ error: "You do not have access to this store." }, { status: 403 });
-  const key = process.env.OPENAI_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const key = process.env.OPENAI_API_KEY?.trim();
+  // Treat deployment redaction placeholders as unset. Otherwise the route
+  // would always prefer Gemini and silently fall back when only OpenAI is
+  // actually configured.
+  const configuredGeminiKey = process.env.GEMINI_API_KEY?.trim();
+  const geminiKey = configuredGeminiKey && !/^\[[^\]]+\]$/.test(configuredGeminiKey)
+    ? configuredGeminiKey
+    : undefined;
   if (!key && !geminiKey) return NextResponse.json({ error: "AI analysis is not configured. You can still review products manually." }, { status: 503 });
   const model = geminiKey ? (process.env.GEMINI_VISION_MODEL || "gemini-3.5-flash") : (process.env.OPENAI_VISION_MODEL || "gpt-4o-mini");
   console.info("Bulk photo grouping sending request", { requestId, provider: geminiKey ? "Gemini" : "OpenAI", model, imageCount: images.length });
@@ -113,7 +119,7 @@ export async function POST(request: Request) {
         ] }],
         generationConfig: { responseMimeType: "application/json", responseSchema: {
           type: "OBJECT",
-          properties: { groups: { type: "ARRAY", minItems: 1, maxItems: 30, items: { type: "OBJECT", properties: {
+          properties: { groups: { type: "ARRAY", items: { type: "OBJECT", properties: {
             imageIds: { type: "ARRAY", minItems: 1, items: { type: "STRING" } },
             title: { type: "STRING" }, description: { type: "STRING" }, categorySlug: { type: "STRING" }, colorName: { type: "STRING" }, confidence: { type: "NUMBER" }, needsReview: { type: "BOOLEAN" },
             colorGroups: { type: "ARRAY", items: { type: "OBJECT", properties: { imageIds: { type: "ARRAY", minItems: 1, items: { type: "STRING" } }, colorName: { type: "STRING" }, confidence: { type: "NUMBER" }, needsReview: { type: "BOOLEAN" } }, required: ["imageIds", "colorName", "confidence", "needsReview"] } },
