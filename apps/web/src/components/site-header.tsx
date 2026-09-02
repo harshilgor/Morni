@@ -106,6 +106,12 @@ const CATEGORY_MENU_GROUPS = [
   },
 ] as const;
 
+const CATEGORY_MENU_FEATURES = [
+  { name: "Lehengas", href: "/categories/lehengas", image: "/categories/lehengas.png" },
+  { name: "Kaftan", href: "/categories/kaftan", image: "/categories/kaftan.jpg" },
+  { name: "Gifting", href: "/categories/gifting", image: "/categories/gifting-cover.png" },
+] as const;
+
 const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI";
 
 function LaunchAnnouncement() {
