@@ -56,6 +56,7 @@ type ProductWithVariants = Product & {
 type ProductDraft = {
   title: string;
   product_tag: string;
+  description: string;
   price_aed: string;
   categorySlug: string;
   fabric: string;
@@ -431,6 +432,7 @@ export default function PortalProductsPage() {
     setEditDraft({
       title: product.title,
       product_tag: product.product_tag ?? "",
+      description: product.description ?? "",
       price_aed: String(product.price_aed),
       categorySlug: product.categories?.slug ?? "",
       fabric: product.fabric ?? "",
@@ -636,6 +638,7 @@ export default function PortalProductsPage() {
         fabric: editDraft.fabric || null,
         title: editDraft.title.trim(),
         product_tag: editDraft.product_tag.trim().toUpperCase() || null,
+        description: editDraft.description.trim() || null,
         price_aed: price,
         stock: aggregate.stock,
         sizes: hasSizes ? aggregate.sizes : [],
@@ -1320,6 +1323,24 @@ export default function PortalProductsPage() {
                 <span className="text-xs text-muted">
                   Internal inventory reference. Shoppers will not see this.
                 </span>
+              </label>
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-[#40534d]">Description</span>
+                <textarea
+                  rows={5}
+                  maxLength={2000}
+                  value={editDraft.description}
+                  onChange={(event) =>
+                    setEditDraft((current) =>
+                      current
+                        ? { ...current, description: event.target.value }
+                        : current,
+                    )
+                  }
+                  placeholder="Describe the product for shoppers"
+                  className="min-h-32 w-full resize-y rounded-xl border border-line bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-accent"
+                />
+                <span className="text-xs text-muted">Shown on the product page.</span>
               </label>
               <label className="block space-y-1.5 text-sm">
                 <span className="font-medium text-[#40534d]">Price (AED)</span>
