@@ -33,12 +33,16 @@ export function PortalMetric({
   detail,
   tone = "default",
   icon,
+  trend,
+  sparkline,
 }: {
   label: string;
   value: string;
   detail?: ReactNode;
   tone?: "default" | "urgent" | "success";
   icon?: PortalIconName;
+  trend?: { value: string; direction: "up" | "down" | "neutral"; label: string } | null;
+  sparkline?: number[];
 }) {
   const toneClasses = {
     default: "bg-white",
@@ -46,17 +50,30 @@ export function PortalMetric({
     success: "border-[#c8e0d6] bg-[#f5fbf8]",
   };
   return (
-    <div className={`portal-card p-4 ${toneClasses[tone]}`}>
+    <div className={`portal-card relative overflow-hidden p-4 ${toneClasses[tone]}`}>
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="portal-eyebrow">{label}</p>
-          <p className="mt-2 text-2xl font-bold tabular-nums tracking-[-0.04em] text-[#17231f]">{value}</p>
-          {detail ? <p className="mt-1 text-xs leading-5 text-[#687770]">{detail}</p> : null}
+          <p className="mt-2 text-[1.75rem] font-bold leading-none tabular-nums tracking-[-0.045em] text-[#17231f]">{value}</p>
+          {trend ? <p className={`mt-2 flex items-center gap-1 text-[11px] font-semibold ${trend.direction === "up" ? "text-[#237a57]" : trend.direction === "down" ? "text-[#b14d42]" : "text-[#687770]"}`}><span aria-hidden="true">{trend.direction === "up" ? "↗" : trend.direction === "down" ? "↘" : "—"}</span>{trend.value}<span className="font-medium text-[#687770]">{trend.label}</span></p> : detail ? <p className="mt-2 text-xs leading-5 text-[#687770]">{detail}</p> : null}
         </div>
         {icon ? <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf3f0] text-[#3c685c]"><PortalIcon name={icon} /></span> : null}
       </div>
+      {sparkline?.length ? <MetricSparkline values={sparkline} /> : null}
     </div>
   );
+}
+
+function MetricSparkline({ values }: { values: number[] }) {
+  const max = Math.max(...values, 1);
+  const width = 86;
+  const height = 25;
+  const points = values.map((value, index) => {
+    const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
+    const y = height - 3 - (Math.max(value, 0) / max) * (height - 8);
+    return `${x},${y}`;
+  }).join(" ");
+  return <svg viewBox={`0 0 ${width} ${height}`} className="absolute bottom-3 right-4 h-7 w-[5.4rem] text-[#5b9183]" aria-hidden="true"><path d={`M0 ${height - 2} H${width}`} stroke="currentColor" strokeOpacity="0.14" strokeWidth="1" /><polyline points={points} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>;
 }
 
 export function StatusBadge({ status }: { status: OrderStatus | "low_stock" | "live" | "paused" | "draft" }) {

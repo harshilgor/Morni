@@ -92,7 +92,7 @@ export async function POST(request: Request) {
   const key = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!key && !geminiKey) return NextResponse.json({ error: "AI analysis is not configured. You can still review products manually." }, { status: 503 });
-  const model = geminiKey ? (process.env.GEMINI_VISION_MODEL || "gemini-3.5-flash-lite") : (process.env.OPENAI_VISION_MODEL || "gpt-4o-mini");
+  const model = geminiKey ? (process.env.GEMINI_VISION_MODEL || "gemini-3.5-flash") : (process.env.OPENAI_VISION_MODEL || "gpt-4o-mini");
   console.info("Bulk photo grouping sending request", { requestId, provider: geminiKey ? "Gemini" : "OpenAI", model, imageCount: images.length });
   const prompt = `You are matching product photos for a fashion marketplace. Compare EVERY uploaded image against every other image. First group photos into the same physical product using silhouette, construction, pattern, embroidery, and material. A materially different fabric, print, pattern, or design is a DIFFERENT product even if it looks similar. Within each product group, create colorGroups: photos of the same product in different colourways belong to separate colorGroups, while different angles and close-ups of one colour belong together. Never merge different fabrics into a colour group. If identity, fabric, or colour is uncertain, keep the uncertain photos separate and set needsReview true. Use ONLY the stable photo labels supplied below; every label must appear exactly once across product groups and exactly once across colorGroups. For each group, write a natural, human-sounding description of 2 to 3 complete sentences and roughly 45 to 90 words. Never invent brand, fabric, measurements, care instructions, price, stock, or sizes. Categories: ${JSON.stringify(mergeBrowseCategories((categories ?? []) as BrowseCategory[]).map(({ name, slug }) => ({ name, slug })))}. The photo labels are: ${JSON.stringify(labelledImages.map(({ label, name }) => ({ label, name })))}.`;
   let response: Response;
@@ -111,7 +111,15 @@ export async function POST(request: Request) {
             { inline_data: { mime_type: image.data.match(/^data:(image\/[a-z]+);base64,/i)?.[1] ?? "image/jpeg", data: image.data.replace(/^data:image\/[a-z]+;base64,/i, "") } },
           ]),
         ] }],
-        generationConfig: { responseMimeType: "application/json" },
+        generationConfig: { responseMimeType: "application/json", responseSchema: {
+          type: "OBJECT",
+          properties: { groups: { type: "ARRAY", minItems: 1, maxItems: 30, items: { type: "OBJECT", properties: {
+            imageIds: { type: "ARRAY", minItems: 1, items: { type: "STRING" } },
+            title: { type: "STRING" }, description: { type: "STRING" }, categorySlug: { type: "STRING" }, colorName: { type: "STRING" }, confidence: { type: "NUMBER" }, needsReview: { type: "BOOLEAN" },
+            colorGroups: { type: "ARRAY", items: { type: "OBJECT", properties: { imageIds: { type: "ARRAY", minItems: 1, items: { type: "STRING" } }, colorName: { type: "STRING" }, confidence: { type: "NUMBER" }, needsReview: { type: "BOOLEAN" } }, required: ["imageIds", "colorName", "confidence", "needsReview"] } },
+          }, required: ["imageIds", "title", "description", "categorySlug", "colorName", "confidence", "needsReview", "colorGroups"] } } },
+          required: ["groups"],
+        } },
       } : {
         model,
         store: false,
@@ -184,6 +192,30 @@ export async function POST(request: Request) {
     }))
     .filter((group) => group.imageIds.length > 0);
   const missing = labelledImages.filter((image) => !seen.has(image.label));
+  let colourReviewCount = 0;
+  const normalizedGroups = validGroups.map((group) => {
+    const groupImageIds = new Set(group.imageIds);
+    const colourSeen = new Set<string>();
+    const colorGroups = group.colorGroups
+      .map((colorGroup) => ({
+        ...colorGroup,
+        imageIds: colorGroup.imageIds.filter(
+          (id) => groupImageIds.has(id) && !colourSeen.has(id) && Boolean(colourSeen.add(id)),
+        ),
+      }))
+      .filter((colorGroup) => colorGroup.imageIds.length > 0);
+    const missingColourIds = group.imageIds.filter((id) => !colourSeen.has(id));
+    if (missingColourIds.length > 0) {
+      colourReviewCount += missingColourIds.length;
+      colorGroups.push({
+        imageIds: missingColourIds,
+        colorName: "Unassigned colour",
+        confidence: 0,
+        needsReview: true,
+      });
+    }
+    return { ...group, colorGroups };
+  });
   if (missing.length > 0 || seen.size !== expected.size) {
     console.warn("Bulk photo grouping recovered incomplete image coverage", {
       requestId,
@@ -192,12 +224,14 @@ export async function POST(request: Request) {
       missing: missing.map((image) => image.label),
     });
   }
-  const groups = [...validGroups, ...fallbackGroups(missing)].map((group) => ({
+  const groups = [...normalizedGroups, ...fallbackGroups(missing)].map((group) => ({
     ...group,
     imageIds: group.imageIds.map((label) => labelToId.get(label)).filter((id): id is string => Boolean(id)),
   }));
   return NextResponse.json({
     groups,
-    warning: missing.length > 0 ? "Some photos needed manual review and were kept separate." : undefined,
+    warning: missing.length > 0 || colourReviewCount > 0
+      ? "Some photos needed a quick review. Every photo was kept in a product and colour group."
+      : undefined,
   });
 }

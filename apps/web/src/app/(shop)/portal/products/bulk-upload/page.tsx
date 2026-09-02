@@ -83,7 +83,7 @@ function PhotoStack({
         </span>
       </div>
 
-      <div className="relative h-56 overflow-hidden rounded-xl bg-[#e8f0eb] p-2 sm:h-64">
+      <div className="relative h-48 overflow-hidden rounded-xl bg-[#e8f0eb] p-2 sm:h-56">
         <img
           src={cover.preview}
           alt={`Product ${draftIndex + 1} cover`}
@@ -94,7 +94,7 @@ function PhotoStack({
           Cover photo
         </span>
         <span className="absolute bottom-4 left-4 text-xs font-semibold text-white drop-shadow">
-          {expanded ? "Choose a photo below to change the cover" : "AI-selected cover"}
+          {expanded ? "Choose a photo below to change the cover" : draft.confidence && draft.confidence > 0 ? "AI-selected cover" : "Selected cover"}
         </span>
       </div>
 
@@ -175,7 +175,7 @@ function ColorGroupingPanel({
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#34594d]">Colour groups</p>
           <p className="mt-1 text-xs text-muted">Click an image and choose the colour it belongs to.</p>
         </div>
-        <button type="button" onClick={onAdd} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink">+ Add colour</button>
+        <button type="button" onClick={onAdd} className="rounded-full border-2 border-[#245448] bg-[#245448] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#173d34]">+ Add colour</button>
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {colors.map((color) => (
@@ -521,6 +521,7 @@ export default function BulkUploadPage() {
       const response = await fetch("/api/portal/products/bulk-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
         body: JSON.stringify({ storeId: store.id, images }),
       });
       const result = await response.json();
@@ -867,7 +868,7 @@ export default function BulkUploadPage() {
           </button>
         </div>
       ) : null}
-      <div className="mt-8 grid gap-5 lg:grid-cols-2">
+      <div className="mt-8 grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
         {drafts.map((draft, index) => (
           <article
             key={draft.id}
@@ -881,7 +882,7 @@ export default function BulkUploadPage() {
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep">
                 Product {index + 1}
-                {draft.confidence != null
+                {draft.confidence != null && draft.confidence > 0
                   ? ` · AI confidence ${Math.round(draft.confidence * 100)}%`
                   : ""}
                 {draft.needsReview ? " · Review grouping" : ""}

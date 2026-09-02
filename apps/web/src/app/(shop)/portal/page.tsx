@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { motion, useReducedMotion } from "motion/react";
 import { PortalIcon } from "@/components/portal-icons";
 import {
   PortalEmpty,
@@ -10,7 +11,7 @@ import {
   PortalSectionHeading,
   StatusBadge,
 } from "@/components/portal-ui";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import { getOnboardingChecklist } from "@/lib/onboarding";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
@@ -25,6 +26,7 @@ type OrderWithItems = Order & { order_items?: OrderItem[] | null };
 type WishRow = { product_id: string; count: number; title: string };
 
 const ACTIVE_STATUSES = new Set(["placed", "accepted", "picking", "out_for_delivery"]);
+type DashboardTrend = { value: string; direction: "up" | "down" | "neutral"; label: string } | null;
 
 function dayKey(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
@@ -45,6 +47,7 @@ export default function PortalOverviewPage() {
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [wishlistRows, setWishlistRows] = useState<WishRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const productIdsRef = useRef<Set<string>>(new Set());
 
   const loadDashboard = useCallback(async (storeId: string) => {
     const supabase = createClient();
@@ -70,10 +73,34 @@ export default function PortalOverviewPage() {
 
   useEffect(() => {
     if (!store) return;
-    const load = () => void loadDashboard(store.id);
+    let active = true;
+    const load = () => {
+      if (active) void loadDashboard(store.id);
+    };
     if (typeof queueMicrotask === "function") queueMicrotask(load);
     else window.setTimeout(load, 0);
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(createRealtimeChannelName("portal-overview", store.id))
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${store.id}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "products", filter: `store_id=eq.${store.id}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "product_reviews", filter: `store_id=eq.${store.id}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "wishlist_items" }, (payload) => {
+        const row = (payload.new as { product_id?: string })?.product_id ? payload.new as { product_id: string } : payload.old as { product_id?: string };
+        if (row.product_id && productIdsRef.current.has(row.product_id)) load();
+      })
+      .subscribe();
+
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
   }, [loadDashboard, store]);
+
+  useEffect(() => {
+    productIdsRef.current = new Set(products.map((product) => product.id));
+  }, [products]);
 
   const insights = useMemo(() => {
     const activeOrders = orders.filter((order) => order.status !== "cancelled");
@@ -81,8 +108,20 @@ export default function PortalOverviewPage() {
     today.setHours(0, 0, 0, 0);
     const weekStart = new Date(today);
     weekStart.setDate(weekStart.getDate() - 6);
+    const previousWeekStart = new Date(weekStart);
+    previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+    const previousDay = new Date(today);
+    previousDay.setDate(previousDay.getDate() - 1);
     const todayOrders = activeOrders.filter((order) => new Date(order.placed_at) >= today);
     const weekOrders = activeOrders.filter((order) => new Date(order.placed_at) >= weekStart);
+    const previousWeekOrders = activeOrders.filter((order) => {
+      const placedAt = new Date(order.placed_at);
+      return placedAt >= previousWeekStart && placedAt < weekStart;
+    });
+    const previousDayOrders = activeOrders.filter((order) => {
+      const placedAt = new Date(order.placed_at);
+      return placedAt >= previousDay && placedAt < today;
+    });
     const productSales = new Map<string, { productId: string | null; title: string; units: number; revenue: number }>();
 
     for (const order of activeOrders) {
@@ -112,6 +151,8 @@ export default function PortalOverviewPage() {
       todayRevenue: todayOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),
       weekRevenue: weekOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),
       averageOrder: activeOrders.length ? activeOrders.reduce((sum, order) => sum + Number(order.total_aed), 0) / activeOrders.length : 0,
+      previousDayRevenue: previousDayOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),
+      previousWeekRevenue: previousWeekOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),
       topProducts: Array.from(productSales.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 4).map((product) => ({
         ...product,
         imageUrl: products.find((candidate) => candidate.id === product.productId)?.image_urls?.[0] ?? null,
@@ -184,37 +225,37 @@ export default function PortalOverviewPage() {
       {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="Excludes cancelled orders" icon="analytics" />
-          <PortalMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} detail={`${insights.activeOrders.length} active order${insights.activeOrders.length === 1 ? "" : "s"}`} icon="orders" />
-          <PortalMetric label="Average order" value={formatAed(insights.averageOrder)} detail="Across non-cancelled orders" icon="sparkle" />
-          <PortalMetric label="Catalog health" value={`${products.length} products`} detail={`${insights.lowStock.length} low stock · ${products.filter((product) => !product.is_available).length} hidden`} icon="products" tone={insights.lowStock.length ? "urgent" : "default"} />
+          <DashboardReveal delay={0}><PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="No prior-day comparison yet" trend={percentageTrend(insights.todayRevenue, insights.previousDayRevenue, "vs yesterday")} sparkline={insights.salesDays.slice(-3).map((day) => day.revenue)} icon="analytics" /></DashboardReveal>
+          <DashboardReveal delay={0.04}><PortalMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} detail="No prior-week comparison yet" trend={percentageTrend(insights.weekRevenue, insights.previousWeekRevenue, "vs previous week")} sparkline={insights.salesDays.map((day) => day.revenue)} icon="orders" /></DashboardReveal>
+          <DashboardReveal delay={0.08}><PortalMetric label="Orders to fulfil" value={String(insights.activeOrders.length)} detail={insights.newOrders.length ? `${insights.newOrders.length} new order${insights.newOrders.length === 1 ? "" : "s"} awaiting review` : "Your order queue is up to date"} icon="package" tone={insights.newOrders.length ? "urgent" : "default"} /></DashboardReveal>
+          <DashboardReveal delay={0.12}><PortalMetric label="Catalogue health" value={`${products.length} products`} detail={insights.lowStock.length ? `${insights.lowStock.length} low stock · ${products.filter((product) => !product.is_available).length} hidden` : `${products.filter((product) => product.is_available).length} ready to sell`} icon="products" tone={insights.lowStock.length ? "urgent" : "success"} /></DashboardReveal>
         </section>
 
-        <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <section className="portal-card p-5">
-            <div className="flex items-end justify-between gap-4 border-b border-[#e8eeeb] pb-4">
-              <div><p className="portal-eyebrow">Today’s priorities</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#1d2925]">Keep your store moving</h2></div>
-              <Link href="/portal/orders" className="portal-text-link">Open orders<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link>
-            </div>
-            <div className="mt-1 divide-y divide-[#edf1ef]">
-              <PriorityRow icon="orders" title={`${insights.newOrders.length} new order${insights.newOrders.length === 1 ? "" : "s"}`} description={insights.newOrders.length ? "Ready to accept and prepare" : "No new orders right now"} href="/portal/orders" urgent={Boolean(insights.newOrders.length)} />
-              <PriorityRow icon="package" title={`${insights.activeOrders.length} in fulfilment`} description={insights.activeOrders.length ? "Keep these orders moving" : "Nothing is being prepared"} href="/portal/orders" />
-              <PriorityRow icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} description={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
-              <PriorityRow icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} description={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
-            </div>
-          </section>
-          <InventoryNotifications storeId={store.id} />
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(19rem,0.9fr)]">
+          <DashboardReveal delay={0.16}><SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} weekRevenue={insights.weekRevenue} trend={percentageTrend(insights.weekRevenue, insights.previousWeekRevenue, "vs previous week")} /></DashboardReveal>
+          <div className="space-y-5">
+            <DashboardReveal delay={0.2}><section className="portal-card p-5">
+              <div className="flex items-end justify-between gap-4 border-b border-[#e8eeeb] pb-4">
+                <div><p className="portal-eyebrow">Action centre</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#1d2925]">Keep your store moving</h2></div>
+                <Link href="/portal/orders" className="portal-text-link">Open orders<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link>
+              </div>
+              <div className="mt-1 divide-y divide-[#edf1ef]">
+                <PriorityRow icon="orders" title={`${insights.newOrders.length} new order${insights.newOrders.length === 1 ? "" : "s"}`} description={insights.newOrders.length ? "Ready to accept and prepare" : "No new orders right now"} href="/portal/orders" urgent={Boolean(insights.newOrders.length)} />
+                <PriorityRow icon="package" title={`${insights.activeOrders.length} in fulfilment`} description={insights.activeOrders.length ? "Keep these orders moving" : "Nothing is being prepared"} href="/portal/orders" />
+                <PriorityRow icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} description={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
+                <PriorityRow icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} description={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
+              </div>
+            </section></DashboardReveal>
+            <DashboardReveal delay={0.24}><StoreHealth store={store} complete={setupComplete} checklistComplete={checklist.filter((item) => item.done).length} reviews={reviews.length} productCount={products.length} lowStockCount={insights.lowStock.length} /></DashboardReveal>
+          </div>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
-          <SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} />
-          <StoreHealth store={store} complete={setupComplete} checklistComplete={checklist.filter((item) => item.done).length} reviews={reviews.length} productCount={products.length} lowStockCount={insights.lowStock.length} />
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(19rem,0.9fr)]">
+          <DashboardReveal delay={0.28}><OrdersToFulfil orders={orders} /></DashboardReveal>
+          <DashboardReveal delay={0.32}><ProductDemand products={insights.topProducts} wishlistRows={wishlistRows} /></DashboardReveal>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
-          <OrdersToFulfil orders={orders} />
-          <ProductDemand products={insights.topProducts} wishlistRows={wishlistRows} />
-        </section>
+        <DashboardReveal delay={0.36}><InventoryNotifications storeId={store.id} /></DashboardReveal>
       </div>
     </div>
   );
@@ -307,7 +348,7 @@ function MobileOverview({
           <MobileMetric label="Products" value={String(products.length)} />
           <MobileMetric label="Hidden items" value={String(products.filter((product) => !product.is_available).length)} />
         </div>
-        <div className="mt-3"><SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} /></div>
+        <div className="mt-3"><SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} weekRevenue={insights.weekRevenue} trend={null} /></div>
       </details>
 
       <details className="portal-mobile-disclosure">
@@ -354,12 +395,46 @@ function AttentionCard({ icon, title, description, href, urgent = false }: { ico
   return <Link href={href} className={`portal-card portal-card-interactive group p-4 ${urgent ? "border-[#e4bda9] bg-[#fff9f4]" : ""}`}><div className="flex items-start justify-between gap-3"><span className={`grid h-9 w-9 place-items-center rounded-lg ${urgent ? "bg-[#ffead7] text-[#a6542e]" : "bg-[#e8efec] text-[#315f54]"}`}><PortalIcon name={icon} /></span><PortalIcon name="arrow" className="h-4 w-4 text-[#7c8d86] transition group-hover:translate-x-0.5 group-hover:text-[#2f6f66]" /></div><p className="mt-4 text-sm font-bold text-[#1f302a]">{title}</p><p className="mt-1 text-xs leading-5 text-[#687770]">{description}</p></Link>;
 }
 
+function percentageTrend(current: number, previous: number, label: string): DashboardTrend {
+  if (previous <= 0) return null;
+  const change = ((current - previous) / previous) * 100;
+  const direction = change > 0.05 ? "up" : change < -0.05 ? "down" : "neutral";
+  return { value: `${Math.abs(change).toFixed(Math.abs(change) >= 10 ? 0 : 1)}%`, direction, label };
+}
+
 function PriorityRow({ icon, title, description, href, urgent = false }: { icon: "orders" | "package" | "warning" | "reviews"; title: string; description: string; href: string; urgent?: boolean }) {
   return <Link href={href} className="group flex items-center gap-3 py-3.5 transition first:pt-3 last:pb-1"><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${urgent ? "bg-[#ffead7] text-[#a6542e]" : "bg-[#edf3f0] text-[#3c685c]"}`}><PortalIcon name={icon} className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#263530]">{title}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{description}</span></span><PortalIcon name="arrow" className="h-4 w-4 shrink-0 text-[#9aa8a2] transition group-hover:translate-x-1 group-hover:text-[#2f6f66]" /></Link>;
 }
 
-function SalesChart({ days, maxRevenue }: { days: { label: string; revenue: number }[]; maxRevenue: number }) {
-  return <div className="portal-card p-5"><PortalSectionHeading title="Sales over the last 7 days" description="Gross order value, excluding cancelled orders." action={{ label: "Open analytics", href: "/portal/analytics" }} /><div className="mt-7 flex h-44 items-end gap-2 sm:gap-4">{days.map((day) => <div key={day.label} className="group flex min-w-0 flex-1 flex-col items-center gap-2"><span className="h-5 text-[11px] font-semibold text-[#466058] opacity-0 transition group-hover:opacity-100">{day.revenue ? formatAed(day.revenue) : ""}</span><div className="flex h-28 w-full items-end rounded-t-lg bg-[#edf3f0]"><div className="w-full rounded-t-lg bg-[#5b9183] transition-all" style={{ height: `${Math.max(day.revenue ? (day.revenue / maxRevenue) * 100 : 4, 4)}%` }} /></div><span className="text-[11px] font-semibold text-[#7b8882]">{day.label}</span></div>)}</div></div>;
+function DashboardReveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const reduceMotion = useReducedMotion();
+  return <motion.div initial={reduceMotion ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36, delay, ease: [0.22, 1, 0.36, 1] }}>{children}</motion.div>;
+}
+
+function SalesChart({ days, maxRevenue, weekRevenue, trend }: { days: { label: string; revenue: number }[]; maxRevenue: number; weekRevenue: number; trend: DashboardTrend }) {
+  const reduceMotion = useReducedMotion();
+  const gradientId = useId();
+  const chartWidth = 620;
+  const chartHeight = 188;
+  const baseline = 156;
+  const left = 16;
+  const right = chartWidth - 16;
+  const points = days.map((day, index) => {
+    const x = days.length === 1 ? chartWidth / 2 : left + (index / (days.length - 1)) * (right - left);
+    const y = baseline - (Math.max(day.revenue, 0) / maxRevenue) * 118;
+    return { ...day, x, y };
+  });
+  const linePath = points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+  const areaPath = points.length ? `${linePath} L ${points.at(-1)?.x ?? right} ${baseline} L ${points[0]?.x ?? left} ${baseline} Z` : "";
+
+  return <section className="portal-card overflow-hidden p-5">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div><p className="portal-eyebrow">Performance</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#17231f]">Sales performance</h2><p className="mt-1 text-xs leading-5 text-[#687770]">Gross order value, excluding cancelled orders.</p></div>
+      <div className="text-right"><p className="text-lg font-bold tabular-nums tracking-[-0.035em] text-[#17231f]">{formatAed(weekRevenue)}</p>{trend ? <p className={`mt-1 text-[11px] font-semibold ${trend.direction === "up" ? "text-[#237a57]" : trend.direction === "down" ? "text-[#b14d42]" : "text-[#687770]"}`}>{trend.direction === "up" ? "↗" : trend.direction === "down" ? "↘" : "—"} {trend.value} <span className="font-medium text-[#687770]">{trend.label}</span></p> : <p className="mt-1 text-[11px] text-[#687770]">Last 7 days</p>}</div>
+    </div>
+    {weekRevenue > 0 ? <><div className="mt-6 overflow-hidden rounded-xl border border-[#edf1ef] bg-[linear-gradient(180deg,#fbfdfc_0%,#f4f8f6_100%)] px-2 pt-3"><svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-52 w-full" role="img" aria-label="Sales trend over the last seven days">{[38, 78, 118, 156].map((y) => <line key={y} x1={left} x2={right} y1={y} y2={y} stroke="#dce8e2" strokeDasharray="3 5" />)}<motion.path d={areaPath} fill={`url(#${gradientId})`} initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} /><motion.path d={linePath} fill="none" stroke="#2f7869" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" initial={reduceMotion ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.8, ease: "easeOut" }} />{points.map((point, index) => <g key={point.label}><circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 5 : 3.5} fill="#fff" stroke="#2f7869" strokeWidth="2.5" /><text x={point.x} y={176} textAnchor="middle" className="fill-[#70817a] text-[11px] font-semibold">{point.label}</text><title>{`${point.label}: ${formatAed(point.revenue)}`}</title></g>)}<defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8fc9b8" stopOpacity="0.48" /><stop offset="100%" stopColor="#8fc9b8" stopOpacity="0.03" /></linearGradient></defs></svg></div><div className="mt-3 grid grid-cols-7 gap-1">{days.map((day) => <div key={day.label} className="min-w-0 text-center text-[10px] font-semibold tabular-nums text-[#60756c]">{day.revenue ? formatAed(day.revenue) : "—"}</div>)}</div></> : <div className="mt-5 grid min-h-52 place-items-center rounded-xl border border-dashed border-[#d8e4de] bg-[#f8fbf9] px-6 text-center"><span><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e7f1ec] text-[#3c685c] mx-auto"><PortalIcon name="analytics" className="h-4 w-4" /></span><p className="mt-3 text-sm font-semibold text-[#263530]">No sales recorded yet</p><p className="mt-1 text-xs leading-5 text-[#687770]">Your live sales trend will appear as soon as shoppers complete orders.</p></span></div>}
+    <Link href="/portal/analytics" className="portal-text-link mt-4">Open analytics<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link>
+  </section>;
 }
 
 function StoreHealth({ store, complete, checklistComplete, reviews, productCount, lowStockCount }: { store: { is_active: boolean; opens_at: string | null; closes_at: string | null }; complete: boolean; checklistComplete: number; reviews: number; productCount: number; lowStockCount: number }) {
