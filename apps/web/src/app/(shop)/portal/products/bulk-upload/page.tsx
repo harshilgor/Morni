@@ -42,6 +42,70 @@ type Draft = {
   colors: ColorGroup[];
 };
 
+const BULK_UPLOAD_MAX_PHOTOS = 30;
+const BULK_UPLOAD_DRAFT_DB = "morni-bulk-upload-drafts";
+const BULK_UPLOAD_DRAFT_STORE = "drafts";
+
+function openBulkDraftDb() {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(BULK_UPLOAD_DRAFT_DB, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(BULK_UPLOAD_DRAFT_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("Could not open local draft storage."));
+  });
+}
+
+async function readBulkDraft(storeId: string): Promise<Draft[] | null> {
+  try {
+    const db = await openBulkDraftDb();
+    return await new Promise<Draft[] | null>((resolve, reject) => {
+      const request = db.transaction(BULK_UPLOAD_DRAFT_STORE, "readonly").objectStore(BULK_UPLOAD_DRAFT_STORE).get(storeId);
+      request.onsuccess = () => {
+        const saved = request.result as { drafts?: Array<Omit<Draft, "photos"> & { photos: Array<Omit<Photo, "preview">> }> } | undefined;
+        if (!saved?.drafts) return resolve(null);
+        resolve(saved.drafts.map((draft) => ({
+          ...draft,
+          photos: draft.photos.map((photo) => ({ ...photo, preview: URL.createObjectURL(photo.file) })),
+        })) as Draft[]);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function saveBulkDraft(storeId: string, drafts: Draft[]) {
+  try {
+    const db = await openBulkDraftDb();
+    await new Promise<void>((resolve, reject) => {
+      const request = db.transaction(BULK_UPLOAD_DRAFT_STORE, "readwrite").objectStore(BULK_UPLOAD_DRAFT_STORE).put({
+        drafts: drafts.map((draft) => ({ ...draft, photos: draft.photos.map(({ preview: _preview, ...photo }) => photo) })),
+        updatedAt: Date.now(),
+      }, storeId);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch {
+    // Local recovery is best-effort; the active in-memory draft remains intact.
+  }
+}
+
+async function clearBulkDraft(storeId: string) {
+  try {
+    const db = await openBulkDraftDb();
+    await new Promise<void>((resolve, reject) => {
+      const request = db.transaction(BULK_UPLOAD_DRAFT_STORE, "readwrite").objectStore(BULK_UPLOAD_DRAFT_STORE).delete(storeId);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch {
+    // Nothing to do if local cleanup is unavailable.
+  }
+}
+
 function createColorGroup(colorName = "") : ColorGroup {
   return { id: uid(), colorName, photos: [], sizeStock: { S: 0, M: 0, L: 0 }, stock: "0", needsReview: true };
 }
@@ -176,6 +240,7 @@ function ColorGroupingPanel({
   onRemove,
   onStockChange,
   noSize,
+  colorValidationErrors,
 }: {
   draft: Draft;
   onAssign: (photoId: string, colorId: string) => void;
@@ -184,6 +249,7 @@ function ColorGroupingPanel({
   onRemove: (colorId: string) => void;
   onStockChange: (colorId: string, sizeStock: Record<string, number>, stock: string) => void;
   noSize: boolean;
+  colorValidationErrors: Record<string, string[]>;
 }) {
   const colors = draft.colors;
   const assignedPhotoIds = new Set(colors.flatMap((color) => color.photos.map((photo) => photo.id)));
@@ -197,14 +263,17 @@ function ColorGroupingPanel({
         </div>
         <button type="button" onClick={onAdd} className="rounded-full border-2 border-[#245448] bg-[#245448] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#173d34]">+ Add colour</button>
       </div>
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        {colors.map((color) => (
-          <div key={color.id} className="rounded-xl border border-line bg-white p-4 sm:p-5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const photoId = event.dataTransfer.getData("photo-id"); if (photoId) onAssign(photoId, color.id); }}>
+      <div className="mt-5 grid gap-4">
+        {colors.map((color) => {
+          const colorErrors = colorValidationErrors[color.id] ?? [];
+          const hasColorError = colorErrors.length > 0;
+          return (
+          <div key={color.id} className={`rounded-xl border bg-white p-4 sm:p-5 ${hasColorError ? "border-red-400 ring-1 ring-red-100" : "border-line"}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const photoId = event.dataTransfer.getData("photo-id"); if (photoId) onAssign(photoId, color.id); }}>
             <div className="flex items-center gap-2">
               <label className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-line" title="Choose colour swatch">
                 <input aria-label="Colour swatch" type="color" value={color.colorHex || colourHexForName(color.colorName)} onChange={(event) => onRename(color.id, color.colorName, event.target.value)} className="absolute -inset-2 h-14 w-14 cursor-pointer" />
               </label>
-              <input value={color.colorName} onChange={(event) => onRename(color.id, event.target.value)} placeholder="Colour name" className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm font-semibold text-ink" />
+              <input value={color.colorName} onChange={(event) => onRename(color.id, event.target.value)} aria-invalid={colorErrors.includes("colour name")} placeholder="Colour name" className={`min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm font-semibold text-ink ${colorErrors.includes("colour name") ? "border-red-400" : "border-line"}`} />
               <button type="button" aria-label={`Remove ${color.colorName || "colour"} group`} onClick={() => onRemove(color.id)} className="rounded-lg p-2 text-accent-deep hover:bg-[#fff1f4]"><PortalIcon name="trash" className="h-4 w-4" /></button>
               <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${color.needsReview ? "bg-[#fff1d8] text-[#98621b]" : "bg-[#e8f5ef] text-[#2f765e]"}`}>{color.needsReview ? "Review" : "Matched"}</span>
             </div>
@@ -219,9 +288,10 @@ function ColorGroupingPanel({
               ))}
             </div>
             {noSize ? <label className="mt-3 block text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">Colour stock<input type="number" min="0" value={color.stock} onChange={(event) => onStockChange(color.id, color.sizeStock, event.target.value)} className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm font-normal normal-case tracking-normal" /></label> : <div className="mt-3"><SizeInventoryEditor sizes={draft.sizes} sizeStock={color.sizeStock} onChange={(_, stock) => onStockChange(color.id, stock, color.stock)} /></div>}
-            <p className="mt-2 text-[11px] text-muted">{color.photos.length} image{color.photos.length === 1 ? "" : "s"} · quantities can be entered before publishing</p>
+            <p className={`mt-2 text-[11px] ${colorErrors.includes("photos") ? "font-semibold text-red-600" : "text-muted"}`}>{color.photos.length} image{color.photos.length === 1 ? "" : "s"} · quantities can be entered before publishing</p>
+            {hasColorError ? <p className="mt-2 text-xs font-medium text-red-600">Fix: {colorErrors.join(", ")}.</p> : null}
           </div>
-        ))}
+        )})}
       </div>
       {unassignedPhotos.length && colors.length ? (
         <div className="mt-5 rounded-xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-4">
@@ -363,6 +433,8 @@ export default function BulkUploadPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [uploadCelebrationKey, setUploadCelebrationKey] = useState(0);
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
+  const [colorValidationErrors, setColorValidationErrors] = useState<Record<string, string[]>>({});
+  const [draftsRestored, setDraftsRestored] = useState(false);
   useEffect(() => {
     void loadBrowseCategoryOptions().then(setCategories);
   }, []);
@@ -388,6 +460,23 @@ export default function BulkUploadPage() {
           .then(({ data }) => setHistory((data ?? []) as typeof history)),
     );
   }, [store]);
+  useEffect(() => {
+    if (!store) return;
+    let active = true;
+    void readBulkDraft(store.id).then((saved) => {
+      if (!active) return;
+      if (saved?.length) {
+        setDrafts(saved);
+        setMessage("Recovered your saved bulk-upload draft. You can continue where you left off.");
+      }
+      setDraftsRestored(true);
+    });
+    return () => { active = false; };
+  }, [store]);
+  useEffect(() => {
+    if (!store || !draftsRestored) return;
+    void saveBulkDraft(store.id, drafts);
+  }, [drafts, draftsRestored, store]);
   function addFiles(list: FileList | File[]) {
     const valid = Array.from(list).filter((file) => {
       if (!validateImageFile(file)) return true;
@@ -399,12 +488,22 @@ export default function BulkUploadPage() {
         file.size <= 8 * 1024 * 1024,
       );
     });
-    if (!valid.length) {
+    const queuedPhotoCount = drafts.reduce((total, draft) => total + draft.photos.length, 0);
+    const remainingPhotoSlots = BULK_UPLOAD_MAX_PHOTOS - queuedPhotoCount;
+    if (remainingPhotoSlots <= 0) {
+      setMessage(`This batch already contains ${BULK_UPLOAD_MAX_PHOTOS} photos. Publish it or start a new batch before adding more.`);
+      return;
+    }
+    if (valid.length > remainingPhotoSlots) {
+      setMessage(`You can analyze up to ${BULK_UPLOAD_MAX_PHOTOS} photos per batch. The first ${remainingPhotoSlots} valid photo${remainingPhotoSlots === 1 ? "" : "s"} were added; select the remaining photos again as a new batch after this one.`);
+    }
+    const accepted = valid.slice(0, remainingPhotoSlots);
+    if (!accepted.length) {
       setMessage("Upload up to 30 valid JPG, PNG, or WebP images.");
       return;
     }
     const grouped = new Map<string, Photo[]>();
-    valid.forEach((file) => {
+    accepted.forEach((file) => {
       const photo = { id: uid(), file, preview: URL.createObjectURL(file) };
       const key = productKey(file.name) || file.name;
       grouped.set(key, [...(grouped.get(key) ?? []), photo]);
@@ -428,7 +527,7 @@ export default function BulkUploadPage() {
       })),
     ];
     setDrafts(nextDrafts);
-    setMessage("AI is grouping these photos by product…");
+    setMessage("AI is grouping these photos by product… Your draft is saved locally while you work.");
     void analyze(nextDrafts);
   }
   function patch(draftId: string, changes: Partial<Draft>) {
@@ -450,7 +549,16 @@ export default function BulkUploadPage() {
     setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: draft.colors.map((color) => color.id === colorId ? { ...color, colorName, colorHex: colorHex ?? color.colorHex, needsReview: !colorName.trim() } : color) } : draft));
   }
   function addColor(draftId: string) {
-    setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: [...(draft.colors.length ? draft.colors : [{ ...createColorGroup("Unassigned colour"), photos: draft.photos }]), createColorGroup()] } : draft));
+    setDrafts((current) => current.map((draft) => {
+      if (draft.id !== draftId) return draft;
+      if (draft.colors.length) {
+        return { ...draft, colors: [...draft.colors, createColorGroup()] };
+      }
+      return {
+        ...draft,
+        colors: [{ ...createColorGroup(), photos: draft.photos }],
+      };
+    }));
   }
   function removeColor(draftId: string, colorId: string) {
     setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: draft.colors.filter((color) => color.id !== colorId) } : draft));
@@ -647,6 +755,16 @@ export default function BulkUploadPage() {
         })
         .filter(([, missing]) => missing.length),
     ) as Record<string, string[]>;
+    const nextColorValidationErrors: Record<string, string[]> = {};
+    drafts.forEach((draft) => {
+      draft.colors.forEach((color) => {
+        const errors = [
+          !color.colorName.trim() ? "colour name" : null,
+          !color.photos.length ? "at least one photo" : null,
+        ].filter((error): error is string => Boolean(error));
+        if (errors.length) nextColorValidationErrors[color.id] = errors;
+      });
+    });
     const tags = drafts.map((draft) => draft.productTag.trim().toUpperCase()).filter(Boolean);
     drafts.forEach((draft) => {
       const tag = draft.productTag.trim();
@@ -660,16 +778,23 @@ export default function BulkUploadPage() {
           missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "unique product tag"];
       });
     }
-    if (Object.keys(missingByDraft).length) {
+    if (Object.keys(missingByDraft).length || Object.keys(nextColorValidationErrors).length) {
       setValidationErrors(missingByDraft);
-      const summary = Object.entries(missingByDraft)
+      setColorValidationErrors(nextColorValidationErrors);
+      const productSummary = Object.entries(missingByDraft)
         .map(([draftId, fields]) => `Product ${drafts.findIndex((draft) => draft.id === draftId) + 1}: ${fields.join(", ")}`)
         .join(" · ");
-      setMessage(`Complete the highlighted fields before publishing. ${summary}`);
+      const colorSummary = drafts
+        .flatMap((draft, draftIndex) => draft.colors.map((color, colorIndex) => ({ draftIndex, colorIndex, errors: nextColorValidationErrors[color.id] })))
+        .filter((color): color is { draftIndex: number; colorIndex: number; errors: string[] } => Boolean(color.errors))
+        .map((color) => `Product ${color.draftIndex + 1}, colour ${color.colorIndex + 1}: ${color.errors.join(", ")}`)
+        .join(" · ");
+      setMessage(`Fix the highlighted fields before publishing. ${[productSummary, colorSummary].filter(Boolean).join(" · ")}`);
       window.setTimeout(() => document.querySelector("[data-upload-message]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
       return;
     }
     setValidationErrors({});
+    setColorValidationErrors({});
     setBusy(true);
     setBusyPhase("publishing");
     setMessage(null);
@@ -744,6 +869,7 @@ export default function BulkUploadPage() {
       );
       if (result.created > 0) setUploadCelebrationKey(Date.now());
       setDrafts([]);
+      if (store) void clearBulkDraft(store.id);
       router.replace("/portal/products");
     } catch (error) {
       if (uploadedUrls.length && store)
@@ -890,7 +1016,7 @@ export default function BulkUploadPage() {
         </div>
       ) : null}
       {message ? (
-        <p data-upload-message className={`mt-5 rounded-xl px-4 py-3 text-sm ${Object.keys(validationErrors).length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length ? "alert" : "status"}>
+        <p data-upload-message className={`mt-5 rounded-xl px-4 py-3 text-sm ${Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length ? "alert" : "status"}>
           {message}
         </p>
       ) : null}
@@ -964,7 +1090,7 @@ export default function BulkUploadPage() {
                 Drop a photo here.
               </div>
             ) : null}
-            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onRemove={(colorId) => removeColor(draft.id, colorId)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} /> : null}
+            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onRemove={(colorId) => removeColor(draft.id, colorId)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} colorValidationErrors={colorValidationErrors} /> : null}
             <div className="mt-4 grid gap-3">
               <label className={`flex items-center gap-2 border-b py-2 ${hasValidationError(draft.id, "product name") ? "border-red-400" : "border-line"}`}>
                 <input
