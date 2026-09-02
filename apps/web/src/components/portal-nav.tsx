@@ -17,6 +17,7 @@ const primaryLinks: { href: string; label: string; icon: PortalIconName }[] = [
 const manageLinks: { href: string; label: string; icon: PortalIconName }[] = [
   { href: "/portal/reviews", label: "Reviews", icon: "reviews" },
   { href: "/portal/analytics", label: "Analytics", icon: "analytics" },
+  { href: "/portal/team", label: "Team access", icon: "team" },
   { href: "/portal/settings", label: "Store settings", icon: "settings" },
 ];
 

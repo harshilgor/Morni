@@ -1,4 +1,5 @@
 export type UserRole = "shopper" | "store_owner" | "admin";
+export type StoreMemberRole = "owner" | "manager" | "staff";
 export type OrderStatus =
   | "placed"
   | "accepted"

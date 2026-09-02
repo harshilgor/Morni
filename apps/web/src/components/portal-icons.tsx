@@ -30,7 +30,8 @@ export type PortalIconName =
   | "camera"
   | "close"
   | "image"
-  | "trash";
+  | "trash"
+  | "team";
 
 export function PortalIcon({
   name,
@@ -70,6 +71,7 @@ export function PortalIcon({
     close: <path d="M6 6l12 12M18 6 6 18" />,
     image: <><rect x="3.5" y="5" width="17" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="m7.5 17 3.5-3.5L14 16l2.5-2.5L20.5 17" /></>,
     trash: <><path d="M5 7h14M10 11v6M14 11v6" /><path d="M9 7V4h6v3M7 7l1 14h8l1-14" /></>,
+    team: <><circle cx="9" cy="8" r="3" /><path d="M3.5 20c.5-3.2 2.4-5 5.5-5s5 1.8 5.5 5" /><path d="M16 7a2.5 2.5 0 0 1 0 4.8M17.5 15.5c1.7.7 2.7 2.1 3 4.5" /></>,
   };
 
   return <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths[name]}</svg>;

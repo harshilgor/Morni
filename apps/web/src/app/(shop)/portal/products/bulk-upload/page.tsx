@@ -12,6 +12,11 @@ import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 import { AiProcessingOverlay as SimpleAiProcessingOverlay } from "@/components/ai-processing-overlay";
 import { aggregateBulkSizeStock } from "@/lib/product-variants";
+import { CustomizationEditor } from "@/components/customization-editor";
+import {
+  defaultCustomizationConfig,
+  type ProductCustomizationConfig,
+} from "@/lib/product-customization";
 
 type Photo = { id: string; file: File; preview: string };
 type ColorGroup = {
@@ -38,6 +43,7 @@ type Draft = {
   stock: string;
   sizes: string[];
   sizeStock: Record<string, number>;
+  customization: ProductCustomizationConfig;
   confidence?: number;
   needsReview?: boolean;
   colors: ColorGroup[];
@@ -83,6 +89,7 @@ async function readBulkDraft(storeId: string): Promise<Draft[] | null> {
             ...color,
             sizes: Array.isArray(color.sizes) ? color.sizes : draft.sizes,
           })),
+          customization: draft.customization ?? defaultCustomizationConfig(),
           photos: draft.photos.map((photo) => ({ ...photo, preview: URL.createObjectURL(photo.file) })),
         })) as Draft[]);
       };
@@ -509,6 +516,7 @@ export default function BulkUploadPage() {
         stock: "",
         sizes: ["S", "M", "L"],
         sizeStock: { S: 0, M: 0, L: 0 },
+        customization: defaultCustomizationConfig(),
         colors: [],
       })),
     ];
@@ -641,6 +649,7 @@ export default function BulkUploadPage() {
         stock: "",
         sizes: ["S", "M", "L"],
         sizeStock: { S: 0, M: 0, L: 0 },
+        customization: defaultCustomizationConfig(),
         colors: [createColorGroup()],
       },
     ]);
@@ -717,6 +726,7 @@ export default function BulkUploadPage() {
             stock: "",
             sizes: ["S", "M", "L"],
             sizeStock: { S: 0, M: 0, L: 0 },
+            customization: defaultCustomizationConfig(),
             confidence: group.confidence,
             needsReview: group.needsReview,
             // Colourways are intentionally manual; AI only groups photos into products.
@@ -768,6 +778,8 @@ export default function BulkUploadPage() {
         missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "assign every photo to a colour or delete it"];
       if (!draft.colors.length && draft.photos.length > MAX_PHOTOS_PER_COLOUR)
         missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), `maximum ${MAX_PHOTOS_PER_COLOUR} photos without colourways`];
+      if (!noSizes(draft.categorySlug) && draft.customization.enabled && !draft.customization.fields.length)
+        missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "choose at least one custom measurement"];
       draft.colors.forEach((color, colorIndex) => {
         const errors = [
           !color.colorName.trim() ? "colour name" : null,
@@ -876,6 +888,9 @@ export default function BulkUploadPage() {
           stock: Number(draft.stock),
           sizes: noSizes(draft.categorySlug) ? [] : draft.sizes,
           sizeStock: aggregateSizeStock,
+          customization: noSizes(draft.categorySlug)
+            ? { ...defaultCustomizationConfig(), enabled: false, fields: [] }
+            : draft.customization,
           images: variants.flatMap((variant) => variant.images).slice(0, MAX_PHOTOS_PER_COLOUR),
           variants,
         });
@@ -1189,6 +1204,9 @@ export default function BulkUploadPage() {
                         : draft.sizes.length
                           ? draft.sizes
                           : ["S", "M", "L"],
+                      ...(noSizes(event.target.value)
+                        ? { customization: { ...draft.customization, enabled: false, fields: [] } }
+                        : {}),
                     })
                   }
                   aria-invalid={hasValidationError(draft.id, "category")}
@@ -1267,6 +1285,13 @@ export default function BulkUploadPage() {
                   No clothing sizes for this category.
                 </p>
               )}
+              {!noSizes(draft.categorySlug) ? (
+                <CustomizationEditor
+                  compact
+                  value={draft.customization}
+                  onChange={(customization) => patch(draft.id, { customization })}
+                />
+              ) : null}
             </div>
           </article>
         ))}

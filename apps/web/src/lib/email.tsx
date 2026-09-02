@@ -8,6 +8,7 @@ import {
 import { OrderStatusEmail } from "@/emails/order-status-email";
 import { StoreNewOrderEmail } from "@/emails/store-new-order-email";
 import { DeliveryInviteEmail } from "@/emails/delivery-invite-email";
+import { StoreTeamInviteEmail } from "@/emails/store-team-invite-email";
 import { LifecycleEmail } from "@/emails/lifecycle-email";
 import { deliveryPromise, formatAed, orderStatusLabel } from "@/lib/format";
 import { formatDeliverySlotWindow } from "@/lib/delivery-slots";
@@ -22,6 +23,7 @@ type NotificationEvent =
   | "order_status"
   | "store_new_order"
   | "delivery_invite"
+  | "store_team_invite"
   | LifecycleEmailKind
   | "store_payment_failed"
   | "store_order_cancelled"
@@ -266,6 +268,17 @@ export async function sendDeliveryInviteEmail({
     react: DeliveryInviteEmail({ partnerName, role, accessUrl }),
   });
 
+  return { sent: true, resendId };
+}
+
+export async function sendStoreTeamInviteEmail({ email, storeName, role, accessUrl, inviteId }: { email: string; storeName: string; role: "manager" | "staff"; accessUrl: string; inviteId: string }) {
+  const { from } = getMailer();
+  const resendId = await sendWithRetry("store_team_invite", inviteId, {
+    from,
+    to: [email],
+    subject: `You have been invited to ${storeName} on Morni`,
+    react: StoreTeamInviteEmail({ storeName, role, accessUrl }),
+  });
   return { sent: true, resendId };
 }
 

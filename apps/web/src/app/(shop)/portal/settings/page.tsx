@@ -21,7 +21,7 @@ import { PortalEmpty, PortalPageHeader, StatusBadge } from "@/components/portal-
 import type { StorePickupLocation } from "@/lib/types";
 
 export default function PortalSettingsPage() {
-  const { store, loading, error, refresh } = useOwnerStore();
+  const { store, loading, error, refresh, storeRole } = useOwnerStore();
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -298,6 +298,9 @@ export default function PortalSettingsPage() {
   if (loading) return <p className="text-muted">Loading…</p>;
   if (!store) {
     return <PortalEmpty icon="store" title="Set up your first store" description="Create a store before you can manage the public storefront and delivery details." action={{ label: "Start store setup", href: "/sell/setup" }} />;
+  }
+  if (storeRole !== "owner") {
+    return <PortalEmpty icon="settings" title="Owner access required" description="Only the store owner can edit store settings, visibility, or delete the store." />;
   }
 
   const incomplete = !isOnboardingComplete(store);

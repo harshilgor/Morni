@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Store } from "@/lib/types";
+import type { Store, StoreMemberRole } from "@/lib/types";
 
 const ACTIVE_STORE_KEY = "morni.owner.active-store-id";
 const STORE_CHANGE_EVENT = "morni-owner-store-change";
@@ -27,6 +27,7 @@ export function useOwnerStore() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [storeRole, setStoreRole] = useState<StoreMemberRole | null>(null);
 
   const refresh = useCallback(async (preferredStoreId?: string) => {
     setLoading(true);
@@ -39,6 +40,7 @@ export function useOwnerStore() {
       setError("unauthenticated");
       setStore(null);
       setStores([]);
+      setStoreRole(null);
       setLoading(false);
       return;
     }
@@ -47,7 +49,7 @@ export function useOwnerStore() {
 
     const { data: memberships, error: membershipError } = await supabase
       .from("store_members")
-      .select("store_id")
+      .select("store_id, role")
       .eq("user_id", user.id)
       .order("created_at", { ascending: true });
 
@@ -55,6 +57,7 @@ export function useOwnerStore() {
       setError(membershipError.message);
       setStore(null);
       setStores([]);
+      setStoreRole(null);
       setLoading(false);
       return;
     }
@@ -64,6 +67,7 @@ export function useOwnerStore() {
       setError(null);
       setStore(null);
       setStores([]);
+      setStoreRole(null);
       setLoading(false);
       return;
     }
@@ -78,6 +82,7 @@ export function useOwnerStore() {
       setError(storeError.message);
       setStore(null);
       setStores([]);
+      setStoreRole(null);
       setLoading(false);
       return;
     }
@@ -100,6 +105,10 @@ export function useOwnerStore() {
     setError(null);
     setStores(ownerStores);
     setStore(selectedStore);
+    const selectedMembership = (memberships ?? []).find(
+      (membership) => membership.store_id === selectedStore?.id,
+    );
+    setStoreRole((selectedMembership?.role as StoreMemberRole | null) ?? "staff");
     setLoading(false);
   }, []);
 
@@ -124,6 +133,7 @@ export function useOwnerStore() {
     if (!nextStore) return;
     window.localStorage.setItem(ACTIVE_STORE_KEY, storeId);
     setStore(nextStore);
+    setStoreRole(null);
     window.dispatchEvent(new Event(STORE_CHANGE_EVENT));
   }
 
@@ -136,6 +146,7 @@ export function useOwnerStore() {
     loading,
     error,
     userId,
+    storeRole,
     refresh,
     selectStore,
     onboardingComplete,
