@@ -28,6 +28,9 @@ export function validateImageFile(file: File | null | undefined): string | null 
   if (!ALLOWED_TYPES.has(file.type)) {
     return "Use a JPG, PNG, or WebP image.";
   }
+  if (file.size <= 0) {
+    return "This image is empty or could not be read. Choose the photo again.";
+  }
   if (file.size > MEDIA_MAX_BYTES) {
     return "Images must be smaller than 8 MB.";
   }

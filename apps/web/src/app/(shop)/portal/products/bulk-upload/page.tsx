@@ -473,6 +473,7 @@ export default function BulkUploadPage() {
   function addFiles(list: FileList | File[]) {
     const valid = Array.from(list).filter((file) => {
       if (!validateImageFile(file)) return true;
+      if (file.size <= 0 || file.size > 8 * 1024 * 1024) return false;
       // Some mobile browsers leave File.type empty or report image/jpg.
       const extension = file.name.split(".").pop()?.toLowerCase();
       return Boolean(
@@ -872,7 +873,8 @@ export default function BulkUploadPage() {
               },
             });
           } catch (error) {
-            throw new Error(`${draft.title || "Untitled product"} → ${color.colorName}: ${error instanceof Error ? error.message : "image upload failed"}`);
+            const detail = error instanceof Error ? error.message : "image upload failed";
+            throw new Error(`${draft.title || "Untitled product"} → ${color.colorName}: ${detail}. Check the photos in this colour group and try again.`);
           }
           uploadedUrls.push(...images);
           const colorStock = noSizes(draft.categorySlug) ? Number(color.stock || 0) : Object.values(color.sizeStock).reduce((sum, quantity) => sum + quantity, 0);
