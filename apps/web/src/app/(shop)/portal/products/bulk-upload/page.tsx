@@ -246,6 +246,8 @@ function ColorGroupingPanel({
   onRename,
   onAdd,
   onRemove,
+  onUnassign,
+  onDeletePhoto,
   onStockChange,
   noSize,
   colorValidationErrors,
@@ -255,6 +257,8 @@ function ColorGroupingPanel({
   onRename: (colorId: string, colorName: string, colorHex?: string) => void;
   onAdd: () => void;
   onRemove: (colorId: string) => void;
+  onUnassign: (photoId: string) => void;
+  onDeletePhoto: (photoId: string) => void;
   onStockChange: (colorId: string, sizeStock: Record<string, number>, stock: string) => void;
   noSize: boolean;
   colorValidationErrors: Record<string, string[]>;
@@ -289,32 +293,39 @@ function ColorGroupingPanel({
               {color.photos.map((photo) => (
                 <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="group relative aspect-square cursor-grab overflow-hidden rounded-lg bg-[#edf3ef] active:cursor-grabbing">
                   <img src={photo.preview} alt={`${color.colorName || "Colour"} product photo`} className="h-full w-full object-cover" />
-                  <select aria-label={`Assign photo to colour`} value={color.id} onChange={(event) => onAssign(photo.id, event.target.value)} className="absolute inset-x-1 bottom-1 min-w-0 rounded bg-white/95 px-1 py-1 text-[10px] text-ink opacity-100 shadow transition sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100">
+                  <div className="absolute right-1 top-1 flex gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
+                    <button type="button" onClick={() => onUnassign(photo.id)} className="rounded bg-white/95 px-1.5 py-1 text-[10px] font-semibold text-ink shadow" title="Move to unassigned photos">Unassign</button>
+                    <button type="button" onClick={() => onDeletePhoto(photo.id)} className="rounded bg-white/95 p-1 text-accent-deep shadow" title="Delete this photo from the upload"><PortalIcon name="trash" className="h-3 w-3" /></button>
+                  </div>
+                  <select aria-label={`Assign photo to colour`} value={color.id} onChange={(event) => event.target.value === "__unassigned" ? onUnassign(photo.id) : onAssign(photo.id, event.target.value)} className="absolute inset-x-1 bottom-1 min-w-0 rounded bg-white/95 px-1 py-1 text-[10px] text-ink opacity-100 shadow transition sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100">
+                    <option value="__unassigned">Unassigned</option>
                     {colors.map((option) => <option key={option.id} value={option.id}>{option.colorName || "Unnamed"}</option>)}
                   </select>
                 </div>
               ))}
             </div>
             {noSize ? <label className="mt-3 block text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">Colour stock<input type="number" min="0" value={color.stock} onChange={(event) => onStockChange(color.id, color.sizeStock, event.target.value)} className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm font-normal normal-case tracking-normal" /></label> : <div className="mt-3"><SizeInventoryEditor sizes={draft.sizes} sizeStock={color.sizeStock} onChange={(_, stock) => onStockChange(color.id, stock, color.stock)} /></div>}
-            <p className={`mt-2 text-[11px] ${colorErrors.includes("photos") ? "font-semibold text-red-600" : "text-muted"}`}>{color.photos.length} image{color.photos.length === 1 ? "" : "s"} · quantities can be entered before publishing</p>
+            <p className={`mt-2 text-[11px] ${hasColorError ? "font-semibold text-red-600" : "text-muted"}`}>{color.photos.length} / 5 photos · quantities can be entered before publishing</p>
             {hasColorError ? <p className="mt-2 text-xs font-medium text-red-600">Fix: {colorErrors.join(", ")}.</p> : null}
           </div>
         )})}
       </div>
-      {unassignedPhotos.length && colors.length ? (
+      {colors.length ? (
         <div className="mt-5 rounded-xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8b641f]">Unassigned photos</p>
-          <p className="mt-1 text-xs text-[#8b641f]">Click a photo, then choose the colour group it belongs to.</p>
+          <p className="mt-1 text-xs text-[#8b641f]">Assign each photo to a colour, or delete photos that should not be published. Each colour supports up to five photos.</p>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             {unassignedPhotos.map((photo) => (
-              <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="overflow-hidden rounded-lg border border-[#ead8a8] bg-white">
+              <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="group relative overflow-hidden rounded-lg border border-[#ead8a8] bg-white">
                 <img src={photo.preview} alt="Unassigned product photo" className="aspect-square w-full cursor-grab object-cover active:cursor-grabbing" />
+                <button type="button" onClick={() => onDeletePhoto(photo.id)} className="absolute right-1 top-1 rounded bg-white/95 p-1 text-accent-deep shadow opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100" title="Delete this photo from the upload"><PortalIcon name="trash" className="h-3.5 w-3.5" /></button>
                 <select aria-label="Assign unassigned photo to colour" defaultValue="" onChange={(event) => { if (event.target.value) onAssign(photo.id, event.target.value); }} className="w-full border-t border-[#ead8a8] bg-white px-2 py-2 text-xs text-ink">
                   <option value="">Choose colour…</option>
-                  {colors.map((color) => <option key={color.id} value={color.id}>{color.colorName || "Unnamed colour"}</option>)}
+                  {colors.map((color) => <option key={color.id} value={color.id} disabled={color.photos.length >= 5}>{color.colorName || "Unnamed colour"}{color.photos.length >= 5 ? " · full (5/5)" : ` (${color.photos.length}/5)`}</option>)}
                 </select>
               </div>
             ))}
+            {!unassignedPhotos.length ? <p className="col-span-full text-xs text-[#8b641f]">All photos are assigned to a colour.</p> : null}
           </div>
         </div>
       ) : null}
@@ -499,6 +510,11 @@ export default function BulkUploadPage() {
     );
   }
   function assignColor(draftId: string, photoId: string, colorId: string) {
+    const target = drafts.find((draft) => draft.id === draftId)?.colors.find((color) => color.id === colorId);
+    if (target && !target.photos.some((photo) => photo.id === photoId) && target.photos.length >= 5) {
+      setMessage(`${target.colorName || "This colour"} already has 5 photos. Remove or unassign a photo before adding another.`);
+      return;
+    }
     setDrafts((current) => current.map((draft) => {
       if (draft.id !== draftId || !draft.colors.length) return draft;
       const photo = draft.photos.find((item) => item.id === photoId);
@@ -512,17 +528,19 @@ export default function BulkUploadPage() {
   function addColor(draftId: string) {
     setDrafts((current) => current.map((draft) => {
       if (draft.id !== draftId) return draft;
-      if (draft.colors.length) {
-        return { ...draft, colors: [...draft.colors, createColorGroup()] };
-      }
-      return {
-        ...draft,
-        colors: [{ ...createColorGroup(), photos: draft.photos }],
-      };
+      return { ...draft, colors: [...draft.colors, createColorGroup()] };
     }));
   }
   function removeColor(draftId: string, colorId: string) {
     setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: draft.colors.filter((color) => color.id !== colorId) } : draft));
+  }
+  function unassignColor(draftId: string, photoId: string) {
+    setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: draft.colors.map((color) => ({ ...color, photos: color.photos.filter((photo) => photo.id !== photoId) })) } : draft));
+  }
+  function deletePhoto(draftId: string, photoId: string) {
+    const photo = drafts.find((draft) => draft.id === draftId)?.photos.find((item) => item.id === photoId);
+    if (photo) URL.revokeObjectURL(photo.preview);
+    setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, photos: draft.photos.filter((item) => item.id !== photoId), colors: draft.colors.map((color) => ({ ...color, photos: color.photos.filter((item) => item.id !== photoId) })) } : draft));
   }
   function updateColorStock(draftId: string, colorId: string, sizeStock: Record<string, number>, stock: string) {
     setDrafts((current) => current.map((draft) => {
@@ -729,10 +747,16 @@ export default function BulkUploadPage() {
     ) as Record<string, string[]>;
     const nextColorValidationErrors: Record<string, string[]> = {};
     drafts.forEach((draft) => {
+      const assignedPhotoIds = new Set(draft.colors.flatMap((color) => color.photos.map((photo) => photo.id)));
+      if (draft.colors.length && draft.photos.some((photo) => !assignedPhotoIds.has(photo.id)))
+        missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "assign every photo to a colour or delete it"];
+      if (!draft.colors.length && draft.photos.length > 5)
+        missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "maximum 5 photos without colourways"];
       draft.colors.forEach((color) => {
         const errors = [
           !color.colorName.trim() ? "colour name" : null,
           !color.photos.length ? "at least one photo" : null,
+          color.photos.length > 5 ? `maximum 5 photos (currently ${color.photos.length})` : null,
         ].filter((error): error is string => Boolean(error));
         if (errors.length) nextColorValidationErrors[color.id] = errors;
       });
@@ -793,9 +817,9 @@ export default function BulkUploadPage() {
         const colors = sourceColors.map((color, colorIndex) => ({
           ...color,
           colorName: color.colorName.trim() || (colorIndex === 0 ? draft.colorName.trim() : "Default"),
-          photos: colorIndex === 0 ? [...color.photos, ...unassignedPhotos] : color.photos,
+          photos: color.photos,
         }));
-        if (colors.some((color) => !color.photos.length || !color.colorName)) throw new Error(`Assign every photo and name each colour for ${draft.title}.`);
+        if (unassignedPhotos.length || colors.some((color) => !color.photos.length || !color.colorName || color.photos.length > 5)) throw new Error(`Fix the highlighted colour assignments for ${draft.title} before publishing.`);
         const aggregateSizeStock = noSizes(draft.categorySlug) ? {} : aggregateBulkSizeStock(colors, draft.sizes);
         const variants = [];
         for (const color of colors) {
@@ -1078,7 +1102,7 @@ export default function BulkUploadPage() {
                 Drop a photo here.
               </div>
             ) : null}
-            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onRemove={(colorId) => removeColor(draft.id, colorId)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} colorValidationErrors={colorValidationErrors} /> : null}
+            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onRemove={(colorId) => removeColor(draft.id, colorId)} onUnassign={(photoId) => unassignColor(draft.id, photoId)} onDeletePhoto={(photoId) => deletePhoto(draft.id, photoId)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} colorValidationErrors={colorValidationErrors} /> : null}
             <div className="mt-4 grid gap-3">
               <label className={`flex items-center gap-2 border-b py-2 ${hasValidationError(draft.id, "product name") ? "border-red-400" : "border-line"}`}>
                 <input

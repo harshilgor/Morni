@@ -15,8 +15,19 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Review the product fields and try again." }, { status: 400 });
+  const requestBody = await request.json().catch(() => null);
+  const parsed = schema.safeParse(requestBody);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((issue) => {
+      const [scope, productIndex, variantKey, colorIndex, field] = issue.path;
+      if (scope === "items" && typeof productIndex === "number" && variantKey === "variants" && typeof colorIndex === "number" && field === "images" && issue.code === "too_big")
+        return `Product ${productIndex + 1}, colour ${colorIndex + 1}: a colour can have a maximum of 5 photos.`;
+      if (scope === "items" && typeof productIndex === "number" && field === "images" && issue.code === "too_big")
+        return `Product ${productIndex + 1}: a product without colourways can have a maximum of 5 photos.`;
+      return `Review ${issue.path.join(" → ") || "the bulk-upload details"}: ${issue.message}`;
+    });
+    return NextResponse.json({ error: issues[0] ?? "Review the product fields and try again.", issues }, { status: 400 });
+  }
   const { storeId } = parsed.data;
   let admin: ReturnType<typeof createAdminClient>;
   try {
