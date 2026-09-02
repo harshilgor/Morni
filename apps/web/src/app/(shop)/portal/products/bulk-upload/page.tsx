@@ -16,6 +16,7 @@ type Photo = { id: string; file: File; preview: string };
 type ColorGroup = {
   id: string;
   colorName: string;
+  colorHex?: string;
   photos: Photo[];
   confidence?: number;
   needsReview?: boolean;
@@ -42,6 +43,20 @@ type Draft = {
 
 function createColorGroup(colorName = "") : ColorGroup {
   return { id: uid(), colorName, photos: [], sizeStock: { S: 0, M: 0, L: 0 }, stock: "0", needsReview: true };
+}
+function colourHexForName(name: string) {
+  const value = name.toLowerCase();
+  if (value.includes("black")) return "#171717";
+  if (value.includes("pink")) return "#e88baa";
+  if (value.includes("red")) return "#c94b4b";
+  if (value.includes("blue")) return "#4d78ed";
+  if (value.includes("green")) return "#4f9b78";
+  if (value.includes("white")) return "#f7f7f4";
+  if (value.includes("cream") || value.includes("beige")) return "#d8c4a4";
+  if (value.includes("purple")) return "#8b6bb1";
+  if (value.includes("yellow")) return "#e5b94e";
+  if (value.includes("orange")) return "#e38b45";
+  return "#245448";
 }
 
 function PhotoStack({
@@ -162,12 +177,14 @@ function ColorGroupingPanel({
 }: {
   draft: Draft;
   onAssign: (photoId: string, colorId: string) => void;
-  onRename: (colorId: string, colorName: string) => void;
+  onRename: (colorId: string, colorName: string, colorHex?: string) => void;
   onAdd: () => void;
   onStockChange: (colorId: string, sizeStock: Record<string, number>, stock: string) => void;
   noSize: boolean;
 }) {
   const colors = draft.colors.length ? draft.colors : [{ ...createColorGroup("Unassigned colour"), photos: draft.photos }];
+  const assignedPhotoIds = new Set(colors.flatMap((color) => color.photos.map((photo) => photo.id)));
+  const unassignedPhotos = draft.photos.filter((photo) => !assignedPhotoIds.has(photo.id));
   return (
     <section className="mt-5 rounded-2xl border border-[#dfe8e3] bg-[#f8fbf9] p-5 sm:p-6" aria-label="Colour grouping">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -179,14 +196,17 @@ function ColorGroupingPanel({
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {colors.map((color) => (
-          <div key={color.id} className="rounded-xl border border-line bg-white p-4 sm:p-5">
+          <div key={color.id} className="rounded-xl border border-line bg-white p-4 sm:p-5" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const photoId = event.dataTransfer.getData("photo-id"); if (photoId) onAssign(photoId, color.id); }}>
             <div className="flex items-center gap-2">
+              <label className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-line" title="Choose colour swatch">
+                <input aria-label="Colour swatch" type="color" value={color.colorHex || colourHexForName(color.colorName)} onChange={(event) => onRename(color.id, color.colorName, event.target.value)} className="absolute -inset-2 h-14 w-14 cursor-pointer" />
+              </label>
               <input value={color.colorName} onChange={(event) => onRename(color.id, event.target.value)} placeholder="Colour name" className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm font-semibold text-ink" />
               <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${color.needsReview ? "bg-[#fff1d8] text-[#98621b]" : "bg-[#e8f5ef] text-[#2f765e]"}`}>{color.needsReview ? "Review" : "Matched"}</span>
             </div>
             <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
               {color.photos.map((photo) => (
-                <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-lg bg-[#edf3ef]">
+                <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="group relative aspect-square cursor-grab overflow-hidden rounded-lg bg-[#edf3ef] active:cursor-grabbing">
                   <img src={photo.preview} alt={`${color.colorName || "Colour"} product photo`} className="h-full w-full object-cover" />
                   <select aria-label={`Assign photo to colour`} value={color.id} onChange={(event) => onAssign(photo.id, event.target.value)} className="absolute inset-x-1 bottom-1 min-w-0 rounded bg-white/95 px-1 py-1 text-[10px] text-ink opacity-100 shadow transition sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100">
                     {colors.map((option) => <option key={option.id} value={option.id}>{option.colorName || "Unnamed"}</option>)}
@@ -199,6 +219,23 @@ function ColorGroupingPanel({
           </div>
         ))}
       </div>
+      {unassignedPhotos.length ? (
+        <div className="mt-5 rounded-xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8b641f]">Unassigned photos</p>
+          <p className="mt-1 text-xs text-[#8b641f]">Click a photo, then choose the colour group it belongs to.</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            {unassignedPhotos.map((photo) => (
+              <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="overflow-hidden rounded-lg border border-[#ead8a8] bg-white">
+                <img src={photo.preview} alt="Unassigned product photo" className="aspect-square w-full cursor-grab object-cover active:cursor-grabbing" />
+                <select aria-label="Assign unassigned photo to colour" defaultValue="" onChange={(event) => { if (event.target.value) onAssign(photo.id, event.target.value); }} className="w-full border-t border-[#ead8a8] bg-white px-2 py-2 text-xs text-ink">
+                  <option value="">Choose colour…</option>
+                  {colors.map((color) => <option key={color.id} value={color.id}>{color.colorName || "Unnamed colour"}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -405,8 +442,8 @@ export default function BulkUploadPage() {
       return { ...draft, colors: draft.colors.map((color) => ({ ...color, photos: color.id === colorId ? [...color.photos.filter((item) => item.id !== photoId), photo] : color.photos.filter((item) => item.id !== photoId) })) };
     }));
   }
-  function renameColor(draftId: string, colorId: string, colorName: string) {
-    setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: draft.colors.map((color) => color.id === colorId ? { ...color, colorName, needsReview: !colorName.trim() } : color) } : draft));
+  function renameColor(draftId: string, colorId: string, colorName: string, colorHex?: string) {
+    setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: draft.colors.map((color) => color.id === colorId ? { ...color, colorName, colorHex: colorHex ?? color.colorHex, needsReview: !colorName.trim() } : color) } : draft));
   }
   function addColor(draftId: string) {
     setDrafts((current) => current.map((draft) => draft.id === draftId ? { ...draft, colors: [...(draft.colors.length ? draft.colors : [{ ...createColorGroup("Unassigned colour"), photos: draft.photos }]), createColorGroup()] } : draft));
@@ -650,14 +687,22 @@ export default function BulkUploadPage() {
           throw new Error(
             `Complete the photos, name, category, price, and stock for ${draft.title || "a draft"}.`,
           );
-        const colors = draft.colors.length ? draft.colors : [{ ...createColorGroup(draft.colorName || "Default"), photos: draft.photos, sizeStock: draft.sizeStock, stock: draft.stock }];
-        if (colors.some((color) => !color.photos.length || !color.colorName.trim())) throw new Error(`Assign every photo and name each colour for ${draft.title}.`);
+        const sourceColors = draft.colors.length ? draft.colors : [{ ...createColorGroup(draft.colorName || "Default"), photos: draft.photos, sizeStock: draft.sizeStock, stock: draft.stock }];
+        const assignedPhotoIds = new Set(sourceColors.flatMap((color) => color.photos.map((photo) => photo.id)));
+        const unassignedPhotos = draft.photos.filter((photo) => !assignedPhotoIds.has(photo.id));
+        const colors = sourceColors.map((color, colorIndex) => ({
+          ...color,
+          colorName: color.colorName.trim() || (colorIndex === 0 ? draft.colorName.trim() : "Default"),
+          photos: colorIndex === 0 ? [...color.photos, ...unassignedPhotos] : color.photos,
+        }));
+        if (colors.some((color) => !color.photos.length || !color.colorName)) throw new Error(`Assign every photo and name each colour for ${draft.title}.`);
         const variants = [];
         for (const color of colors) {
+          setMessage(`Uploading images for ${draft.title}…`);
           const images = await uploadProductImages({ storeId: store.id, files: color.photos.map((photo) => photo.file) });
           uploadedUrls.push(...images);
           const colorStock = noSizes(draft.categorySlug) ? Number(color.stock || 0) : Object.values(color.sizeStock).reduce((sum, quantity) => sum + quantity, 0);
-          variants.push({ colorName: color.colorName.trim(), colorHex: null, sizes: noSizes(draft.categorySlug) ? [] : draft.sizes, sizeStock: noSizes(draft.categorySlug) ? {} : color.sizeStock, stock: colorStock, images });
+          variants.push({ colorName: color.colorName.trim(), colorHex: color.colorHex ?? null, sizes: noSizes(draft.categorySlug) ? [] : draft.sizes, sizeStock: noSizes(draft.categorySlug) ? {} : color.sizeStock, stock: colorStock, images });
         }
         items.push({
           title: draft.title,
@@ -679,6 +724,7 @@ export default function BulkUploadPage() {
           "Content-Type": "application/json",
           "Idempotency-Key": uid(),
         },
+        signal: AbortSignal.timeout(120_000),
         body: JSON.stringify({ storeId: store.id, items }),
       });
       const result = await response.json();
@@ -917,7 +963,7 @@ export default function BulkUploadPage() {
                 Drop a photo here.
               </div>
             ) : null}
-            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name) => renameColor(draft.id, colorId, name)} onAdd={() => addColor(draft.id)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} /> : null}
+            {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onStockChange={(colorId, sizeStock, stock) => updateColorStock(draft.id, colorId, sizeStock, stock)} /> : null}
             <div className="mt-4 grid gap-3">
               <label className={`flex items-center gap-2 border-b py-2 ${hasValidationError(draft.id, "product name") ? "border-red-400" : "border-line"}`}>
                 <input

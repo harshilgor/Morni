@@ -104,9 +104,11 @@ export async function uploadStoreMedia(options: {
       : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const path = `${folder}/${options.prefix}-${uploadId}-${safeName}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from(options.bucket)
-    .upload(path, options.file, { upsert: false, contentType: options.file.type });
+  const uploadResult = await Promise.race([
+    supabase.storage.from(options.bucket).upload(path, options.file, { upsert: false, contentType: options.file.type }),
+    new Promise<{ error: Error }>((resolve) => window.setTimeout(() => resolve({ error: new Error("Image upload timed out. Check your connection and try again.") }), 45_000)),
+  ]);
+  const uploadError = uploadResult.error;
 
   if (uploadError) {
     throw new Error(uploadError.message);
