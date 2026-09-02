@@ -231,8 +231,11 @@ export default function PortalOverviewPage() {
           <DashboardReveal delay={0.12}><PortalMetric label="Catalogue health" value={`${products.length} products`} detail={insights.lowStock.length ? `${insights.lowStock.length} low stock · ${products.filter((product) => !product.is_available).length} hidden` : `${products.filter((product) => product.is_available).length} ready to sell`} icon="products" tone={insights.lowStock.length ? "urgent" : "success"} /></DashboardReveal>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(19rem,0.9fr)]">
-          <DashboardReveal delay={0.16}><SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} weekRevenue={insights.weekRevenue} trend={percentageTrend(insights.weekRevenue, insights.previousWeekRevenue, "vs previous week")} /></DashboardReveal>
+        <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(19rem,0.9fr)]">
+          <div className="space-y-5">
+            <DashboardReveal delay={0.16}><SalesChart days={insights.salesDays} maxRevenue={insights.maxRevenue} weekRevenue={insights.weekRevenue} trend={percentageTrend(insights.weekRevenue, insights.previousWeekRevenue, "vs previous week")} /></DashboardReveal>
+            <DashboardReveal delay={0.28}><OrdersToFulfil orders={orders} /></DashboardReveal>
+          </div>
           <div className="space-y-5">
             <DashboardReveal delay={0.2}><section className="portal-card p-5">
               <div className="flex items-end justify-between gap-4 border-b border-[#e8eeeb] pb-4">
@@ -247,12 +250,8 @@ export default function PortalOverviewPage() {
               </div>
             </section></DashboardReveal>
             <DashboardReveal delay={0.24}><StoreHealth store={store} complete={setupComplete} checklistComplete={checklist.filter((item) => item.done).length} reviews={reviews.length} productCount={products.length} lowStockCount={insights.lowStock.length} /></DashboardReveal>
+            <DashboardReveal delay={0.32}><ProductDemand products={insights.topProducts} wishlistRows={wishlistRows} /></DashboardReveal>
           </div>
-        </section>
-
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(19rem,0.9fr)]">
-          <DashboardReveal delay={0.28}><OrdersToFulfil orders={orders} /></DashboardReveal>
-          <DashboardReveal delay={0.32}><ProductDemand products={insights.topProducts} wishlistRows={wishlistRows} /></DashboardReveal>
         </section>
 
         <DashboardReveal delay={0.36}><InventoryNotifications storeId={store.id} /></DashboardReveal>
