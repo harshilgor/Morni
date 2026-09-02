@@ -140,11 +140,11 @@ export default async function SearchPage({
   const heading = query
     ? `Results for “${query}”`
     : maxPrice != null
-      ? `Under AED ${maxPrice}`
+      ? `Products Under AED ${maxPrice}`
       : minPrice != null
         ? `From AED ${minPrice}`
-        : sizeFilter
-          ? `Size ${sizeFilter}`
+          : sizeFilter
+          ? `Products in Size ${sizeFilter === "S" ? "Small" : sizeFilter === "M" ? "Medium" : sizeFilter === "L" ? "Large" : sizeFilter}`
           : sort === "rated"
           ? "Best rated"
           : sort === "new"
@@ -157,7 +157,7 @@ export default async function SearchPage({
   const browseProducts = productList as unknown as BrowsableProduct[];
 
   return (
-    <div className="square-catalog mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="square-catalog mx-auto max-w-[1600px] px-4 py-8 sm:px-6">
       <h1 className="font-display text-3xl text-ink sm:text-4xl">{heading}</h1>
       <p className="mt-2 text-sm text-muted">
         Stores and products across UAE retail floors.

@@ -6,19 +6,19 @@ export default async function Under149Page() {
   const { products, categories, ratings } = await getCachedPriceRailProducts(149);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6">
       <nav className="flex items-center gap-1.5 text-xs text-muted">
         <Link href="/" className="hover:text-ink">
           Home
         </Link>
         <span aria-hidden>/</span>
-        <span className="text-ink">Under AED 149</span>
+        <span className="text-ink">Products Under AED 149</span>
       </nav>
 
       <div className="mt-3 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
           <h1 className="font-display text-3xl text-ink sm:text-4xl">
-            Under AED 149
+            Products Under AED 149
           </h1>
         </div>
       </div>

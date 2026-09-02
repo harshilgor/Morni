@@ -106,13 +106,6 @@ const CATEGORY_MENU_GROUPS = [
   },
 ] as const;
 
-const CATEGORY_MENU_FEATURES = [
-  { name: "Lehengas", href: "/categories/lehengas", image: "/categories/lehengas.png" },
-  { name: "Kaftan", href: "/categories/kaftan", image: "/categories/kaftan.jpg" },
-  { name: "Gifting", href: "/categories/gifting", image: "/categories/gifting-cover.png" },
-  { name: "Jewelry / Accessories", href: "/categories/jewelry-accessories", image: "/categories/jewelry-accessories.png" },
-] as const;
-
 const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI";
 
 function LaunchAnnouncement() {
@@ -605,11 +598,11 @@ export function SiteHeader() {
             role="menu"
             aria-label="Shop by category"
           >
-            <div className="mx-auto grid max-w-7xl grid-cols-[repeat(3,minmax(0,1fr))_1.35fr] gap-8 px-5 py-7">
+            <div className="mx-auto grid max-w-7xl grid-cols-3 gap-10 px-5 py-5">
               {CATEGORY_MENU_GROUPS.map((group) => (
                 <div key={group.title}>
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-deep">{group.title}</p>
-                  <div className="mt-4 space-y-2.5">
+                  <div className="mt-3 space-y-2">
                     {group.links.map(([label, href]) => (
                       <Link key={href} href={href} role="menuitem" onClick={() => setCategoriesOpen(false)} className="block w-fit text-sm text-ink/80 transition hover:text-accent-deep hover:underline">
                         {label}
@@ -618,20 +611,6 @@ export function SiteHeader() {
                   </div>
                 </div>
               ))}
-              <div className="rounded-2xl border border-[#eadfe2] bg-[#fbf4f5] p-3.5">
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-accent-deep">Trending now</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {CATEGORY_MENU_FEATURES.map((feature) => (
-                    <Link key={feature.href} href={feature.href} role="menuitem" onClick={() => setCategoriesOpen(false)} className="group">
-                      <div className="aspect-[3/4] overflow-hidden rounded-xl bg-sand">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={feature.image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                      </div>
-                      <p className="mt-2 text-center text-xs font-medium text-ink group-hover:text-accent-deep">{feature.name}</p>
-                    </Link>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         ) : null}

@@ -16,6 +16,13 @@ const COLLECTIONS = {
   "best-rated": "Best rated",
 } as const;
 
+const DISPLAY_TITLES = {
+  "under-55": "Products Under AED 55",
+  "under-99": "Products Under AED 99",
+  "under-149": "Products Under AED 149",
+  "under-199": "Products Under AED 199",
+} as const;
+
 export default async function CollectionPage({
   params,
 }: {
@@ -24,6 +31,7 @@ export default async function CollectionPage({
   const { slug } = await params;
   const title = COLLECTIONS[slug as keyof typeof COLLECTIONS];
   if (!title) notFound();
+  const pageTitle = DISPLAY_TITLES[slug as keyof typeof DISPLAY_TITLES] ?? title;
 
   const home = await getCachedHomeCatalog();
   const priceBand = slug === "under-55" || slug === "under-99" || slug === "under-199"
@@ -39,14 +47,14 @@ export default async function CollectionPage({
   const categories = await getCachedBrowseCategories();
 
   return (
-    <div className="square-catalog mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="square-catalog mx-auto max-w-[1600px] px-4 py-8 sm:px-6">
       <nav className="flex items-center gap-1.5 text-xs text-muted">
         <Link href="/" className="hover:text-ink">Home</Link>
         <span aria-hidden>/</span>
-        <span className="text-ink">{title}</span>
+        <span className="text-ink">{pageTitle}</span>
       </nav>
       <div className="mt-3 border-b border-line pb-5">
-        <h1 className="font-display text-3xl text-ink sm:text-4xl">{title}</h1>
+        <h1 className="font-display text-3xl text-ink sm:text-4xl">{pageTitle}</h1>
       </div>
       <div className="mt-6">
         <ProductBrowser
