@@ -4,13 +4,33 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { ProductCard } from "@/components/cards";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
+import { createClient } from "@/lib/supabase/client";
 
 export function RecentlyViewedRail() {
   const items = useRecentlyViewed((s) => s.items);
+  const removeMany = useRecentlyViewed((s) => s.removeMany);
 
   useEffect(() => {
     void useRecentlyViewed.persist.rehydrate();
   }, []);
+
+  useEffect(() => {
+    if (!items.length) return;
+    let cancelled = false;
+    const supabase = createClient();
+    void supabase
+      .from("products")
+      .select("id")
+      .in("id", items.map((item) => item.id))
+      .then(({ data }) => {
+        if (cancelled) return;
+        const existing = new Set((data ?? []).map((product) => product.id));
+        removeMany(items.filter((item) => !existing.has(item.id)).map((item) => item.id));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [items, removeMany]);
 
   if (items.length === 0) return null;
 

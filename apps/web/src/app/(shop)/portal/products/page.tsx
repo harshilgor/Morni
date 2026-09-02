@@ -47,6 +47,7 @@ import {
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { AiProcessingOverlay } from "@/components/ai-processing-overlay";
+import { useRecentlyViewed } from "@/lib/recently-viewed";
 
 type ProductWithVariants = Product & {
   product_variants?: ProductVariant[] | null;
@@ -712,7 +713,12 @@ export default function PortalProductsPage() {
     if (!window.confirm(`Delete “${product.title}”? This cannot be undone.`))
       return;
     const supabase = createClient();
-    await supabase.from("products").delete().eq("id", product.id);
+    const { error } = await supabase.from("products").delete().eq("id", product.id);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    useRecentlyViewed.getState().removeMany([product.id]);
     void revalidatePublicCatalog();
     if (editingProductId === product.id) closeEdit();
     if (store) await loadProducts(store.id);
