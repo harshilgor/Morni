@@ -319,23 +319,28 @@ function ColorGroupingPanel({
         )})}
       </div>
       {colors.length ? (
-        <div className="mt-5 rounded-xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8b641f]">Unassigned photos</p>
-          <p className="mt-1 text-xs text-[#8b641f]">Assign each photo to a colour, or delete photos that should not be published. Each colour supports up to {MAX_PHOTOS_PER_COLOUR} photos.</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-            {unassignedPhotos.map((photo) => (
-              <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="group relative overflow-hidden rounded-lg border border-[#ead8a8] bg-white">
-                <img src={photo.preview} alt="Unassigned product photo" className="aspect-square w-full cursor-grab object-cover active:cursor-grabbing" />
-                <button type="button" onClick={() => onDeletePhoto(photo.id)} className="absolute right-1 top-1 rounded bg-white/95 p-1 text-accent-deep shadow opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100" title="Delete this photo from the upload"><PortalIcon name="trash" className="h-3.5 w-3.5" /></button>
-                <select aria-label="Assign unassigned photo to colour" defaultValue="" onChange={(event) => { if (event.target.value) onAssign(photo.id, event.target.value); }} className="w-full border-t border-[#ead8a8] bg-white px-2 py-2 text-xs text-ink">
-                  <option value="">Choose colour…</option>
-                  {colors.map((color) => <option key={color.id} value={color.id} disabled={color.photos.length >= MAX_PHOTOS_PER_COLOUR}>{color.colorName || "Unnamed colour"}{color.photos.length >= MAX_PHOTOS_PER_COLOUR ? ` · full (${MAX_PHOTOS_PER_COLOUR}/${MAX_PHOTOS_PER_COLOUR})` : ` (${color.photos.length}/${MAX_PHOTOS_PER_COLOUR})`}</option>)}
-                </select>
-              </div>
-            ))}
-            {!unassignedPhotos.length ? <p className="col-span-full text-xs text-[#8b641f]">All photos are assigned to a colour.</p> : null}
+        unassignedPhotos.length ? (
+          <div className="mt-5 rounded-xl border border-dashed border-[#d6b46a] bg-[#fffaf0] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8b641f]">Unassigned photos</p>
+            <p className="mt-1 text-xs text-[#8b641f]">Assign each photo to a colour, or delete photos that should not be published. Each colour supports up to {MAX_PHOTOS_PER_COLOUR} photos.</p>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+              {unassignedPhotos.map((photo) => (
+                <div key={photo.id} draggable onDragStart={(event) => { event.dataTransfer.setData("photo-id", photo.id); event.dataTransfer.effectAllowed = "move"; }} className="group relative overflow-hidden rounded-lg border border-[#ead8a8] bg-white">
+                  <img src={photo.preview} alt="Unassigned product photo" className="aspect-square w-full cursor-grab object-cover active:cursor-grabbing" />
+                  <button type="button" onClick={() => onDeletePhoto(photo.id)} className="absolute right-1 top-1 rounded bg-white/95 p-1 text-accent-deep shadow opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100" title="Delete this photo from the upload"><PortalIcon name="trash" className="h-3.5 w-3.5" /></button>
+                  <select aria-label="Assign unassigned photo to colour" defaultValue="" onChange={(event) => { if (event.target.value) onAssign(photo.id, event.target.value); }} className="w-full border-t border-[#ead8a8] bg-white px-2 py-2 text-xs text-ink">
+                    <option value="">Choose colour…</option>
+                    {colors.map((color) => <option key={color.id} value={color.id} disabled={color.photos.length >= MAX_PHOTOS_PER_COLOUR}>{color.colorName || "Unnamed colour"}{color.photos.length >= MAX_PHOTOS_PER_COLOUR ? ` · full (${MAX_PHOTOS_PER_COLOUR}/${MAX_PHOTOS_PER_COLOUR})` : ` (${color.photos.length}/${MAX_PHOTOS_PER_COLOUR})`}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-5 rounded-xl border border-[#e8c56d] bg-[#fff6d8] px-4 py-3 text-center shadow-[0_0_24px_rgba(222,178,67,0.3)] ring-1 ring-[#fff1bc]">
+            <p className="text-sm font-semibold text-[#735313]">All photos are assigned!</p>
+          </div>
+        )
       ) : null}
     </section>
   );
