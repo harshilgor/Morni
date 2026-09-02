@@ -557,6 +557,7 @@ export function ProductBrowser({
   const hasTasteProfile = Boolean(
     tasteProfile && tasteProfile.likes + tasteProfile.passes > 0,
   );
+  const categoryIsPreferred = hasTasteProfile;
   const currentSort = SORTS.find((option) => option.id === sort) ?? SORTS[0];
   const activeCount =
     (Object.keys(EMPTY_FILTERS) as (keyof Filters)[]).reduce((sum, key) => {

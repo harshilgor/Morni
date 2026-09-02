@@ -3,7 +3,7 @@ import type { BrowseCategory } from "@/lib/browse-categories";
 type CategoryMatchProduct = {
   title: string;
   description?: string | null;
-  category?: { slug: string } | null;
+  category?: { slug?: string | null } | null;
 };
 
 type CategoryMatchInput = Pick<BrowseCategory, "slug"> & {
