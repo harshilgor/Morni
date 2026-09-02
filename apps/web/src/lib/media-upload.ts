@@ -121,6 +121,7 @@ export async function uploadProductImages(options: {
   storeId: string;
   files: File[];
   productId?: string;
+  onFileUploaded?: (file: File, completed: number, total: number) => void;
 }) {
   const urls: string[] = [];
   for (let index = 0; index < options.files.length; index += 1) {
@@ -133,6 +134,7 @@ export async function uploadProductImages(options: {
       productId: options.productId,
     });
     urls.push(url);
+    options.onFileUploaded?.(file, index + 1, options.files.length);
   }
   return urls;
 }

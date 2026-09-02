@@ -42,6 +42,13 @@ type Draft = {
   colors: ColorGroup[];
 };
 
+type PublishProgress = {
+  completed: number;
+  total: number;
+  currentProduct?: string;
+  stage: "uploading" | "saving";
+};
+
 const BULK_UPLOAD_MAX_PHOTOS = 500;
 const AI_ANALYSIS_MAX_PHOTOS = 30;
 const BULK_UPLOAD_DRAFT_DB = "morni-bulk-upload-drafts";
@@ -315,54 +322,6 @@ function ColorGroupingPanel({
   );
 }
 
-function AiProcessingOverlay({
-  phase,
-  photoCount,
-  productCount,
-}: {
-  phase: "reading" | "analyzing" | "publishing";
-  photoCount: number;
-  productCount: number;
-}) {
-  const copy = phase === "reading"
-    ? { eyebrow: "Step 1 of 3", title: "Preparing your photos", detail: "Optimizing image previews securely before AI reviews them." }
-    : phase === "analyzing"
-      ? { eyebrow: "Step 2 of 3", title: "AI is building your catalogue", detail: "Matching product views, writing descriptions, and suggesting categories." }
-      : { eyebrow: "Step 3 of 3", title: "Publishing your products", detail: "Uploading approved images and saving each product safely." };
-
-  return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-[#14251f]/45 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="ai-processing-title" aria-describedby="ai-processing-detail">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/60 bg-[#f7fbf8]/95 p-6 shadow-[0_30px_100px_-35px_rgba(12,35,28,0.8)] sm:p-9">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-          <div className="absolute -left-16 -top-20 h-56 w-56 rounded-full bg-[#75c6a5]/25 blur-3xl animate-[pulse_4s_ease-in-out_infinite]" />
-          <div className="absolute -bottom-24 -right-12 h-64 w-64 rounded-full bg-[#6d91ff]/20 blur-3xl animate-[pulse_5s_ease-in-out_infinite]" />
-          <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#4f9c80]/20 animate-[spin_14s_linear_infinite]" />
-          <div className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#547fef]/25 animate-[spin_9s_linear_infinite_reverse]" />
-        </div>
-        <div className="relative">
-          <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-white/80 shadow-[0_0_0_10px_rgba(78,148,120,0.08),0_0_45px_rgba(84,125,255,0.28)]">
-            <div className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-[#5fc6a1] via-[#467eea] to-[#273f9b] shadow-[0_0_25px_rgba(70,126,234,0.65)] animate-[pulse_2.2s_ease-in-out_infinite]">
-              <PortalIcon name="sparkle" className="h-6 w-6 text-white" />
-            </div>
-          </div>
-          <p className="mt-6 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-[#4b806d]">{copy.eyebrow}</p>
-          <h2 id="ai-processing-title" className="mt-2 text-center font-display text-3xl tracking-[-0.035em] text-[#17362b]">{copy.title}</h2>
-          <p id="ai-processing-detail" className="mx-auto mt-3 max-w-sm text-center text-sm leading-6 text-[#60746b]">{copy.detail} This can take a few seconds—keep this window open.</p>
-          <div className="mt-7 grid grid-cols-3 gap-2 text-center text-[11px] font-semibold text-[#6c7f76]">
-            <div className={`rounded-xl px-2 py-2.5 ${phase === "reading" ? "bg-[#e0f2e9] text-[#2f765e]" : "bg-[#edf4ef]"}`}>Read photos</div>
-            <div className={`rounded-xl px-2 py-2.5 ${phase === "analyzing" ? "bg-[#e0e9ff] text-[#3c5caf]" : "bg-[#edf4ef]"}`}>Understand styles</div>
-            <div className={`rounded-xl px-2 py-2.5 ${phase === "publishing" ? "bg-[#e0f2e9] text-[#2f765e]" : "bg-[#edf4ef]"}`}>Save products</div>
-          </div>
-          <div className="mt-5 flex items-center justify-between text-xs text-[#71837a]">
-            <span>{photoCount} photo{photoCount === 1 ? "" : "s"} in this batch</span>
-            <span>{productCount} candidate{productCount === 1 ? "" : "s"}</span>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#dcebe2]"><div className={`h-full rounded-full bg-gradient-to-r from-[#5bb98f] to-[#4d78ed] transition-all duration-500 ${phase === "reading" ? "w-1/3" : phase === "analyzing" ? "w-2/3" : "w-full"}`} /></div>
-        </div>
-      </div>
-    </div>
-  );
-}
 const noSizes = (slug: string) =>
   ["gifting", "hamper", "hampers"].includes(slug);
 const uid = () => crypto.randomUUID();
@@ -430,6 +389,7 @@ export default function BulkUploadPage() {
   const [busyPhase, setBusyPhase] = useState<
     "idle" | "reading" | "analyzing" | "publishing"
   >("idle");
+  const [publishProgress, setPublishProgress] = useState<PublishProgress | null>(null);
   const [showCoach, setShowCoach] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [uploadCelebrationKey, setUploadCelebrationKey] = useState(0);
@@ -811,6 +771,9 @@ export default function BulkUploadPage() {
     setBusyPhase("publishing");
     setMessage(null);
     const uploadedUrls: string[] = [];
+    const totalPhotoCount = drafts.reduce((total, draft) => total + draft.photos.length, 0);
+    let uploadedPhotoCount = 0;
+    setPublishProgress({ completed: 0, total: totalPhotoCount, stage: "uploading" });
     try {
       const items = [];
       for (const draft of drafts) {
@@ -836,8 +799,19 @@ export default function BulkUploadPage() {
         const aggregateSizeStock = noSizes(draft.categorySlug) ? {} : aggregateBulkSizeStock(colors, draft.sizes);
         const variants = [];
         for (const color of colors) {
-          setMessage(`Uploading images for ${draft.title}…`);
-          const images = await uploadProductImages({ storeId: store.id, files: color.photos.map((photo) => photo.file) });
+          const images = await uploadProductImages({
+            storeId: store.id,
+            files: color.photos.map((photo) => photo.file),
+            onFileUploaded: () => {
+              uploadedPhotoCount += 1;
+              setPublishProgress({
+                completed: uploadedPhotoCount,
+                total: totalPhotoCount,
+                currentProduct: draft.title,
+                stage: "uploading",
+              });
+            },
+          });
           uploadedUrls.push(...images);
           const colorStock = noSizes(draft.categorySlug) ? Number(color.stock || 0) : Object.values(color.sizeStock).reduce((sum, quantity) => sum + quantity, 0);
           variants.push({ colorName: color.colorName.trim(), colorHex: color.colorHex ?? null, sizes: noSizes(draft.categorySlug) ? [] : draft.sizes, sizeStock: noSizes(draft.categorySlug) ? {} : color.sizeStock, stock: colorStock, images });
@@ -856,6 +830,7 @@ export default function BulkUploadPage() {
           variants,
         });
       }
+      setPublishProgress({ completed: uploadedPhotoCount, total: totalPhotoCount, stage: "saving" });
       const response = await fetch("/api/portal/products/bulk-publish", {
         method: "POST",
         headers: {
@@ -896,6 +871,7 @@ export default function BulkUploadPage() {
     } finally {
       setBusy(false);
       setBusyPhase("idle");
+      setPublishProgress(null);
     }
   }
   async function retryImport(importId: string) {
@@ -1287,6 +1263,7 @@ export default function BulkUploadPage() {
           phase={busyPhase === "idle" ? "reading" : busyPhase}
           photoCount={drafts.reduce((sum, draft) => sum + draft.photos.length, 0)}
           productCount={drafts.length}
+          uploadProgress={publishProgress}
         />
       ) : null}
     </main>
