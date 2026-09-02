@@ -69,7 +69,9 @@ export async function POST(request: Request) {
         .filter((id): id is string => Boolean(id)),
     }));
   const totalPayloadBytes = images.reduce((total, image) => total + image.data.length, 0);
-  if (totalPayloadBytes > 45_000_000) {
+  // Gemini inline image requests have a smaller practical request limit.
+  // Keep a little headroom for the prompt and structured response.
+  if (totalPayloadBytes > (process.env.GEMINI_API_KEY ? 18_000_000 : 45_000_000)) {
     return NextResponse.json({ error: "The selected photos are too large to analyze together. Please upload fewer photos at a time." }, { status: 413 });
   }
   const [{ data: member, error: memberError }, { data: profile, error: profileError }, { data: categories, error: categoriesError }] = await Promise.all([
@@ -88,17 +90,29 @@ export async function POST(request: Request) {
   }
   if (!member && profile?.role !== "admin") return NextResponse.json({ error: "You do not have access to this store." }, { status: 403 });
   const key = process.env.OPENAI_API_KEY;
-  if (!key) return NextResponse.json({ error: "AI analysis is not configured. You can still review products manually." }, { status: 503 });
-  const model = process.env.OPENAI_VISION_MODEL || "gpt-4o-mini";
-  console.info("Bulk photo grouping sending request to OpenAI", { requestId, model, imageCount: images.length });
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!key && !geminiKey) return NextResponse.json({ error: "AI analysis is not configured. You can still review products manually." }, { status: 503 });
+  const model = geminiKey ? (process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash-lite") : (process.env.OPENAI_VISION_MODEL || "gpt-4o-mini");
+  console.info("Bulk photo grouping sending request", { requestId, provider: geminiKey ? "Gemini" : "OpenAI", model, imageCount: images.length });
   const prompt = `You are matching product photos for a fashion marketplace. Compare EVERY uploaded image against every other image. First group photos into the same physical product using silhouette, construction, pattern, embroidery, and material. A materially different fabric, print, pattern, or design is a DIFFERENT product even if it looks similar. Within each product group, create colorGroups: photos of the same product in different colourways belong to separate colorGroups, while different angles and close-ups of one colour belong together. Never merge different fabrics into a colour group. If identity, fabric, or colour is uncertain, keep the uncertain photos separate and set needsReview true. Use ONLY the stable photo labels supplied below; every label must appear exactly once across product groups and exactly once across colorGroups. For each group, write a natural, human-sounding description of 2 to 3 complete sentences and roughly 45 to 90 words. Never invent brand, fabric, measurements, care instructions, price, stock, or sizes. Categories: ${JSON.stringify(mergeBrowseCategories((categories ?? []) as BrowseCategory[]).map(({ name, slug }) => ({ name, slug })))}. The photo labels are: ${JSON.stringify(labelledImages.map(({ label, name }) => ({ label, name })))}.`;
   let response: Response;
   try {
-    response = await fetch("https://api.openai.com/v1/responses", {
+    response = await fetch(geminiKey
+      ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`
+      : "https://api.openai.com/v1/responses", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      headers: { "Content-Type": "application/json", ...(geminiKey ? {} : { Authorization: `Bearer ${key}` }) },
       signal: AbortSignal.timeout(45_000),
-      body: JSON.stringify({
+      body: JSON.stringify(geminiKey ? {
+        contents: [{ parts: [
+          { text: prompt },
+          ...labelledImages.flatMap((image) => [
+            { text: `PHOTO LABEL: ${image.label}\nFILENAME: ${image.name}` },
+            { inline_data: { mime_type: image.data.match(/^data:(image\/[a-z]+);base64,/i)?.[1] ?? "image/jpeg", data: image.data.replace(/^data:image\/[a-z]+;base64,/i, "") } },
+          ]),
+        ] }],
+        generationConfig: { responseMimeType: "application/json" },
+      } : {
         model,
         store: false,
         input: [{ role: "user", content: [
@@ -112,7 +126,7 @@ export async function POST(request: Request) {
       }),
     });
   } catch (error) {
-    console.error("Bulk photo grouping OpenAI request failed", { requestId, name: error instanceof Error ? error.name : "unknown" });
+    console.error("Bulk photo grouping provider request failed", { requestId, name: error instanceof Error ? error.name : "unknown" });
     return NextResponse.json({
       groups: restoreImageIds(fallbackGroups(labelledImages)),
       warning: "AI analysis was temporarily unavailable. The photos were kept separate for manual review.",
@@ -132,14 +146,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       groups: restoreImageIds(fallbackGroups(labelledImages)),
       warning: response.status === 401 || response.status === 403
-        ? "OpenAI rejected the configured API key. The photos were kept separate for manual review."
+        ? `${geminiKey ? "Gemini" : "OpenAI"} rejected the configured API key. The photos were kept separate for manual review.`
         : response.status === 404
-          ? `OpenAI model "${model}" is not available. The photos were kept separate for manual review.`
-          : "OpenAI could not analyze these photos. The photos were kept separate for manual review.",
+          ? `${geminiKey ? "Gemini" : "OpenAI"} model "${model}" is not available. The photos were kept separate for manual review.`
+          : `${geminiKey ? "Gemini" : "OpenAI"} could not analyze these photos. The photos were kept separate for manual review.`,
     });
   }
-  const payload = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
-  const outputText = payload.output_text ?? payload.output?.flatMap((item) => item.content ?? []).map((part) => part.text ?? "").join("");
+  const payload = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+  const outputText = payload.output_text ?? payload.output?.flatMap((item) => item.content ?? []).map((part) => part.text ?? "").join("") ?? payload.candidates?.flatMap((candidate) => candidate.content?.parts ?? []).map((part) => part.text ?? "").join("");
   let parsedOutput: unknown;
   try {
     parsedOutput = JSON.parse(outputText || "{}");

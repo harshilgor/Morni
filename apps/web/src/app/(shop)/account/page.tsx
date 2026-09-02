@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { animate } from "animejs";
@@ -89,6 +89,10 @@ export default function AccountPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -176,6 +180,31 @@ export default function AccountPage() {
 
     router.push("/");
     router.refresh();
+  }
+
+  async function handlePasswordChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (newPassword.length < 8) {
+      setPasswordMessage("Use at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage("The passwords do not match.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    setPasswordMessage(null);
+    const { error } = await createClient().auth.updateUser({ password: newPassword });
+    if (error) {
+      setPasswordMessage(error.message);
+      setPasswordSaving(false);
+      return;
+    }
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordMessage("Your password has been changed successfully.");
+    setPasswordSaving(false);
   }
 
   if (authLoading || !auth) {
@@ -297,6 +326,31 @@ export default function AccountPage() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Password security */}
+      <div className="mt-8">
+        <h2 className="font-display text-2xl text-ink">Password & security</h2>
+        <form onSubmit={handlePasswordChange} className="mt-4 space-y-4 rounded-2xl border border-line bg-surface p-5 sm:p-6">
+          <div>
+            <h3 className="font-medium text-ink">Change your password</h3>
+            <p className="mt-1 text-sm leading-6 text-muted">Choose a new password for your Morni account. You will stay signed in on this device.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-xs font-medium uppercase tracking-wider text-muted">
+              New password
+              <input type="password" required minLength={8} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-ink outline-none transition focus:border-accent focus:ring-1 focus:ring-accent" />
+            </label>
+            <label className="block text-xs font-medium uppercase tracking-wider text-muted">
+              Confirm new password
+              <input type="password" required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2.5 text-sm font-normal normal-case tracking-normal text-ink outline-none transition focus:border-accent focus:ring-1 focus:ring-accent" />
+            </label>
+          </div>
+          <button type="submit" disabled={passwordSaving} className="rounded-lg bg-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-ink/90 disabled:opacity-50">
+            {passwordSaving ? "Changing password…" : "Change password"}
+          </button>
+          {passwordMessage ? <p className="text-sm text-muted" role="status">{passwordMessage}</p> : null}
+        </form>
       </div>
 
       {/* Seller section */}

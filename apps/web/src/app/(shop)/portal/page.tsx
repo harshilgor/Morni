@@ -183,24 +183,25 @@ export default function PortalOverviewPage() {
 
       {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
 
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="Excludes cancelled orders" icon="analytics" />
+          <PortalMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} detail={`${insights.activeOrders.length} active order${insights.activeOrders.length === 1 ? "" : "s"}`} icon="orders" />
+          <PortalMetric label="Average order" value={formatAed(insights.averageOrder)} detail="Across non-cancelled orders" icon="sparkle" />
+          <PortalMetric label="Catalog health" value={`${products.length} products`} detail={`${insights.lowStock.length} low stock · ${products.filter((product) => !product.is_available).length} hidden`} icon="products" tone={insights.lowStock.length ? "urgent" : "default"} />
+        </section>
+
         <section className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <section>
-          <div className="mb-3 flex items-center justify-between">
-            <div><p className="portal-eyebrow">Priority queue</p><h2 className="mt-1 text-lg font-semibold text-[#1d2925]">What needs your attention</h2></div>
-            <Link href="/portal/orders" className="portal-text-link">Open orders<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <AttentionCard icon="orders" title={`${insights.newOrders.length} new order${insights.newOrders.length === 1 ? "" : "s"}`} description={insights.newOrders.length ? "Ready to accept and prepare" : "No new orders right now"} href="/portal/orders" urgent={Boolean(insights.newOrders.length)} />
-            <AttentionCard icon="package" title={`${insights.activeOrders.length} in fulfilment`} description={insights.activeOrders.length ? "Keep these orders moving" : "Nothing is being prepared"} href="/portal/orders" />
-            <AttentionCard icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} description={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
-            <AttentionCard icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} description={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="Excludes cancelled orders" icon="analytics" />
-            <PortalMetric label="Sales, 7 days" value={formatAed(insights.weekRevenue)} detail={`${insights.activeOrders.length} active order${insights.activeOrders.length === 1 ? "" : "s"}`} icon="orders" />
-            <PortalMetric label="Average order" value={formatAed(insights.averageOrder)} detail="Across non-cancelled orders" icon="sparkle" />
-            <PortalMetric label="Catalog health" value={`${products.length} products`} detail={`${insights.lowStock.length} low stock and ${products.filter((product) => !product.is_available).length} hidden`} icon="products" tone={insights.lowStock.length ? "urgent" : "default"} />
-          </div>
+          <section className="portal-card p-5">
+            <div className="flex items-end justify-between gap-4 border-b border-[#e8eeeb] pb-4">
+              <div><p className="portal-eyebrow">Today’s priorities</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#1d2925]">Keep your store moving</h2></div>
+              <Link href="/portal/orders" className="portal-text-link">Open orders<PortalIcon name="arrow" className="h-3.5 w-3.5" /></Link>
+            </div>
+            <div className="mt-1 divide-y divide-[#edf1ef]">
+              <PriorityRow icon="orders" title={`${insights.newOrders.length} new order${insights.newOrders.length === 1 ? "" : "s"}`} description={insights.newOrders.length ? "Ready to accept and prepare" : "No new orders right now"} href="/portal/orders" urgent={Boolean(insights.newOrders.length)} />
+              <PriorityRow icon="package" title={`${insights.activeOrders.length} in fulfilment`} description={insights.activeOrders.length ? "Keep these orders moving" : "Nothing is being prepared"} href="/portal/orders" />
+              <PriorityRow icon="warning" title={`${insights.lowStock.length} low-stock item${insights.lowStock.length === 1 ? "" : "s"}`} description={insights.lowStock.length ? "Update stock before they sell out" : "Inventory is looking healthy"} href="/portal/products" urgent={Boolean(insights.lowStock.length)} />
+              <PriorityRow icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} description={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
+            </div>
           </section>
           <InventoryNotifications storeId={store.id} />
         </section>
@@ -351,6 +352,10 @@ function LaunchCard({ storeActive, complete, checklist }: { storeActive: boolean
 
 function AttentionCard({ icon, title, description, href, urgent = false }: { icon: "orders" | "package" | "warning" | "reviews"; title: string; description: string; href: string; urgent?: boolean }) {
   return <Link href={href} className={`portal-card portal-card-interactive group p-4 ${urgent ? "border-[#e4bda9] bg-[#fff9f4]" : ""}`}><div className="flex items-start justify-between gap-3"><span className={`grid h-9 w-9 place-items-center rounded-lg ${urgent ? "bg-[#ffead7] text-[#a6542e]" : "bg-[#e8efec] text-[#315f54]"}`}><PortalIcon name={icon} /></span><PortalIcon name="arrow" className="h-4 w-4 text-[#7c8d86] transition group-hover:translate-x-0.5 group-hover:text-[#2f6f66]" /></div><p className="mt-4 text-sm font-bold text-[#1f302a]">{title}</p><p className="mt-1 text-xs leading-5 text-[#687770]">{description}</p></Link>;
+}
+
+function PriorityRow({ icon, title, description, href, urgent = false }: { icon: "orders" | "package" | "warning" | "reviews"; title: string; description: string; href: string; urgent?: boolean }) {
+  return <Link href={href} className="group flex items-center gap-3 py-3.5 transition first:pt-3 last:pb-1"><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${urgent ? "bg-[#ffead7] text-[#a6542e]" : "bg-[#edf3f0] text-[#3c685c]"}`}><PortalIcon name={icon} className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#263530]">{title}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{description}</span></span><PortalIcon name="arrow" className="h-4 w-4 shrink-0 text-[#9aa8a2] transition group-hover:translate-x-1 group-hover:text-[#2f6f66]" /></Link>;
 }
 
 function SalesChart({ days, maxRevenue }: { days: { label: string; revenue: number }[]; maxRevenue: number }) {
