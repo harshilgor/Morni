@@ -657,6 +657,7 @@ export default function PortalProductsPage() {
           editDraft.customization.enabled
             ? editDraft.customization.fields
             : [],
+        is_available: aggregate.stock > 0 ? editingProduct.is_available : false,
       })
       .eq("id", editingProduct.id)
       .eq("store_id", store.id);
@@ -778,8 +779,9 @@ export default function PortalProductsPage() {
           .from("product_variants")
           .update({ stock })
           .eq("product_id", productId);
+        await supabase.from("products").update({ is_available: stock > 0 ? product.is_available : false }).eq("id", productId);
       } else {
-        await supabase.from("products").update({ stock }).eq("id", productId);
+        await supabase.from("products").update({ stock, is_available: stock > 0 ? product.is_available : false }).eq("id", productId);
       }
     }
 

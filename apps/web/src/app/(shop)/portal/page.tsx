@@ -223,6 +223,7 @@ export default function PortalOverviewPage() {
       </PortalPageHeader>
 
       {!setupComplete || !store.is_active ? <LaunchCard storeActive={store.is_active} complete={setupComplete} checklist={checklist} /> : null}
+        <NeedsAttention insights={insights} products={products} />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <DashboardReveal delay={0}><PortalMetric label="Sales today" value={formatAed(insights.todayRevenue)} detail="No prior-day comparison yet" trend={percentageTrend(insights.todayRevenue, insights.previousDayRevenue, "vs yesterday")} sparkline={insights.salesDays.slice(-3).map((day) => day.revenue)} icon="analytics" /></DashboardReveal>
@@ -333,6 +334,7 @@ function MobileOverview({
           <MobilePriorityRow icon="reviews" title={`${insights.unreplied.length} review${insights.unreplied.length === 1 ? "" : "s"} to reply to`} detail={insights.unreplied.length ? "Build confidence with a prompt reply" : "All reviews are answered"} href="/portal/reviews" />
         </div>
       </section>
+      <NeedsAttention insights={insights} products={products} />
 
       <OrdersToFulfil orders={orders} limit={3} />
 
@@ -376,6 +378,19 @@ function MobileOverview({
 
 function MobileMetric({ label, value }: { label: string; value: string }) {
   return <div className="portal-card p-3"><p className="portal-eyebrow">{label}</p><p className="mt-1 text-lg font-bold tabular-nums text-[#17231f]">{value}</p></div>;
+}
+
+function NeedsAttention({ insights, products }: { insights: { newOrders: OrderWithItems[]; lowStock: Product[]; unreplied: ProductReview[] }; products: Product[] }) {
+  const outOfStock = products.filter((product) => product.stock <= 0);
+  const incomplete = products.filter((product) => !product.title.trim() || !product.description?.trim() || !product.category_id || Number(product.price_aed) <= 0);
+  const items = [
+    outOfStock.length ? ["warning", outOfStock.length + " product" + (outOfStock.length === 1 ? "" : "s") + " out of stock", "They are hidden until restocked.", "/portal/products"] : null,
+    insights.newOrders.length ? ["orders", insights.newOrders.length + " new order" + (insights.newOrders.length === 1 ? "" : "s") + " to accept", "Review and prepare the next orders.", "/portal/orders"] : null,
+    incomplete.length ? ["edit", incomplete.length + " listing" + (incomplete.length === 1 ? "" : "s") + " need details", "Complete title, description, category, or price.", "/portal/products"] : null,
+    insights.unreplied.length ? ["reviews", insights.unreplied.length + " review" + (insights.unreplied.length === 1 ? "" : "s") + " need a reply", "A quick response builds shopper confidence.", "/portal/reviews"] : null,
+    !outOfStock.length && insights.lowStock.length ? ["package", insights.lowStock.length + " item" + (insights.lowStock.length === 1 ? "" : "s") + " running low", "Consider replenishing before they sell out.", "/portal/products"] : null,
+  ].filter(Boolean) as string[][];
+  return <section className="portal-card p-4 sm:p-5"><div className="flex items-start justify-between gap-3 border-b border-[#e8eeeb] pb-4"><div><p className="portal-eyebrow">Needs attention</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[#1d2925]">Issues to resolve</h2><p className="mt-1 text-sm text-[#687770]">A short, prioritized queue for your store.</p></div><span className="rounded-full bg-[#fff1dc] px-2.5 py-1 text-xs font-bold text-[#8f5a13]">{items.length ? items.length + " open" : "All clear"}</span></div>{items.length ? <div className="divide-y divide-[#edf1ef]">{items.map(([icon, title, detail, href]) => <Link key={title} href={href} className="flex items-center gap-3 py-3.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#fff1dc] text-[#9c6817]"><PortalIcon name={icon as "warning"} className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#263530]">{title}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{detail}</span></span><PortalIcon name="arrow" className="h-4 w-4 shrink-0 text-[#9aa8a2]" /></Link>)}</div> : <p className="pt-4 text-sm text-[#687770]">No urgent issues right now. Your store is in good shape.</p>}</section>;
 }
 
 function MobilePriorityRow({ icon, title, detail, href, urgent = false }: { icon: "orders" | "package" | "warning" | "reviews"; title: string; detail: string; href: string; urgent?: boolean }) {
