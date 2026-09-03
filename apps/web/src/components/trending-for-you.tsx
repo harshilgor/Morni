@@ -20,5 +20,5 @@ export function TrendingForYou({ products }: { products: (TrendingCandidate & { 
   if (!result.products.length) return null;
   const rail: RailProduct[] = result.products.map((p) => ({ id: p.id, title: p.title, price_aed: Number(p.price_aed), compare_at_price_aed: p.compare_at_price_aed, image_urls: p.image_urls, href: p.stores ? `/stores/${p.stores.slug}/products/${p.id}` : `/products/${p.id}` }));
   const label = result.categoryName ? `Check out the hottest ${result.categoryName}` : "Trending for you";
-  return <ProductRail id="trending-for-you" title={label} subtitle="Fresh picks selected from what is available today." products={rail} href={result.categorySlug ? `/categories/${result.categorySlug}` : "/search"} unoptimized />;
+  return <ProductRail id="trending-for-you" title={`${label}!`} subtitle="Fresh picks selected from what is available today." products={rail} href={result.categorySlug ? `/categories/${result.categorySlug}` : "/search"} sharp unoptimized />;
 }

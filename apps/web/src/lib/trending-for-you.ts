@@ -27,12 +27,15 @@ export function rankTrendingForYou({ products, preferredCategorySlugs = [], user
     buckets.set(slug, [...(buckets.get(slug) ?? []), product]);
   }
   const preferred = preferredCategorySlugs.find((slug) => buckets.has(slug));
-  const categories = [...buckets.keys()].sort((a, b) => {
+  // A recommendation should feel intentional: only surface categories with
+  // enough depth to fill a complete rail, otherwise fall back to discovery.
+  const categories = [...buckets.keys()].filter((slug) => (buckets.get(slug)?.length ?? 0) >= 7).sort((a, b) => {
     const ai = preferredCategorySlugs.indexOf(a), bi = preferredCategorySlugs.indexOf(b);
     if (ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     return a.localeCompare(b);
   });
-  const selected = preferred ?? categories[hash(`${userKey}:${date.toISOString().slice(0, 10)}`) % categories.length];
+  if (!categories.length) return { categorySlug: null, categoryName: null, products: [] };
+  const selected = preferred && categories.includes(preferred) ? preferred : categories[hash(`${userKey}:${date.toISOString().slice(0, 10)}`) % categories.length];
   const bucket = [...(buckets.get(selected) ?? eligible)].sort((a, b) => a.id.localeCompare(b.id));
   const offset = hash(`${userKey}:${date.toISOString().slice(0, 10)}:${selected}`) % bucket.length;
   return { categorySlug: selected === "discover" ? null : selected, categoryName: bucket[0]?.category?.name ?? null, products: bucket.slice(offset).concat(bucket.slice(0, offset)).slice(0, 10) };

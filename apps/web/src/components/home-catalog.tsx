@@ -139,11 +139,6 @@ export async function HomeCatalog({
       <FeaturedCategories categories={featured} />
       <ShopBySize />
       <HomeDiscovery intents={intentRails} />
-      <HomeStores
-        stores={stores}
-        storeRecommendationStats={storeRecommendationStats}
-        initialEmirate={initialEmirate}
-      />
       <TrendingForYou products={products} />
       {topRated.length > 0 ? (
         <ProductRail
@@ -157,6 +152,11 @@ export async function HomeCatalog({
       ) : null}
       <ProductRail title="New in" products={newIn} href="/search?sort=new" sharp unoptimized />
       <RecentlyViewedRail />
+      <HomeStores
+        stores={stores}
+        storeRecommendationStats={storeRecommendationStats}
+        initialEmirate={initialEmirate}
+      />
       <NewAndPopular tabs={popularTabs} />
     </>
   );
