@@ -369,7 +369,9 @@ export function ProductDetail({
     setAdded(false);
   }
 
-  const needsColor = variants.length > 0;
+  // "Default" is an internal synthetic variant, not a shopper-facing colour.
+  const hasColorVariants = variants.some((variant) => variant.color_name.trim().toLowerCase() !== "default");
+  const needsColor = hasColorVariants;
   const canAdd = availableStock > 0 && (!needsColor || Boolean(selectedVariant));
   const addToBag = (size = selectedSize) => {
     if (!canAdd) return;
@@ -394,7 +396,7 @@ export function ProductDetail({
     addItem(product, store.name, 1, {
       size: size ?? undefined,
       variantId: selectedVariant?.id,
-      colorName: selectedVariant?.color_name,
+      colorName: hasColorVariants ? selectedVariant?.color_name : undefined,
       imageUrl: gallery[0],
       customization: Object.keys(customization).length ? customization : undefined,
     });
@@ -554,7 +556,7 @@ export function ProductDetail({
           </div>
 
           <p className={`mt-4 text-sm ${availableStock > 0 ? "text-[#2d7565]" : "text-accent-deep"}`}>
-            {availableStock > 0 ? `${availableStock} available${selectedVariant ? ` in ${selectedVariant.color_name}${selectedSize ? ` · size ${selectedSize}` : ""}` : hasSizeInventory && selectedSize ? ` in size ${selectedSize}` : product.sizes?.length ? " total across sizes · size quantities pending" : ""}` : "This piece is currently out of stock"}
+            {availableStock > 0 ? `${availableStock} available${hasColorVariants && selectedVariant ? ` in ${selectedVariant.color_name}${selectedSize ? ` · size ${selectedSize}` : ""}` : hasSizeInventory && selectedSize ? ` in size ${selectedSize}` : product.sizes?.length ? " total across sizes · size quantities pending" : ""}` : "This piece is currently out of stock"}
           </p>
           <div className="mt-4 hidden gap-3 sm:flex">
             <div className="relative min-w-0 flex-1">
@@ -569,7 +571,7 @@ export function ProductDetail({
           <div className="mt-6 border-b border-line lg:mt-5">
             <ProductAccordion title="Product details" open={detailsOpen} onToggle={() => setDetailsOpen((open) => !open)}>
               <p>{product.description ?? "A thoughtfully selected piece from this local boutique."}</p>
-              {selectedVariant ? <p className="mt-3">Colour: {selectedVariant.color_name}.</p> : null}
+              {hasColorVariants && selectedVariant ? <p className="mt-3">Colour: {selectedVariant.color_name}.</p> : null}
             </ProductAccordion>
             <ProductAccordion title="Fabric" open={fabricOpen} onToggle={() => setFabricOpen((open) => !open)}>
               <p>{product.fabric?.trim() || "Fabric information has not been provided by the vendor yet."}</p>
