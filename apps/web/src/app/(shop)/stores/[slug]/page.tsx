@@ -225,6 +225,7 @@ async function StorePageContent({
             products={browsable}
             ratings={ratings}
             variant="store"
+            sharp
           />
         )}
       </div>
