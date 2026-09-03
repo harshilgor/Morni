@@ -17,6 +17,7 @@ import {
   type StoreHoursValue,
 } from "@/components/delivery-setup-fields";
 import { uploadStoreMedia } from "@/lib/media-upload";
+import { ImageUploadField } from "@/components/image-upload-field";
 import { PortalEmpty, PortalPageHeader, StatusBadge } from "@/components/portal-ui";
 import type { StorePickupLocation } from "@/lib/types";
 
@@ -355,7 +356,18 @@ export default function PortalSettingsPage() {
               <h2 className="text-lg font-semibold text-[#263530]">Branding & sizing</h2>
               <p className="mt-1 text-sm text-muted">Keep your storefront recognizable across Morni.</p>
             </div>
-            <StoreBrandingFields value={branding} onChange={setBranding} />
+            <StoreBrandingFields value={branding} onChange={setBranding} includeSizeChart={false} />
+          </section>
+
+          <section className="rounded-2xl border border-[#c9ddd4] bg-[#f7fbf8] p-5">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[#263530]">Size chart</h2>
+                <p className="mt-1 max-w-xl text-sm leading-6 text-muted">Upload the chart shoppers should use when choosing a size. It appears on product pages that offer sizing.</p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#3b7162]">{branding.sizeChartUrl ? "Uploaded" : "Optional"}</span>
+            </div>
+            <ImageUploadField label="Store size chart" hint="Use a clear JPG, PNG, or WebP image up to 8 MB." aspect="product" valueUrl={branding.sizeChartUrl} file={branding.sizeChartFile ?? null} onFileChange={(sizeChartFile) => setBranding((current) => ({ ...current, sizeChartFile }))} />
           </section>
 
           <section className="rounded-2xl border border-line bg-[#fbfdfc] p-5">

@@ -15,16 +15,18 @@ export function StoreBrandingFields({
   required = false,
   logoError,
   sizeChartError,
+  includeSizeChart = true,
 }: {
   value: StoreBrandingValue;
   onChange: (next: StoreBrandingValue) => void;
   required?: boolean;
   logoError?: string | null;
   sizeChartError?: string | null;
+  includeSizeChart?: boolean;
 }) {
   return (
     <div className="space-y-5">
-      <ImageUploadField
+      {includeSizeChart ? <ImageUploadField
         label="Store logo"
         hint="Square logo works best (recommended 400 × 400)."
         aspect="square"
@@ -33,7 +35,7 @@ export function StoreBrandingFields({
         file={value.logoFile}
         error={logoError}
         onFileChange={(logoFile) => onChange({ ...value, logoFile })}
-      />
+      /> : null}
       <ImageUploadField
         label="Size chart"
         hint="Optional. Shoppers will see this when they are choosing sizes for your products."
