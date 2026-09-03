@@ -6,6 +6,7 @@ import { ProductCardImage } from "@/components/product-card-image";
 import { formatAed } from "@/lib/format";
 import { WishlistToggle } from "@/components/wishlist-toggle";
 import type { RailProduct } from "@/components/product-rail";
+import { catalogShuffleSeed, shuffleCatalog } from "@/lib/catalog-random";
 
 export type PopularTab = {
   slug: string;
@@ -17,7 +18,7 @@ export type PopularTab = {
 export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
   const [activeSlug, setActiveSlug] = useState(tabs[0]?.slug ?? "");
   const [productsByTab, setProductsByTab] = useState<Record<string, RailProduct[]>>(
-    () => Object.fromEntries(tabs.map((tab) => [tab.slug, tab.products])),
+    () => Object.fromEntries(tabs.map((tab) => [tab.slug, shuffleCatalog(tab.products, catalogShuffleSeed(tab.slug))])),
   );
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -35,7 +36,8 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
       fetch(`/api/home/new-and-popular?slug=${encodeURIComponent(active.slug)}&offset=${activeProducts.length}`)
         .then((response) => (response.ok ? response.json() : Promise.reject(new Error("load failed"))))
         .then((result: { products: RailProduct[]; hasMore: boolean }) => {
-          setProductsByTab((current) => ({ ...current, [active.slug]: [...(current[active.slug] ?? []), ...result.products] }));
+          const randomized = shuffleCatalog(result.products, `${catalogShuffleSeed(active.slug)}:${activeProducts.length}`);
+          setProductsByTab((current) => ({ ...current, [active.slug]: [...(current[active.slug] ?? []), ...randomized] }));
           setHasMore(result.hasMore);
         })
         .catch(() => setHasMore(false))
