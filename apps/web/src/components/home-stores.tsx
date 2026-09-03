@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { StoreCard } from "@/components/cards";
-import { EMIRATES, emirateLabel } from "@/lib/format";
+import { SHOPPER_EMIRATES, emirateLabel } from "@/lib/format";
 import { useLocation } from "@/lib/location";
 import type { Store, UaeEmirate } from "@/lib/types";
 import type { StoreRecommendationStats } from "@/lib/catalog";
@@ -14,7 +14,7 @@ function EmirateFilters({
   onSelect,
 }: {
   activeSelection: UaeEmirate | "all";
-  availableEmirates: typeof EMIRATES;
+  availableEmirates: typeof SHOPPER_EMIRATES;
   onSelect: (value: UaeEmirate | "all") => void;
 }) {
   const pillClass = (active: boolean) =>
@@ -81,8 +81,9 @@ export function HomeStores({
     return () => window.removeEventListener("morni:taste-updated", syncTaste);
   }, []);
 
-  const registeredEmirates = new Set(stores.map((store) => store.emirate));
-  const availableEmirates = EMIRATES.filter((emirate) =>
+  const shopperStores = stores.filter((store) => store.emirate === "dubai");
+  const registeredEmirates = new Set(shopperStores.map((store) => store.emirate));
+  const availableEmirates = SHOPPER_EMIRATES.filter((emirate) =>
     registeredEmirates.has(emirate.value),
   );
   const activeSelection =
@@ -90,8 +91,8 @@ export function HomeStores({
 
   const filtered =
     activeSelection === "all"
-      ? stores
-      : stores.filter((store) => store.emirate === activeSelection);
+      ? shopperStores
+      : shopperStores.filter((store) => store.emirate === activeSelection);
 
   const preferredCategories = Object.entries(taste.categories)
     .filter(([, evidence]) => evidence.likes > evidence.passes)

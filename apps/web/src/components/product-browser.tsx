@@ -492,7 +492,7 @@ export function ProductBrowser({
     return FIT_FACETS.filter((f) => present.has(f.id));
   }, [annotated]);
   const emirateOptions = useMemo(
-    () => [...new Set(annotated.map((p) => p.stores.emirate))],
+    () => [...new Set(annotated.map((p) => p.stores.emirate))].filter((emirate) => emirate === "dubai"),
     [annotated],
   );
   const storeOptions = useMemo(() => {

@@ -9,6 +9,8 @@ export type BrowseCategory = {
   is_featured: boolean;
 };
 
+export const RETIRED_BROWSE_CATEGORY_SLUGS = new Set(["elegant-fashion"]);
+
 const featuredCategory = (
   name: string,
   slug: string,
@@ -106,46 +108,32 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
     11,
   ),
   featuredCategory(
-    "Casual Wear",
-    "casual-wear",
-    "/categories/brunch-everyday.jpg",
-    ["casual", "everyday", "brunch", "daywear"],
-    12,
-  ),
-  featuredCategory(
-    "Office Wear",
-    "office-wear",
-    "/categories/office-wear.webp",
-    ["office", "workwear", "work wear", "formal"],
-    13,
-  ),
-  featuredCategory(
     "Anarkalis",
     "anarkalis",
     "/categories/anarkalis.jpg",
     ["anarkali", "anarkali suit", "flared kurta"],
-    14,
+    12,
   ),
   featuredCategory(
     "Ethnic Tops / Crop Tops",
     "tops",
     "/categories/ethnic-tops-crop-tops.jpg",
     ["ethnic top", "crop top", "blouse", "top"],
-    15,
+    13,
   ),
   featuredCategory(
     "Kaftan",
     "kaftan",
     "/categories/kaftan.jpg",
     ["kaftan", "kaftans", "abaya", "modest dress", "flowy dress"],
-    16,
+    14,
   ),
   featuredCategory(
     "Gifting",
     "gifting",
     "/categories/gifting-cover.png",
     ["gift", "gifting", "present", "celebration", "occasion"],
-    17,
+    15,
   ),
   featuredCategory(
     "Jewelry / Accessories",
@@ -163,7 +151,7 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
       "clutch",
       "scarf",
     ],
-    18,
+    16,
   ),
 ];
 
@@ -182,7 +170,7 @@ export function mergeBrowseCategories(categories: BrowseCategory[]): BrowseCateg
   const featured = mergeFeaturedCategories(categories);
   const featuredSlugs = new Set(featured.map((category) => category.slug));
   const additional = categories
-    .filter((category) => category.slug !== "more" && !featuredSlugs.has(category.slug))
+    .filter((category) => category.slug !== "more" && !featuredSlugs.has(category.slug) && !RETIRED_BROWSE_CATEGORY_SLUGS.has(category.slug))
     .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
 
   return [...featured, ...additional];
@@ -192,6 +180,7 @@ export function getBrowseCategory(
   slug: string,
   categories: BrowseCategory[],
 ): BrowseCategory | null {
+  if (RETIRED_BROWSE_CATEGORY_SLUGS.has(slug)) return null;
   const existing = categories.find((category) => category.slug === slug);
   const catalogCategory = FEATURED_CATEGORY_CATALOG.find(
     (category) => category.slug === slug,

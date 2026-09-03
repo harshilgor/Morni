@@ -10,6 +10,8 @@ export const EMIRATES: { value: UaeEmirate; label: string }[] = [
   { value: "fujairah", label: "Fujairah" },
 ];
 
+export const SHOPPER_EMIRATES = EMIRATES.filter(({ value }) => value === "dubai");
+
 export function formatAed(amount: number | string) {
   const value = typeof amount === "string" ? Number(amount) : amount;
   return new Intl.NumberFormat("en-AE", {

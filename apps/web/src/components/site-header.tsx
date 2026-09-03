@@ -10,6 +10,7 @@ import { useAuthUser } from "@/lib/use-auth-user";
 import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
 import { SavedAddressPicker } from "@/components/saved-address-picker";
+import { GiveawayCountdown } from "@/components/giveaway-countdown";
 
 const SearchTypeahead = dynamic(
   () =>
@@ -98,7 +99,7 @@ const CATEGORY_MENU_GROUPS = [
   },
   {
     title: "More to explore",
-    links: [["Party wear", "/categories/party-wear"], ["Casual wear", "/categories/casual-wear"], ["Office wear", "/categories/office-wear"], ["Anarkalis", "/categories/anarkalis"]],
+    links: [["Party wear", "/categories/party-wear"], ["Anarkalis", "/categories/anarkalis"]],
   },
   {
     title: "Complete the look",
@@ -590,6 +591,7 @@ export function SiteHeader() {
               Sell on Morni
             </Link>
           )}
+          <GiveawayCountdown />
           {firstName ? (
             <span className="ml-auto hidden shrink-0 text-xs text-white/60 sm:inline">
               Welcome back, {firstName}

@@ -65,16 +65,6 @@ const SLIDES: Slide[] = [
     visualOnly: true,
   },
   {
-    id: "brunch-everyday",
-    eyebrow: "Weekend dressing",
-    title: "Brunch & everyday",
-    subtitle: "Easy outfits for every moment.",
-    cta: "Shop brunch & everyday",
-    href: "/categories/casual-wear",
-    image: "/hero/brunch-everyday.webp",
-    visualOnly: true,
-  },
-  {
     id: "gifting-edit",
     eyebrow: "A thoughtful gesture",
     title: "The gifting edit",

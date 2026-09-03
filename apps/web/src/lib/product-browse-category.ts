@@ -17,8 +17,6 @@ const CUSTOM_CATEGORY_SLUGS = new Set([
   "salwar-kameez",
   "sets",
   "party-wear",
-  "casual-wear",
-  "office-wear",
   "tops",
 ]);
 
@@ -77,15 +75,6 @@ export function productMatchesBrowseCategory(
 
     case "party-wear":
       return matchesSearchTerms && title !== "crimson pearl chikankari set";
-
-    case "casual-wear":
-      return matchesSearchTerms && !text.includes("chikankari");
-
-    case "office-wear":
-      return (
-        title !== "midnight sequin gown" &&
-        includesAny(text, ["office", "workwear", "work wear"])
-      );
 
     case "tops":
       return false;

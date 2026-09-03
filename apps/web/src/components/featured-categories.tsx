@@ -22,8 +22,6 @@ export function FeaturedCategories({
               ? "/categories/indo-western.jpeg"
               : category.slug === "lehengas"
                 ? "/categories/lehengas.webp"
-                : category.slug === "office-wear"
-                  ? "/categories/office-wear-featured.png"
                 : category.image_url;
 
   return (
