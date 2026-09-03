@@ -370,7 +370,11 @@ export function ProductDetail({
   }
 
   // "Default" is an internal synthetic variant, not a shopper-facing colour.
-  const hasColorVariants = variants.some((variant) => variant.color_name.trim().toLowerCase() !== "default");
+  // A colour picker is useful only when shoppers have a real choice. The
+  // database may contain one named variant or an internal Default variant;
+  // neither should create a colour section on the storefront.
+  const shopperColorVariants = variants.filter((variant) => variant.color_name.trim().toLowerCase() !== "default");
+  const hasColorVariants = shopperColorVariants.length > 1;
   const needsColor = hasColorVariants;
   const canAdd = availableStock > 0 && (!needsColor || Boolean(selectedVariant));
   const addToBag = (size = selectedSize) => {
@@ -500,7 +504,7 @@ export function ProductDetail({
           ) : null}
 
           <div className="mt-6 space-y-5 lg:mt-5 lg:space-y-4">
-            {variants.length ? (
+            {hasColorVariants ? (
               <div>
                 <p className="text-sm font-semibold text-ink">
                   Colour {selectedVariant ? <span className="font-normal text-muted">— {selectedVariant.color_name}</span> : null}
