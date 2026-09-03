@@ -4,6 +4,7 @@ import { HomeStores } from "@/components/home-stores";
 import { NewAndPopular, type PopularTab } from "@/components/new-and-popular";
 import { ProductRail } from "@/components/product-rail";
 import { RecentlyViewedRail } from "@/components/recently-viewed-rail";
+import { TrendingForYou } from "@/components/trending-for-you";
 import { ShopBySize } from "@/components/shop-by-size";
 import { getCachedHomeCatalog, type ProductWithStore } from "@/lib/catalog";
 import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
@@ -143,6 +144,7 @@ export async function HomeCatalog({
         storeRecommendationStats={storeRecommendationStats}
         initialEmirate={initialEmirate}
       />
+      <TrendingForYou products={products} />
       {topRated.length > 0 ? (
         <ProductRail
           id="top-rated"
