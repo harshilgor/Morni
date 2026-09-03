@@ -49,7 +49,10 @@ export function productMatchesBrowseCategory(
 
   switch (category.slug) {
     case "jewelry-accessories":
-      return product.category?.slug === "jewelry" || product.category?.slug === "accessories";
+      return (
+        (product.category?.slug === "jewelry" || product.category?.slug === "accessories") &&
+        !/(kurti|kurta|saree|sari|set|top|shirt|dress|gown|sharara|salwar|anarkali|co ord|coord|trouser|pant|blazer|abaya|kaftan)/.test(text)
+      );
 
     case "sarees":
       return (
