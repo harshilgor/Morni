@@ -103,7 +103,7 @@ const CATEGORY_MENU_GROUPS = [
   },
   {
     title: "Complete the look",
-    links: [["Bags", "/categories/bags"], ["Shoes", "/categories/shoes"], ["Jewelry", "/categories/jewelry"], ["Accessories", "/categories/accessories"], ["Gifting", "/categories/gifting"]],
+    links: [["Bags", "/categories/bags"], ["Shoes", "/categories/shoes"], ["Gifting", "/categories/gifting"]],
   },
 ] as const;
 
@@ -577,10 +577,10 @@ export function SiteHeader() {
             Under AED 55
           </Link>
           <Link href="/under-99" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/under-99"))}>
-            Under AED 99
+            AED 55 – AED 99
           </Link>
           <Link href="/under-149" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/under-149"))}>
-            Under AED 149
+            AED 99 – AED 149
           </Link>
           {isStoreOwner ? (
             <Link href="/portal" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/portal"))}>

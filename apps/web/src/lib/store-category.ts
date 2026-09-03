@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import {
   mergeBrowseCategories,
+  RETIRED_BROWSE_CATEGORY_SLUGS,
   type BrowseCategory,
 } from "@/lib/browse-categories";
 import { slugify } from "@/lib/format";
@@ -12,6 +13,9 @@ export async function ensureStoreCategory(options: {
 }) {
   const supabase = createClient();
   const slug = slugify(options.categorySlug) || "general";
+  if (RETIRED_BROWSE_CATEGORY_SLUGS.has(slug)) {
+    throw new Error("This category is no longer available.");
+  }
   const name =
     options.categoryName?.trim() ||
     slug

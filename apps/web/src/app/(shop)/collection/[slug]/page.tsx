@@ -8,7 +8,7 @@ import {
 } from "@/lib/catalog";
 
 const COLLECTIONS = {
-  "under-99": "Under AED 99",
+  "under-99": "AED 55 – AED 99",
   "under-55": "Mega Sale · Under AED 55",
   "under-199": "Under AED 199",
   luxury: "Luxury picks",
@@ -18,8 +18,8 @@ const COLLECTIONS = {
 
 const DISPLAY_TITLES = {
   "under-55": "Products Under AED 55",
-  "under-99": "Products Under AED 99",
-  "under-149": "Products Under AED 149",
+  "under-99": "Products AED 55 – AED 99",
+  "under-149": "Products AED 99 – AED 149",
   "under-199": "Products Under AED 199",
 } as const;
 
@@ -34,8 +34,16 @@ export default async function CollectionPage({
   const pageTitle = DISPLAY_TITLES[slug as keyof typeof DISPLAY_TITLES] ?? title;
 
   const home = await getCachedHomeCatalog();
-  const priceBand = slug === "under-55" || slug === "under-99" || slug === "under-199"
-    ? await getCachedPriceRailProducts(slug === "under-55" ? 55 : slug === "under-99" ? 99 : 199)
+  const priceBand = slug === "under-55" || slug === "under-99" || slug === "under-149" || slug === "under-199"
+    ? await getCachedPriceRailProducts(
+      slug === "under-55"
+        ? { maxPrice: 55, tag: "price:0-55" }
+        : slug === "under-99"
+          ? { minPriceExclusive: 55, maxPrice: 99, tag: "price:55-99" }
+          : slug === "under-149"
+            ? { minPriceExclusive: 99, maxPrice: 149, tag: "price:99-149" }
+            : { maxPrice: 199, tag: "price:0-199" },
+    )
     : null;
   let products = priceBand?.products ?? home.products;
   if (slug === "luxury") products = home.luxuryPicks;

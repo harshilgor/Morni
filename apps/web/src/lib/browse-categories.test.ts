@@ -23,6 +23,28 @@ describe("active browse categories", () => {
     expect(merged.map((category) => category.slug)).not.toContain("casual-wear");
   });
 
+  it("does not expose jewelry or accessories categories", () => {
+    const retired = ["jewelry", "accessories", "jewelry-accessories"];
+    const merged = mergeBrowseCategories(
+      retired.map((slug, index) => ({
+        id: slug,
+        name: slug,
+        slug,
+        image_url: "",
+        badge: null,
+        search_terms: [slug],
+        sort_order: index,
+        is_featured: true,
+      })),
+    );
+    expect(merged.map((category) => category.slug)).not.toEqual(
+      expect.arrayContaining(retired),
+    );
+    for (const slug of retired) {
+      expect(getBrowseCategory(slug, [])).toBeNull();
+    }
+  });
+
   it("returns no browse route for retired categories", () => {
     expect(getBrowseCategory("office-wear", [])).toBeNull();
     expect(getBrowseCategory("casual-wear", [])).toBeNull();

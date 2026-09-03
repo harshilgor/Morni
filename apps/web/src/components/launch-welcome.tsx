@@ -5,16 +5,16 @@ import { launchNumberSequence } from "@/lib/launch-welcome";
 
 export function LaunchWelcome() {
   const [visible, setVisible] = useState(false);
-  const [customerNumber, setCustomerNumber] = useState(100);
+  const [customerNumber, setCustomerNumber] = useState<number | null>(null);
 
   useEffect(() => {
-    setCustomerNumber(100);
     setVisible(true);
+    void fetch("/api/launch/customer-number").then((response) => response.ok ? response.json() : null).then((data) => { if (data?.customerNumber) setCustomerNumber(data.customerNumber); });
   }, []);
 
   const [displayNumber, setDisplayNumber] = useState(90);
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || customerNumber == null) return;
     const sequence = launchNumberSequence(customerNumber);
     let index = 0;
     setDisplayNumber(sequence[0] ?? customerNumber);

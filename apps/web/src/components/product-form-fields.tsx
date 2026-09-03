@@ -71,13 +71,15 @@ export function ProductFormFields({
         ) : null}
       </label>
 
-      <label className="block space-y-1.5 text-sm">
-        <span className="text-muted">Fabric / material</span>
-        <select className="w-full rounded-xl border border-line bg-background px-3 py-2.5" value={value.fabric} onChange={(e) => patch({ fabric: e.target.value })}>
-          <option value="">Select material</option>
-          {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
-        </select>
-      </label>
+      {!( ["gifting", "hamper", "hampers"].includes(value.categorySlug)) ? (
+        <label className="block space-y-1.5 text-sm">
+          <span className="text-muted">Fabric / material</span>
+          <select className="w-full rounded-xl border border-line bg-background px-3 py-2.5" value={value.fabric} onChange={(e) => patch({ fabric: e.target.value })}>
+            <option value="">Select material</option>
+            {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
+          </select>
+        </label>
+      ) : null}
 
       <label className="block space-y-1.5 text-sm">
         <span className="text-muted">

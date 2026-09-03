@@ -212,8 +212,8 @@ export async function getCachedHomeCatalog() {
       getCachedFeaturedCategories(),
       getCachedHomeProducts(48),
       getCachedHomePriceBand({ maxPrice: 55, limit: 12, tag: "home-price-max:55" }),
-      getCachedHomePriceBand({ maxPrice: 99, limit: 12, tag: "home-price-max:99" }),
-      getCachedHomePriceBand({ maxPrice: 149, limit: 12, tag: "home-price-max:149" }),
+      getCachedHomePriceBand({ minPriceExclusive: 55, maxPrice: 99, limit: 12, tag: "home-price:55-99" }),
+      getCachedHomePriceBand({ minPriceExclusive: 99, maxPrice: 149, limit: 12, tag: "home-price:99-149" }),
       getCachedHomePriceBand({ minPriceExclusive: 300, limit: 12, tag: "home-luxury" }),
     ]);
 
@@ -351,23 +351,31 @@ export async function getCachedCategoryPage(slug: string): Promise<{
   };
 }
 
-export async function getCachedPriceRailProducts(maxPrice: number) {
+export async function getCachedPriceRailProducts(options: {
+  maxPrice: number;
+  minPriceExclusive?: number;
+  tag?: string;
+}) {
   "use cache";
   cacheLife("minutes");
-  tagCatalog("products", `price-max:${maxPrice}`);
+  tagCatalog("products", options.tag ?? `price:${options.minPriceExclusive ?? 0}-${options.maxPrice}`);
 
   const supabase = createPublicClient();
+  let productsQuery = supabase
+    .from("storefront_products")
+    .select(
+      "*, category:categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
+    )
+    .eq("is_available", true)
+    .eq("stores.is_active", true)
+    .lte("price_aed", options.maxPrice);
+  if (options.minPriceExclusive != null) {
+    productsQuery = productsQuery.gt("price_aed", options.minPriceExclusive);
+  }
+  productsQuery = productsQuery.order("created_at", { ascending: false }).limit(200);
+
   const [{ data: productsData }, { data: categoryList }] = await Promise.all([
-    supabase
-      .from("storefront_products")
-      .select(
-        "*, category:categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
-      )
-      .eq("is_available", true)
-      .eq("stores.is_active", true)
-      .lte("price_aed", maxPrice)
-      .order("created_at", { ascending: false })
-      .limit(200),
+    productsQuery,
     supabase
       .from("browse_categories")
       .select("name, slug")
@@ -444,6 +452,7 @@ export async function getCachedProductPage(
       .from("storefront_products")
       .select("*, product_variants(*)")
       .eq("id", productId)
+      .eq("is_available", true)
       .maybeSingle(),
     supabase
       .from("products")

@@ -106,8 +106,10 @@ export const PRICE_BUCKETS: {
   min: number;
   max: number | null;
 }[] = [
-  { id: "under-99", label: "Under AED 99", min: 0, max: 99 },
-  { id: "99-199", label: "AED 99 – 199", min: 99, max: 199 },
+  { id: "under-55", label: "Under AED 55", min: 0, max: 55 },
+  { id: "55-99", label: "AED 55 – 99", min: 55, max: 99 },
+  { id: "99-149", label: "AED 99 – 149", min: 99, max: 149 },
+  { id: "149-199", label: "AED 149 – 199", min: 149, max: 199 },
   { id: "200-399", label: "AED 200 – 399", min: 200, max: 399 },
   { id: "400-799", label: "AED 400 – 799", min: 400, max: 799 },
   { id: "800-plus", label: "AED 800 & above", min: 800, max: null },

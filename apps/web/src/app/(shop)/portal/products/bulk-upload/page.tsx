@@ -888,7 +888,7 @@ export default function BulkUploadPage() {
           title: draft.title,
           productTag: draft.productTag,
           description: draft.description,
-          fabric: draft.fabric || null,
+          fabric: noSizes(draft.categorySlug) ? null : draft.fabric || null,
           categorySlug: draft.categorySlug,
           priceAed: Number(draft.priceAed),
           stock: Number(draft.stock),
@@ -1250,13 +1250,15 @@ export default function BulkUploadPage() {
                   />
                 </label>
               </div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Fabric / material
-                <select value={draft.fabric} onChange={(event) => patch(draft.id, { fabric: event.target.value })} className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm font-normal normal-case tracking-normal">
-                  <option value="">Select material</option>
-                  {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
-                </select>
-              </label>
+              {!noSizes(draft.categorySlug) ? (
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Fabric / material
+                  <select value={draft.fabric} onChange={(event) => patch(draft.id, { fabric: event.target.value })} className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm font-normal normal-case tracking-normal">
+                    <option value="">Select material</option>
+                    {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
+                  </select>
+                </label>
+              ) : null}
               {!noSizes(draft.categorySlug) && !draft.colors.length ? (
                 <>
                 <SizeInventoryEditor

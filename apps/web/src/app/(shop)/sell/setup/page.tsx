@@ -400,7 +400,7 @@ export default function SellSetupPage() {
           .update({
             title: productForm.title.trim(),
             description: productForm.description.trim(),
-            fabric: productForm.fabric || null,
+            fabric: productForm.categorySlug === "gifting" ? null : productForm.fabric || null,
             category_id: categoryId,
             price_aed: price,
             compare_at_price_aed:
@@ -428,7 +428,7 @@ export default function SellSetupPage() {
           category_id: categoryId,
           title: productForm.title.trim(),
           description: productForm.description.trim(),
-          fabric: productForm.fabric || null,
+          fabric: productForm.categorySlug === "gifting" ? null : productForm.fabric || null,
           price_aed: price,
           compare_at_price_aed:
             compareAt && Number.isFinite(compareAt) ? compareAt : null,

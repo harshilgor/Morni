@@ -577,9 +577,11 @@ export function ProductDetail({
               <p>{product.description ?? "A thoughtfully selected piece from this local boutique."}</p>
               {hasColorVariants && selectedVariant ? <p className="mt-3">Colour: {selectedVariant.color_name}.</p> : null}
             </ProductAccordion>
-            <ProductAccordion title="Fabric" open={fabricOpen} onToggle={() => setFabricOpen((open) => !open)}>
-              <p>{product.fabric?.trim() || "Fabric information has not been provided by the vendor yet."}</p>
-            </ProductAccordion>
+            {product.category?.slug !== "gifting" && product.category?.slug !== "hamper" && product.category?.slug !== "hampers" ? (
+              <ProductAccordion title="Fabric" open={fabricOpen} onToggle={() => setFabricOpen((open) => !open)}>
+                <p>{product.fabric?.trim() || "Fabric information has not been provided by the vendor yet."}</p>
+              </ProductAccordion>
+            ) : null}
             <ProductAccordion title="Delivery" open={deliveryOpen} onToggle={() => setDeliveryOpen((open) => !open)}>
               <p>Delivery is available across Dubai. Your exact delivery estimate is confirmed at checkout once you choose an address.</p>
             </ProductAccordion>
