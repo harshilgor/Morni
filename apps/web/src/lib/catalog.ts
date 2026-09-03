@@ -135,6 +135,7 @@ async function fetchHomeProductBand(options: {
   limit: number;
   maxPrice?: number;
   minPrice?: number;
+  minPriceExclusive?: number;
   tag: string;
 }) {
   const supabase = createPublicClient();
@@ -151,6 +152,9 @@ async function fetchHomeProductBand(options: {
   }
   if (options.minPrice != null) {
     query = query.gte("price_aed", options.minPrice);
+  }
+  if (options.minPriceExclusive != null) {
+    query = query.gt("price_aed", options.minPriceExclusive);
   }
 
   const { data, error } = await query;
@@ -184,6 +188,7 @@ export async function getCachedHomeProducts(limit = 48) {
 export async function getCachedHomePriceBand(options: {
   maxPrice?: number;
   minPrice?: number;
+  minPriceExclusive?: number;
   limit?: number;
   tag: string;
 }) {
@@ -195,6 +200,7 @@ export async function getCachedHomePriceBand(options: {
     limit: options.limit ?? 12,
     maxPrice: options.maxPrice,
     minPrice: options.minPrice,
+    minPriceExclusive: options.minPriceExclusive,
     tag: options.tag,
   });
 }
@@ -208,7 +214,7 @@ export async function getCachedHomeCatalog() {
       getCachedHomePriceBand({ maxPrice: 55, limit: 12, tag: "home-price-max:55" }),
       getCachedHomePriceBand({ maxPrice: 99, limit: 12, tag: "home-price-max:99" }),
       getCachedHomePriceBand({ maxPrice: 149, limit: 12, tag: "home-price-max:149" }),
-      getCachedHomePriceBand({ minPrice: 500, limit: 12, tag: "home-luxury" }),
+      getCachedHomePriceBand({ minPriceExclusive: 300, limit: 12, tag: "home-luxury" }),
     ]);
 
   const storeRecommendationStats = await getCachedStoreRecommendationStats(featured);
