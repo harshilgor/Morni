@@ -29,6 +29,7 @@ export function ReturnRequestsPanel({ storeId }: { storeId: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [liveWarning, setLiveWarning] = useState<string | null>(null);
   const [storeCodes, setStoreCodes] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -56,17 +57,22 @@ export function ReturnRequestsPanel({ storeId }: { storeId: string }) {
         .subscribe((status, subscriptionError) => {
           if (!active) return;
           if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && subscriptionError) {
-            setError("Live return updates are temporarily unavailable. Refresh to retry.");
+            // Realtime is an enhancement; the initial query and polling remain
+            // authoritative when a table is not in the realtime publication.
+            setLiveWarning("Live updates are unavailable; checking automatically.");
           }
         });
     } catch {
       queueMicrotask(() => {
-        if (active) setError("Live return updates are temporarily unavailable. Refresh to retry.");
+        if (active) setLiveWarning("Live updates are unavailable; checking automatically.");
       });
     }
 
+    const poll = window.setInterval(requestLoad, 30_000);
+
     return () => {
       active = false;
+      window.clearInterval(poll);
       if (channel) void supabase.removeChannel(channel);
     };
   }, [load, storeId]);
