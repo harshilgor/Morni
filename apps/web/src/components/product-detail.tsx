@@ -601,7 +601,7 @@ export function ProductDetail({
               View boutique
             </Link>
           </div>
-          <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-4 sm:gap-5 lg:mt-5 lg:grid-cols-5 lg:gap-4">
+          <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-4 sm:gap-5 lg:mt-5 lg:grid-cols-6 lg:gap-4">
             {relatedProducts.map((relatedProduct) => (
               <RelatedProductCard key={relatedProduct.id} product={relatedProduct} />
             ))}

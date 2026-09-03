@@ -494,7 +494,9 @@ export async function getCachedProductPage(
           Number(a.category_id === row.category_id) ||
         Number(b.store_id === row.store_id) - Number(a.store_id === row.store_id),
     )
-    .slice(0, 4);
+    // Keep a generous recommendation set so the detail page feels like a
+    // discovery destination rather than a four-item dead end.
+    .slice(0, 12);
 
   return {
     store: storeData as Store,
