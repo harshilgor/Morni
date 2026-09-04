@@ -393,6 +393,9 @@ export default function SellSetupPage() {
           (product.image_urls?.length ?? 0) > 0,
       );
       const aggregate = aggregateFromColorDrafts(colors, hasSizes);
+      if (aggregate.stock <= 0) {
+        throw new Error("Add at least 1 unit of stock before listing this product.");
+      }
 
       if (existingComplete) {
         const { error: updateError } = await supabase

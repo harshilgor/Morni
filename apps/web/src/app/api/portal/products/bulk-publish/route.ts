@@ -73,6 +73,12 @@ export async function POST(request: Request) {
   }
   if (!items.length) return NextResponse.json({ error: "No products are ready to publish." }, { status: 400 });
   items = items.map((item) => ({ ...item, categorySlug: item.categorySlug.trim().toLowerCase() }));
+  const outOfStock = items.find((item) => {
+    const sizeTotal = Object.values(item.sizeStock ?? {}).reduce((sum, quantity) => sum + quantity, 0);
+    const variantTotal = (item.variants ?? []).reduce((sum, variant) => sum + (Object.keys(variant.sizeStock ?? {}).length ? Object.values(variant.sizeStock).reduce((inner, quantity) => inner + quantity, 0) : variant.stock), 0);
+    return (item.variants?.length ? variantTotal : (Object.keys(item.sizeStock ?? {}).length ? sizeTotal : item.stock)) <= 0;
+  });
+  if (outOfStock) return NextResponse.json({ error: `Add at least 1 unit of stock before publishing “${outOfStock.title}”.` }, { status: 400 });
   const categorySlugs = [...new Set(items.map((item) => item.categorySlug.trim().toLowerCase()))];
   const { data: existingCategories, error: categoriesError } = await admin
     .from("categories")

@@ -632,6 +632,13 @@ export default function PortalProductsPage() {
       setSavingEdits(false);
       return;
     }
+    const { data: stockAlert } = await supabase
+      .from("store_inventory_notifications")
+      .select("id")
+      .eq("product_id", editingProduct.id)
+      .eq("kind", "out_of_stock")
+      .eq("status", "pending")
+      .maybeSingle();
     const { error: updateError } = await supabase
       .from("products")
       .update({
@@ -657,7 +664,7 @@ export default function PortalProductsPage() {
           editDraft.customization.enabled
             ? editDraft.customization.fields
             : [],
-        is_available: aggregate.stock > 0 ? editingProduct.is_available : false,
+        is_available: aggregate.stock > 0 ? (stockAlert ? true : editingProduct.is_available) : false,
       })
       .eq("id", editingProduct.id)
       .eq("store_id", store.id);
@@ -690,6 +697,13 @@ export default function PortalProductsPage() {
         .update({ status: "accepted", resolved_at: new Date().toISOString() })
         .eq("product_id", editingProduct.id)
         .eq("kind", "legacy_size_inventory")
+        .eq("status", "pending");
+    }
+    if (stockAlert && aggregate.stock > 0) {
+      await supabase
+        .from("store_inventory_notifications")
+        .update({ status: "accepted", resolved_at: new Date().toISOString() })
+        .eq("id", stockAlert.id)
         .eq("status", "pending");
     }
 
