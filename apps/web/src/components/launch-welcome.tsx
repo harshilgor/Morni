@@ -4,6 +4,22 @@ import { useEffect, useState } from "react";
 import { launchNumberSequence } from "@/lib/launch-welcome";
 
 const LAUNCH_WELCOME_STORAGE_KEY = "morni:launch-welcome:v1";
+const LAUNCH_VISITOR_STORAGE_KEY = "morni:launch-visitor:v1";
+
+function launchVisitorId() {
+  try {
+    const existing = window.localStorage.getItem(LAUNCH_VISITOR_STORAGE_KEY);
+    if (existing && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existing)) {
+      return existing;
+    }
+    const created = crypto.randomUUID();
+    window.localStorage.setItem(LAUNCH_VISITOR_STORAGE_KEY, created);
+    return created;
+  } catch {
+    // The server cookie remains a fallback for browsers with storage disabled.
+    return null;
+  }
+}
 
 export function LaunchWelcome() {
   const [visible, setVisible] = useState(false);
@@ -18,7 +34,10 @@ export function LaunchWelcome() {
       // If storage is unavailable, keep the launch experience usable.
     }
     const revealTimer = window.setTimeout(() => setVisible(true), 0);
-    void fetch("/api/launch/customer-number").then((response) => response.ok ? response.json() : null).then((data) => { if (data?.customerNumber) setCustomerNumber(data.customerNumber); });
+    const visitorId = launchVisitorId();
+    void fetch("/api/launch/customer-number", {
+      headers: visitorId ? { "x-morni-launch-visitor": visitorId } : undefined,
+    }).then((response) => response.ok ? response.json() : null).then((data) => { if (data?.customerNumber) setCustomerNumber(data.customerNumber); });
     return () => window.clearTimeout(revealTimer);
   }, []);
 
