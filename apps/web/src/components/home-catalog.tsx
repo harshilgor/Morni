@@ -8,7 +8,7 @@ import { TrendingForYou } from "@/components/trending-for-you";
 import { ShopBySize } from "@/components/shop-by-size";
 import { getCachedHomeCatalog, type ProductWithStore } from "@/lib/catalog";
 import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
-import { catalogShuffleSeed, shuffleCatalog } from "@/lib/catalog-random";
+import { catalogShuffleSeed, diversifyByKey, merchandiseCatalog, shuffleCatalog } from "@/lib/catalog-random";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import type { UaeEmirate } from "@/lib/types";
 
@@ -45,7 +45,11 @@ export async function HomeCatalog({
   // New & popular should not be a second copy of the newest-products rail.
   // Shuffle the full cached candidate set once per day so older inventory gets
   // a fair chance while the order remains stable during a browsing session.
-  const popularPool = shuffleCatalog(products, catalogShuffleSeed("home-popular"));
+  const popularPool = merchandiseCatalog(products, {
+    seed: catalogShuffleSeed("home-popular"),
+    getCategoryKey: (product) => product.category?.slug ?? "uncategorized",
+    getStoreKey: (product) => product.stores?.slug ?? product.stores?.name ?? "",
+  });
 
   const topRated = [...products]
     .map((product) => ({
@@ -122,7 +126,10 @@ export async function HomeCatalog({
         slug: category.slug,
         label: category.name,
         href: `/categories/${category.slug}`,
-        products: shuffleCatalog(matches, catalogShuffleSeed(`category:${category.slug}`)).slice(0, 10).map((p) => ({
+        products: diversifyByKey(
+          shuffleCatalog(matches, catalogShuffleSeed(`category:${category.slug}`)),
+          (product) => product.stores?.slug ?? product.stores?.name ?? "",
+        ).slice(0, 10).map((p) => ({
           id: p.id,
           title: p.title,
           price_aed: Number(p.price_aed),

@@ -15,6 +15,7 @@ import { fetchProductRatingMap, type ProductRatingSummary } from "@/lib/product-
 import { createPublicClient } from "@/lib/supabase/public";
 import type { Product, ProductReview, ProductVariant, RelatedProduct, Store, StoreCampaign } from "@/lib/types";
 import { categoryForProduct } from "@/lib/for-you";
+import { catalogShuffleSeed, merchandiseCatalog } from "@/lib/catalog-random";
 
 export type ProductWithStore = Product & {
   stores: { slug: string; name: string };
@@ -37,6 +38,25 @@ export type CachedProductPage = {
   relatedProducts: RelatedProduct[];
   reviews: ProductReview[];
 };
+
+type MerchandisingProduct = {
+  id: string;
+  category?: { slug?: string | null } | null;
+  stores?: { slug?: string | null; name?: string | null } | null;
+};
+
+// A rail must be selected from a meaningful candidate set before we apply the
+// category/store balancing rules. Keeping this bounded protects the public
+// catalog query while still covering the current storefront inventory.
+const HOME_RAIL_CANDIDATE_LIMIT = 500;
+
+function merchandiseProducts<T extends MerchandisingProduct>(products: T[], railId: string): T[] {
+  return merchandiseCatalog(products, {
+    seed: catalogShuffleSeed(railId),
+    getCategoryKey: (product) => product.category?.slug ?? "uncategorized",
+    getStoreKey: (product) => product.stores?.slug ?? product.stores?.name ?? "",
+  });
+}
 
 function tagCatalog(...extra: string[]) {
   cacheTag("catalog", ...extra);
@@ -213,10 +233,10 @@ export async function getCachedHomeCatalog() {
       // Keep a broad candidate pool so the daily New & Popular shuffle can
       // surface older products instead of only the latest uploads.
       getCachedHomeProducts(200),
-      getCachedHomePriceBand({ maxPrice: 55, limit: 12, tag: "home-price-max:55" }),
-      getCachedHomePriceBand({ minPriceExclusive: 55, maxPrice: 99, limit: 12, tag: "home-price:55-99" }),
-      getCachedHomePriceBand({ minPriceExclusive: 99, maxPrice: 149, limit: 12, tag: "home-price:99-149" }),
-      getCachedHomePriceBand({ minPriceExclusive: 300, limit: 12, tag: "home-luxury" }),
+      getCachedHomePriceBand({ maxPrice: 55, limit: HOME_RAIL_CANDIDATE_LIMIT, tag: "home-price-max:55" }),
+      getCachedHomePriceBand({ minPriceExclusive: 55, maxPrice: 99, limit: HOME_RAIL_CANDIDATE_LIMIT, tag: "home-price:55-99" }),
+      getCachedHomePriceBand({ minPriceExclusive: 99, maxPrice: 149, limit: HOME_RAIL_CANDIDATE_LIMIT, tag: "home-price:99-149" }),
+      getCachedHomePriceBand({ minPriceExclusive: 300, limit: HOME_RAIL_CANDIDATE_LIMIT, tag: "home-luxury" }),
     ]);
 
   const storeRecommendationStats = await getCachedStoreRecommendationStats(featured);
@@ -226,10 +246,10 @@ export async function getCachedHomeCatalog() {
     storeRecommendationStats,
     featured,
     products: homeProducts.products,
-    megaSale,
-    under99,
-    under149,
-    luxuryPicks,
+    megaSale: merchandiseProducts(megaSale, "home-price:0-55"),
+    under99: merchandiseProducts(under99, "home-price:55-99"),
+    under149: merchandiseProducts(under149, "home-price:99-149"),
+    luxuryPicks: merchandiseProducts(luxuryPicks, "home-luxury"),
     ratings: homeProducts.ratings,
   };
 }
@@ -385,7 +405,10 @@ export async function getCachedPriceRailProducts(options: {
       .order("sort_order"),
   ]);
 
-  const products = productsData ?? [];
+  const products = merchandiseProducts(
+    (productsData ?? []) as MerchandisingProduct[],
+    options.tag ?? `price:${options.minPriceExclusive ?? 0}-${options.maxPrice}`,
+  );
   const ratingMap = await fetchProductRatingMap(
     supabase,
     products.map((product: { id: string }) => product.id),

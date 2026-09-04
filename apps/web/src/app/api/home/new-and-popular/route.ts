@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCachedHomeCatalog } from "@/lib/catalog";
 import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
-import { catalogShuffleSeed, diversifyByKey, shuffleCatalog } from "@/lib/catalog-random";
+import { catalogShuffleSeed, diversifyByKey, merchandiseCatalog, shuffleCatalog } from "@/lib/catalog-random";
 
 const BATCH_SIZE = 10;
 
@@ -12,10 +12,16 @@ export async function GET(request: Request) {
   const { products, featured } = await getCachedHomeCatalog();
   const category = featured.find((item) => item.slug === slug);
   const matching = slug === "all" || !category ? products : products.filter((product) => productMatchesBrowseCategory(category, product));
-  const ordered = diversifyByKey(
-    shuffleCatalog(matching, catalogShuffleSeed(`home-popular:${slug}`)),
-    (product) => product.stores?.slug ?? product.stores?.name ?? "",
-  );
+  const ordered = slug === "all"
+    ? merchandiseCatalog(matching, {
+      seed: catalogShuffleSeed("home-popular:all"),
+      getCategoryKey: (product) => product.category?.slug ?? "uncategorized",
+      getStoreKey: (product) => product.stores?.slug ?? product.stores?.name ?? "",
+    })
+    : diversifyByKey(
+      shuffleCatalog(matching, catalogShuffleSeed(`home-popular:${slug}`)),
+      (product) => product.stores?.slug ?? product.stores?.name ?? "",
+    );
   const batch = ordered.slice(offset, offset + BATCH_SIZE).map((product) => ({
     id: product.id,
     title: product.title,
