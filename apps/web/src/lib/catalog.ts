@@ -210,7 +210,9 @@ export async function getCachedHomeCatalog() {
     await Promise.all([
       getCachedActiveStores(),
       getCachedFeaturedCategories(),
-      getCachedHomeProducts(48),
+      // Keep a broad candidate pool so the daily New & Popular shuffle can
+      // surface older products instead of only the latest uploads.
+      getCachedHomeProducts(200),
       getCachedHomePriceBand({ maxPrice: 55, limit: 12, tag: "home-price-max:55" }),
       getCachedHomePriceBand({ minPriceExclusive: 55, maxPrice: 99, limit: 12, tag: "home-price:55-99" }),
       getCachedHomePriceBand({ minPriceExclusive: 99, maxPrice: 149, limit: 12, tag: "home-price:99-149" }),

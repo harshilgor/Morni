@@ -3,13 +3,23 @@
 import { useEffect, useState } from "react";
 import { launchNumberSequence } from "@/lib/launch-welcome";
 
+const LAUNCH_WELCOME_STORAGE_KEY = "morni:launch-welcome:v1";
+
 export function LaunchWelcome() {
   const [visible, setVisible] = useState(false);
   const [customerNumber, setCustomerNumber] = useState<number | null>(null);
 
   useEffect(() => {
-    setVisible(true);
+    try {
+      if (window.localStorage.getItem(LAUNCH_WELCOME_STORAGE_KEY) === "seen") {
+        return;
+      }
+    } catch {
+      // If storage is unavailable, keep the launch experience usable.
+    }
+    const revealTimer = window.setTimeout(() => setVisible(true), 0);
     void fetch("/api/launch/customer-number").then((response) => response.ok ? response.json() : null).then((data) => { if (data?.customerNumber) setCustomerNumber(data.customerNumber); });
+    return () => window.clearTimeout(revealTimer);
   }, []);
 
   const [displayNumber, setDisplayNumber] = useState(90);
@@ -17,7 +27,7 @@ export function LaunchWelcome() {
     if (!visible || customerNumber == null) return;
     const sequence = launchNumberSequence(customerNumber);
     let index = 0;
-    setDisplayNumber(sequence[0] ?? customerNumber);
+    window.queueMicrotask(() => setDisplayNumber(sequence[0] ?? customerNumber));
     const timer = window.setInterval(() => {
       index += 1;
       const value = sequence[index] ?? customerNumber;
@@ -29,6 +39,11 @@ export function LaunchWelcome() {
 
   if (!visible) return null;
   const close = () => {
+    try {
+      window.localStorage.setItem(LAUNCH_WELCOME_STORAGE_KEY, "seen");
+    } catch {
+      // Dismissal still works when storage is blocked.
+    }
     setVisible(false);
   };
   return (

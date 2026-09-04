@@ -15,5 +15,5 @@ export function GiveawayCountdown() {
     return () => window.clearInterval(timer);
   }, []);
   const { hours, minutes, seconds } = giveawayParts(remaining);
-  return <Link href="/giveaway" className="giveaway-countdown" aria-label={`Giveaway ends in ${hours} hours`}><span className="giveaway-countdown-dot" aria-hidden /> <span className="giveaway-countdown-label">Giveaway</span><strong className="giveaway-countdown-time">{remaining ? `${hours}:${minutes}:${seconds}` : "Ended"}</strong></Link>;
+  return <Link href="/giveaway" className="giveaway-countdown" aria-label={remaining ? `Giveaway ends in ${hours} hours` : "Giveaway has ended"}><span className="giveaway-countdown-dot" aria-hidden /><span className="giveaway-countdown-label">Giveaway</span><span className="giveaway-countdown-separator" aria-hidden>·</span><strong className="giveaway-countdown-time">{remaining ? `${hours}:${minutes}:${seconds}` : "Ended"}</strong><span className="giveaway-countdown-arrow" aria-hidden>↗</span></Link>;
 }
