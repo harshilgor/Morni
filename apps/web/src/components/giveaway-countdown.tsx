@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-export const GIVEAWAY_END_MS = Date.parse(process.env.NEXT_PUBLIC_GIVEAWAY_END_AT ?? "2026-09-05T09:00:00+04:00");
+// Reset on 4 September 2026 at 11:56:54 AM Dubai time; deployments can override this
+// without a code change via NEXT_PUBLIC_GIVEAWAY_END_AT.
+export const GIVEAWAY_END_MS = Date.parse(process.env.NEXT_PUBLIC_GIVEAWAY_END_AT ?? "2026-09-06T11:56:54+04:00");
 export function giveawayParts(ms: number) { const r = Math.max(0, ms); return { hours: Math.floor(r / 3600000).toString().padStart(2, "0"), minutes: Math.floor(r % 3600000 / 60000).toString().padStart(2, "0"), seconds: Math.floor(r % 60000 / 1000).toString().padStart(2, "0") }; }
 
 export function GiveawayCountdown() {

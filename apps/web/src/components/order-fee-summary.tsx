@@ -94,10 +94,6 @@ export function OrderFeeLines({ fees }: { fees: CheckoutFees }) {
           <span className="text-muted">Convenience fee</span>
           <span aria-label="Not charged">–</span>
         </div>
-        <p className="mt-1 max-w-72 text-xs leading-relaxed text-muted">
-          (Only applies if you return all items — AED 10 will be deducted from
-          your refund)
-        </p>
       </div>
     </div>
   );
