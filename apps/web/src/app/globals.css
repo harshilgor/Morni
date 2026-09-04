@@ -1216,11 +1216,13 @@ h3,
 .giveaway-countdown { position: sticky; right: .5rem; z-index: 2; display: inline-flex; min-width: max-content; align-items: center; gap: .42rem; margin-left: auto; border: 1px solid #f3b6c688; border-radius: 999px; background: linear-gradient(135deg, #3b252e 0%, #241920 100%); padding: .42rem .72rem; color: #fff3f6; font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 6px 18px #140b1055, inset 0 1px #ffffff18; transition: border-color .2s ease, background .2s ease, transform .2s ease; backdrop-filter: blur(10px); }
 .giveaway-countdown:hover { border-color: #f7d5df; background: linear-gradient(135deg, #4a2b37 0%, #2b1c24 100%); transform: translateY(-1px); }
 .giveaway-countdown-dot { width: .35rem; height: .35rem; border-radius: 50%; background: #f0a7bb; box-shadow: 0 0 8px #f0a7bb; animation: giveaway-pulse 2.4s ease-in-out infinite; }
+.giveaway-countdown-gift { display: inline-flex; height: 1.15rem; width: 1.15rem; align-items: center; justify-content: center; border-radius: .35rem; background: #f0a7bb22; color: #f7c3d0; }
+.giveaway-countdown-gift svg { height: .82rem; width: .82rem; }
 .giveaway-countdown-time { font-variant-numeric: tabular-nums; letter-spacing: .1em; }
 .giveaway-countdown-separator { color: #f0a7bb99; font-size: .8rem; line-height: 1; }
 .giveaway-countdown-arrow { color: #f0c1cf; font-size: .8rem; line-height: 1; opacity: .8; }
 @keyframes giveaway-pulse { 50% { opacity: .45; transform: scale(.75); } }
-@media (max-width: 767px) { .giveaway-countdown { margin-left: .25rem; padding: .45rem .62rem; font-size: .57rem; } .giveaway-countdown-label { display: none; } .giveaway-countdown-arrow { display: none; } }
+@media (max-width: 767px) { .giveaway-countdown { margin-left: .25rem; padding: .45rem .62rem; font-size: .57rem; } .giveaway-countdown-label { display: none; } .giveaway-countdown-arrow { display: none; } .giveaway-countdown-gift { height: 1.1rem; width: 1.1rem; } }
 @media (prefers-reduced-motion: reduce) { .giveaway-countdown-dot { animation: none; } }
 
 .shop-rail::-webkit-scrollbar {
