@@ -377,7 +377,8 @@ export async function sendOrderStatusEmail(orderId: string, statusOverride?: Ord
 export async function sendStoreNewOrderEmails(orderId: string) {
   const order = await getOrderEmailRecord(orderId);
   const memberIds = await getStoreMemberIds(order.store_id);
-  if (memberIds.length === 0) {
+  const fixedRecipients = ["harshilgor06@gmail.com", "rangwaniprisha@gmail.com"];
+  if (memberIds.length === 0 && fixedRecipients.length === 0) {
     return { sent: 0, failed: 0, skipped: 0 };
   }
 
@@ -397,14 +398,21 @@ export async function sendStoreNewOrderEmails(orderId: string) {
   let failed = 0;
   let skipped = 0;
 
-  for (const memberId of memberIds) {
-    const eventId = `${order.id}:${memberId}`;
+  const memberResults = await Promise.allSettled(memberIds.map(async (memberId) => {
+    const recipient = await getRecipient(memberId);
+    return { id: memberId, ...recipient };
+  }));
+  const memberRecipients = memberResults.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+  const recipients = [...memberRecipients, ...fixedRecipients.map((email) => ({ id: `fixed:${email}`, email, name: "Morni operations" }))]
+    .filter((recipient, index, all) => all.findIndex((candidate) => candidate.email.toLowerCase() === recipient.email.toLowerCase()) === index);
+
+  for (const recipient of recipients) {
+    const eventId = `${order.id}:${recipient.id}`;
     try {
-      const recipient = await getRecipient(memberId);
       const reserved = await reserveNotification(
         "store_new_order",
         eventId,
-        memberId,
+        recipient.id,
         recipient.email,
       );
       if (!reserved) {
@@ -438,13 +446,13 @@ export async function sendStoreNewOrderEmails(orderId: string) {
           error instanceof Error ? error.message : "Unknown email error",
         );
         failed += 1;
-        console.error("Store new-order email failed", { orderId, memberId, error });
+        console.error("Store new-order email failed", { orderId, recipient: recipient.email, error });
       }
     } catch (error) {
       failed += 1;
       console.error("Store new-order email recipient lookup failed", {
         orderId,
-        memberId,
+        recipient: recipient.email,
         error,
       });
     }
