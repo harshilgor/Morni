@@ -26,7 +26,7 @@ type FounderData = {
   metrics: { today_orders: number; today_revenue: number; average_order_value: number; new_shoppers: number; new_stores: number; active_stores: number; open_orders: number; delivery_rate: number };
   daily_sales: Array<{ day: string; label: string; revenue: number; orders: number; shoppers: number }>;
   status_breakdown: Partial<Record<OrderStatus, number>>;
-  recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; delivery_area: string }>;
+  recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; delivery_area: string; products?: string[] }>;
   stores: Array<{ id: string; name: string; slug: string; emirate: string; is_active: boolean; created_at: string; live_products: number; low_stock_products: number; period_orders: number; period_revenue: number; today_orders: number; today_revenue: number }>;
   top_products: Array<{ id: string; title: string; store_name: string; units: number; revenue: number; stock: number | null }>;
   customers: Array<{ id: string; full_name: string; created_at: string; orders: number; revenue: number; last_order_at: string | null }>;
@@ -462,7 +462,7 @@ function OrderTable({ orders, compact = false }: { orders: FounderData["recent_o
           {orders.map((order) => (
             <tr key={order.id} className="transition hover:bg-[#f9fbfa]">
               <td className="px-5 py-3.5 text-sm font-semibold text-[#17231f]">{order.order_number}</td>
-              <td className="px-5 py-3.5 text-sm text-[#52615b]">{order.store_name}</td>
+              <td className="px-5 py-3.5 text-sm text-[#52615b]">{order.store_name}<span className="mt-1 block max-w-[260px] truncate text-xs text-[#7b8882]" title={(order.products ?? []).join(" · ")}>{(order.products ?? []).join(" · ") || "Product details unavailable"}</span></td>
               <td className="px-5 py-3.5 text-sm text-[#52615b]">{order.shopper_name}</td>
               <td className="px-5 py-3.5">
                 <StatusPill status={order.status} />
@@ -1145,14 +1145,24 @@ export function FounderWorkspace() {
   useEffect(() => {
     if (!isAdmin) return;
     let active = true;
-    void Promise.all([createClient().rpc("founder_workspace_data", { p_range_days: range }), createClient().rpc("founder_delivery_workspace_data")]).then(([workspaceResponse, deliveryResponse]) => {
+    const client = createClient();
+    void Promise.all([client.rpc("founder_workspace_data", { p_range_days: range }), client.rpc("founder_delivery_workspace_data")]).then(async ([workspaceResponse, deliveryResponse]) => {
       if (!active) return;
       if (workspaceResponse.error || deliveryResponse.error) {
         setError(workspaceResponse.error?.message ?? deliveryResponse.error?.message ?? "Unable to load Founder data.");
         setData(null);
         setDeliveryData(null);
       } else {
-        setData(workspaceResponse.data as unknown as FounderData);
+        const founderData = workspaceResponse.data as unknown as FounderData;
+        const orderIds = founderData.recent_orders.map((order) => order.id);
+        const { data: itemRows } = orderIds.length ? await client.from("order_items").select("order_id,title,quantity").in("order_id", orderIds) : { data: [] };
+        const productsByOrder = new Map<string, string[]>();
+        for (const item of (itemRows ?? []) as Array<{ order_id: string; title: string; quantity: number }>) {
+          const products = productsByOrder.get(item.order_id) ?? [];
+          products.push(`${item.quantity}× ${item.title}`);
+          productsByOrder.set(item.order_id, products);
+        }
+        setData({ ...founderData, recent_orders: founderData.recent_orders.map((order) => ({ ...order, products: productsByOrder.get(order.id) ?? [] })) });
         setDeliveryData(deliveryResponse.data as unknown as FounderDeliveryData);
         setError(null);
       }
