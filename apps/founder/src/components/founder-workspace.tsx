@@ -34,10 +34,10 @@ type FounderData = {
   metrics: { today_orders: number; today_revenue: number; average_order_value: number; new_shoppers: number; new_stores: number; active_stores: number; open_orders: number; delivery_rate: number };
   daily_sales: Array<{ day: string; label: string; revenue: number; orders: number; shoppers: number }>;
   status_breakdown: Partial<Record<OrderStatus, number>>;
-  recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; delivery_area: string; products?: FounderOrderProduct[] }>;
+  recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; customer_phone: string | null; delivery_area: string; products?: FounderOrderProduct[] }>;
   stores: Array<{ id: string; name: string; slug: string; emirate: string; is_active: boolean; created_at: string; live_products: number; low_stock_products: number; period_orders: number; period_revenue: number; today_orders: number; today_revenue: number }>;
   top_products: Array<{ id: string; title: string; store_name: string; units: number; revenue: number; stock: number | null }>;
-  customers: Array<{ id: string; full_name: string; created_at: string; orders: number; revenue: number; last_order_at: string | null }>;
+  customers: Array<{ id: string; full_name: string; phone: string | null; created_at: string; orders: number; revenue: number; last_order_at: string | null }>;
   finance: { gross_sales: number; product_sales: number; delivery_fees: number; service_fees: number; small_order_fees: number; paid_orders: number; pending_orders: number };
   alerts: Array<{ tone: FounderTone; title: string; detail: string; href: string }>;
 };
@@ -564,7 +564,7 @@ function OrderTable({ orders, compact = false }: { orders: FounderData["recent_o
       <table className="w-full min-w-[760px] text-left">
         <thead className="border-y border-[#e2e7e4] bg-[#f7faf8]">
           <tr>
-            {["Order", "Boutique", "Shopper", "Status", "Value", "Placed"].map((heading) => (
+            {["Order", "Boutique", "Shopper", "Phone", "Status", "Value", "Placed"].map((heading) => (
               <th key={heading} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">
                 {heading}
               </th>
@@ -597,6 +597,15 @@ function OrderTable({ orders, compact = false }: { orders: FounderData["recent_o
                   )}
                 </td>
                 <td className="px-5 py-3.5 text-sm text-[#52615b]">{order.shopper_name}</td>
+                <td className="px-5 py-3.5 text-sm text-[#52615b]">
+                  {order.customer_phone ? (
+                    <a href={`tel:${order.customer_phone}`} className="font-semibold text-[#245448] underline-offset-2 hover:underline">
+                      {order.customer_phone}
+                    </a>
+                  ) : (
+                    <span className="text-[#9aa9a2]">No phone</span>
+                  )}
+                </td>
                 <td className="px-5 py-3.5">
                   <StatusPill status={order.status} />
                 </td>
@@ -607,7 +616,7 @@ function OrderTable({ orders, compact = false }: { orders: FounderData["recent_o
           })}
           {orders.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-5 py-12 text-center text-sm text-[#687770]">
+              <td colSpan={7} className="px-5 py-12 text-center text-sm text-[#687770]">
                 No orders in this period yet.
               </td>
             </tr>
@@ -1080,7 +1089,7 @@ function CustomersView({ customers }: { customers: FounderData["customers"] }) {
         <table className="w-full min-w-[720px] text-left">
           <thead className="border-y border-[#e2e7e4] bg-[#f7faf8]">
             <tr>
-              {["Customer", "Joined", "Orders", "Lifetime value", "Last order"].map((heading) => (
+              {["Customer", "Phone", "Joined", "Orders", "Lifetime value", "Last order"].map((heading) => (
                 <th key={heading} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">
                   {heading}
                 </th>
@@ -1091,6 +1100,15 @@ function CustomersView({ customers }: { customers: FounderData["customers"] }) {
             {customers.map((customer) => (
               <tr key={customer.id} className="transition hover:bg-[#f9fbfa]">
                 <td className="px-5 py-4 text-sm font-semibold text-[#17231f]">{customer.full_name}</td>
+                <td className="px-5 py-4 text-sm text-[#52615b]">
+                  {customer.phone ? (
+                    <a href={`tel:${customer.phone}`} className="font-semibold text-[#245448] underline-offset-2 hover:underline">
+                      {customer.phone}
+                    </a>
+                  ) : (
+                    <span className="text-[#9aa9a2]">No phone</span>
+                  )}
+                </td>
                 <td className="px-5 py-4 text-sm text-[#52615b]">{dateTime(customer.created_at)}</td>
                 <td className="px-5 py-4 text-sm font-semibold tabular-nums text-[#17231f]">{number(customer.orders)}</td>
                 <td className="px-5 py-4 text-sm font-semibold tabular-nums text-[#17231f]">{formatAed(customer.revenue)}</td>
@@ -1099,7 +1117,7 @@ function CustomersView({ customers }: { customers: FounderData["customers"] }) {
             ))}
             {customers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-sm text-[#687770]">
+                <td colSpan={6} className="px-5 py-12 text-center text-sm text-[#687770]">
                   Customer relationships will appear as shoppers order.
                 </td>
               </tr>

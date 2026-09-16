@@ -14,6 +14,7 @@ import {
 import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import { getOnboardingChecklist } from "@/lib/onboarding";
+import { PORTAL_ORDER_SELECT } from "@/lib/portal-order-select";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
 import type { Order, OrderItem, Product, ProductReview, Store } from "@/lib/types";
 import { InventoryNotifications } from "@/components/inventory-notifications";
@@ -52,7 +53,7 @@ export default function PortalOverviewPage() {
   const loadDashboard = useCallback(async (storeId: string) => {
     const supabase = createClient();
     const [ordersResult, productsResult, reviewsResult, wishlistResult] = await Promise.all([
-      supabase.from("orders").select("*, order_items(*)").eq("store_id", storeId).order("placed_at", { ascending: false }),
+      supabase.from("orders").select(PORTAL_ORDER_SELECT).eq("store_id", storeId).order("placed_at", { ascending: false }),
       supabase.from("products").select("*").eq("store_id", storeId),
       supabase.from("product_reviews").select("*").eq("store_id", storeId).order("created_at", { ascending: false }),
       supabase.from("wishlist_items").select("product_id, products!inner(store_id, title)").eq("products.store_id", storeId),

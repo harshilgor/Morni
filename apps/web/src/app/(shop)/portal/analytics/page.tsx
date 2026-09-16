@@ -5,6 +5,7 @@ import { PortalEmpty, PortalMetric, PortalPageHeader, PortalSectionHeading } fro
 import { createClient } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import { useOwnerStore } from "@/lib/use-owner-store";
+import { PORTAL_ORDER_SELECT } from "@/lib/portal-order-select";
 import type { Order, OrderItem, Product } from "@/lib/types";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] | null };
@@ -55,7 +56,7 @@ export default function PortalAnalyticsPage() {
     if (!store) return;
     const supabase = createClient();
     void Promise.all([
-      supabase.from("orders").select("*, order_items(*)").eq("store_id", store.id).order("placed_at", { ascending: false }),
+      supabase.from("orders").select(PORTAL_ORDER_SELECT).eq("store_id", store.id).order("placed_at", { ascending: false }),
       supabase.from("products").select("*").eq("store_id", store.id),
       supabase.from("delivery_jobs").select("id,order_id,status,created_at,updated_at,delivered_at,assignment_expires_at").order("updated_at", { ascending: false }),
     ]).then(([ordersResult, productsResult, jobsResult]) => {

@@ -431,7 +431,6 @@ export async function sendStoreNewOrderEmails(orderId: string) {
             storeName,
             total: formatAed(order.total_aed),
             deliveryArea: order.delivery_area,
-            deliveryPhone: order.delivery_phone,
             items,
             portalOrdersUrl,
           }),

@@ -8,7 +8,6 @@ type StoreNewOrderEmailProps = {
   storeName: string;
   total: string;
   deliveryArea: string;
-  deliveryPhone: string | null;
   items: EmailOrderItem[];
   portalOrdersUrl: string;
 };
@@ -19,7 +18,6 @@ export function StoreNewOrderEmail({
   storeName,
   total,
   deliveryArea,
-  deliveryPhone,
   items,
   portalOrdersUrl,
 }: StoreNewOrderEmailProps) {
@@ -63,12 +61,6 @@ export function StoreNewOrderEmail({
         <strong>Total: {total}</strong>
         <br />
         Delivering to {deliveryArea}
-        {deliveryPhone ? (
-          <>
-            <br />
-            Shopper phone: {deliveryPhone}
-          </>
-        ) : null}
       </Text>
     </MorniEmail>
   );
