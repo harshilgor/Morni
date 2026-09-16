@@ -77,6 +77,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [{ source: "/giveaway", destination: "/", permanent: true }];
+  },
   async headers() {
     return [
       {
