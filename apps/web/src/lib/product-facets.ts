@@ -86,6 +86,7 @@ export const FABRIC_FACETS: { id: string; label: string; terms: string[] }[] = [
   { id: "brocade", label: "Brocade", terms: ["brocade", "jacquard"] },
   { id: "denim", label: "Denim", terms: ["denim"] },
   { id: "knit", label: "Knit", terms: ["knit", "jersey"] },
+  { id: "laykra", label: "Laykra", terms: ["laykra", "lycra"] },
 ];
 
 export const FIT_FACETS: { id: string; label: string; terms: string[] }[] = [
