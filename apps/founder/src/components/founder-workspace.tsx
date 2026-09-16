@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUser } from "@/lib/use-auth-user";
 import { formatAed, orderStatusLabel } from "@/lib/format";
 import { PortalIcon, type PortalIconName } from "@/components/portal-icons";
 import type { OrderStatus } from "@/lib/types";
+
+type FounderOrderProduct = {
+  id: string;
+  title: string;
+  quantity: number;
+  image_url: string | null;
+};
 
 type FounderView = "overview" | "operations" | "delivery" | "stores" | "customers" | "catalogue" | "finance" | "settlements" | "refunds" | "alerts";
 type FounderTone = "urgent" | "warning" | "default";
@@ -26,7 +34,7 @@ type FounderData = {
   metrics: { today_orders: number; today_revenue: number; average_order_value: number; new_shoppers: number; new_stores: number; active_stores: number; open_orders: number; delivery_rate: number };
   daily_sales: Array<{ day: string; label: string; revenue: number; orders: number; shoppers: number }>;
   status_breakdown: Partial<Record<OrderStatus, number>>;
-  recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; delivery_area: string; products?: string[] }>;
+  recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; delivery_area: string; products?: FounderOrderProduct[] }>;
   stores: Array<{ id: string; name: string; slug: string; emirate: string; is_active: boolean; created_at: string; live_products: number; low_stock_products: number; period_orders: number; period_revenue: number; today_orders: number; today_revenue: number }>;
   top_products: Array<{ id: string; title: string; store_name: string; units: number; revenue: number; stock: number | null }>;
   customers: Array<{ id: string; full_name: string; created_at: string; orders: number; revenue: number; last_order_at: string | null }>;
@@ -445,10 +453,115 @@ function Overview({ data, ownerName, onViewChange }: { data: FounderData; ownerN
   );
 }
 
+const STACK_ROTATIONS = ["-rotate-6", "rotate-3", "-rotate-2"];
+
+function OrderProductImageStack({ products, onPreview }: { products: FounderOrderProduct[]; onPreview: (product: FounderOrderProduct) => void }) {
+  const visible = products.slice(0, 3);
+  if (!visible.length) {
+    return (
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#dce5e0] bg-[#edf3f0] text-[#5b9183]">
+        <PortalIcon name="products" className="h-4 w-4" />
+      </span>
+    );
+  }
+
+  return (
+    <span role="img" className="relative h-11 w-[3.4rem] shrink-0" aria-label={`${products.length} product${products.length === 1 ? "" : "s"} in this order`}>
+      {visible.map((product, index) => {
+        const offset = (visible.length - 1 - index) * 7;
+        const thumb = product.image_url ? (
+          <Image src={product.image_url} alt={product.title} width={44} height={44} className="h-full w-full object-cover" />
+        ) : (
+          <span className="grid h-full w-full place-items-center text-[#5b9183]">
+            <PortalIcon name="products" className="h-4 w-4" />
+          </span>
+        );
+        return product.image_url ? (
+          <button
+            key={product.id}
+            type="button"
+            onClick={() => onPreview(product)}
+            aria-label={`View larger image of ${product.title}`}
+            className={`absolute inset-y-0 block h-11 w-11 overflow-hidden rounded-lg border-2 border-white bg-[#edf3f0] shadow-[0_2px_7px_rgba(28,48,40,0.16)] ${STACK_ROTATIONS[index]}`}
+            style={{ left: `${offset}px` }}
+          >
+            {thumb}
+          </button>
+        ) : (
+          <span key={product.id} className={`absolute inset-y-0 block h-11 w-11 overflow-hidden rounded-lg border-2 border-white bg-[#edf3f0] shadow-[0_2px_7px_rgba(28,48,40,0.16)] ${STACK_ROTATIONS[index]}`} style={{ left: `${offset}px` }}>
+            {thumb}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function OrderProductList({ products, onPreview }: { products: FounderOrderProduct[]; onPreview: (product: FounderOrderProduct) => void }) {
+  if (!products.length) {
+    return <p className="mt-1 text-xs text-[#7b8882]">Product details unavailable</p>;
+  }
+
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {products.map((product) => (
+        <li key={product.id} className="flex min-w-0 items-center gap-2">
+          {product.image_url ? (
+            <button
+              type="button"
+              onClick={() => onPreview(product)}
+              aria-label={`View larger image of ${product.title}`}
+              className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-[#dce5e0] bg-[#edf3f0] transition hover:border-[#5b9183] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3c8272]"
+            >
+              <Image src={product.image_url} alt={product.title} width={36} height={36} className="h-full w-full object-cover" />
+            </button>
+          ) : (
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[#dce5e0] bg-[#edf3f0] text-[#5b9183]">
+              <PortalIcon name="products" className="h-3.5 w-3.5" />
+            </span>
+          )}
+          <span className="min-w-0 truncate text-xs text-[#7b8882]" title={`${product.quantity}× ${product.title}`}>
+            {product.quantity}× {product.title}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ProductImageDialog({ product, onClose }: { product: FounderOrderProduct; onClose: () => void }) {
+  if (!product.image_url) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#132c2a]/65 p-4" role="presentation" onMouseDown={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Larger image of ${product.title}`}
+        className="relative max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white p-3 shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-5 top-5 z-10 rounded-full bg-[#17231f]/80 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#17231f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          Close
+        </button>
+        <Image src={product.image_url} alt={product.title} width={1200} height={1200} sizes="(max-width: 768px) 90vw, 672px" className="max-h-[82vh] w-full rounded-xl object-contain" />
+        <p className="mt-3 px-1 text-sm font-semibold text-[#17231f]">
+          {product.quantity}× {product.title}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function OrderTable({ orders, compact = false }: { orders: FounderData["recent_orders"]; compact?: boolean }) {
+  const [preview, setPreview] = useState<FounderOrderProduct | null>(null);
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[700px] text-left">
+      <table className="w-full min-w-[760px] text-left">
         <thead className="border-y border-[#e2e7e4] bg-[#f7faf8]">
           <tr>
             {["Order", "Boutique", "Shopper", "Status", "Value", "Placed"].map((heading) => (
@@ -459,18 +572,39 @@ function OrderTable({ orders, compact = false }: { orders: FounderData["recent_o
           </tr>
         </thead>
         <tbody className="divide-y divide-[#eef2f0]">
-          {orders.map((order) => (
-            <tr key={order.id} className="transition hover:bg-[#f9fbfa]">
-              <td className="px-5 py-3.5 text-sm font-semibold text-[#17231f]">{order.order_number}</td>
-              <td className="px-5 py-3.5 text-sm text-[#52615b]">{order.store_name}<span className="mt-1 block max-w-[260px] truncate text-xs text-[#7b8882]" title={(order.products ?? []).join(" · ")}>{(order.products ?? []).join(" · ") || "Product details unavailable"}</span></td>
-              <td className="px-5 py-3.5 text-sm text-[#52615b]">{order.shopper_name}</td>
-              <td className="px-5 py-3.5">
-                <StatusPill status={order.status} />
-              </td>
-              <td className="px-5 py-3.5 text-sm font-semibold tabular-nums text-[#17231f]">{formatAed(order.total_aed)}</td>
-              <td className="px-5 py-3.5 text-xs text-[#687770]">{compact ? dateTime(order.placed_at) : `${dateTime(order.placed_at)} · ${order.delivery_area}`}</td>
-            </tr>
-          ))}
+          {orders.map((order) => {
+            const products = order.products ?? [];
+            const productSummary = products.map((product) => `${product.quantity}× ${product.title}`).join(" · ");
+            return (
+              <tr key={order.id} className="transition hover:bg-[#f9fbfa]">
+                <td className="px-5 py-3.5 text-sm font-semibold text-[#17231f]">{order.order_number}</td>
+                <td className="px-5 py-3.5 text-sm text-[#52615b]">
+                  {compact ? (
+                    <div className="flex min-w-0 items-start gap-3">
+                      <OrderProductImageStack products={products} onPreview={setPreview} />
+                      <div className="min-w-0">
+                        <p>{order.store_name}</p>
+                        <p className="mt-1 max-w-[260px] truncate text-xs text-[#7b8882]" title={productSummary}>
+                          {productSummary || "Product details unavailable"}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <p>{order.store_name}</p>
+                      <OrderProductList products={products} onPreview={setPreview} />
+                    </div>
+                  )}
+                </td>
+                <td className="px-5 py-3.5 text-sm text-[#52615b]">{order.shopper_name}</td>
+                <td className="px-5 py-3.5">
+                  <StatusPill status={order.status} />
+                </td>
+                <td className="px-5 py-3.5 text-sm font-semibold tabular-nums text-[#17231f]">{formatAed(order.total_aed)}</td>
+                <td className="px-5 py-3.5 text-xs text-[#687770]">{compact ? dateTime(order.placed_at) : `${dateTime(order.placed_at)} · ${order.delivery_area}`}</td>
+              </tr>
+            );
+          })}
           {orders.length === 0 ? (
             <tr>
               <td colSpan={6} className="px-5 py-12 text-center text-sm text-[#687770]">
@@ -480,6 +614,7 @@ function OrderTable({ orders, compact = false }: { orders: FounderData["recent_o
           ) : null}
         </tbody>
       </table>
+      {preview?.image_url ? <ProductImageDialog product={preview} onClose={() => setPreview(null)} /> : null}
     </div>
   );
 }
@@ -1155,11 +1290,13 @@ export function FounderWorkspace() {
       } else {
         const founderData = workspaceResponse.data as unknown as FounderData;
         const orderIds = founderData.recent_orders.map((order) => order.id);
-        const { data: itemRows } = orderIds.length ? await client.from("order_items").select("order_id,title,quantity").in("order_id", orderIds) : { data: [] };
-        const productsByOrder = new Map<string, string[]>();
-        for (const item of (itemRows ?? []) as Array<{ order_id: string; title: string; quantity: number }>) {
+        const { data: itemRows } = orderIds.length
+          ? await client.from("order_items").select("id,order_id,title,quantity,image_url").in("order_id", orderIds)
+          : { data: [] };
+        const productsByOrder = new Map<string, FounderOrderProduct[]>();
+        for (const item of (itemRows ?? []) as Array<FounderOrderProduct & { order_id: string }>) {
           const products = productsByOrder.get(item.order_id) ?? [];
-          products.push(`${item.quantity}× ${item.title}`);
+          products.push({ id: item.id, title: item.title, quantity: item.quantity, image_url: item.image_url });
           productsByOrder.set(item.order_id, products);
         }
         setData({ ...founderData, recent_orders: founderData.recent_orders.map((order) => ({ ...order, products: productsByOrder.get(order.id) ?? [] })) });

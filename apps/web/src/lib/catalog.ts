@@ -465,20 +465,21 @@ export async function getCachedClearanceProducts() {
 export async function getCachedProductPage(
   slug: string,
   productId: string,
+  allowUnavailable = false,
 ): Promise<CachedProductPage | null> {
   "use cache";
   cacheLife("minutes");
   tagCatalog("products", `product:${productId}`, `store:${slug}`);
 
   const supabase = createPublicClient();
-  const [{ data: storeData }, { data: productData }, { data: customizationData }] = await Promise.all([
-    supabase.from("stores").select("*").eq("slug", slug).eq("is_active", true).maybeSingle(),
-    supabase
+  const productQuery = supabase
       .from("storefront_products")
       .select("*, product_variants(*)")
-      .eq("id", productId)
-      .eq("is_available", true)
-      .maybeSingle(),
+      .eq("id", productId);
+  if (!allowUnavailable) productQuery.eq("is_available", true);
+  const [{ data: storeData }, { data: productData }, { data: customizationData }] = await Promise.all([
+    supabase.from("stores").select("*").eq("slug", slug).eq("is_active", true).maybeSingle(),
+    productQuery.maybeSingle(),
     supabase
       .from("products")
       .select("customization_enabled, customization_instructions, customization_fields")
