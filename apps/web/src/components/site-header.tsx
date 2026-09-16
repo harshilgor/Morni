@@ -111,26 +111,19 @@ const CATEGORY_MENU_FEATURES = [
   { name: "Gifting", href: "/categories/gifting", image: "/categories/gifting-cover.png" },
 ] as const;
 
-const LAUNCH_ITEMS = [
-  { label: "Launch sale", accent: true },
-  { label: "Delivery in Dubai" },
-  { label: "No small order fee" },
-] as const;
+const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI  ·  NO SMALL ORDER FEE";
 
-function LaunchAnnouncementGroup() {
+function LaunchAnnouncementSegment() {
   return (
-    <div className="morni-announcement-group">
-      {LAUNCH_ITEMS.map((item) => (
-        <span
-          key={item.label}
-          className={`morni-announcement-item${"accent" in item && item.accent ? " morni-announcement-item--accent" : ""}`}
-        >
-          {item.label}
-        </span>
+    <div className="morni-announcement-segment">
+      {[0, 1, 2, 3].map((group) => (
+        <div className="morni-announcement-group" key={group}>
+          <span>{LAUNCH_MESSAGE}</span>
+          <span className="morni-announcement-dot">✦</span>
+          <span>{LAUNCH_MESSAGE}</span>
+          <span className="morni-announcement-dot">✦</span>
+        </div>
       ))}
-      <span className="morni-announcement-dot" aria-hidden="true">
-        ✦
-      </span>
     </div>
   );
 }
@@ -143,9 +136,8 @@ function LaunchAnnouncement() {
       role="region"
     >
       <div className="morni-announcement-track" aria-hidden="true">
-        {[0, 1, 2, 3].map((group) => (
-          <LaunchAnnouncementGroup key={group} />
-        ))}
+        <LaunchAnnouncementSegment />
+        <LaunchAnnouncementSegment />
       </div>
     </div>
   );

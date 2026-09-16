@@ -1104,7 +1104,7 @@ h3,
 }
 
 .morni-announcement-bar {
-  height: 2.35rem;
+  height: 2rem;
   overflow: hidden;
   background: #050505;
   color: #fff;
@@ -1116,40 +1116,31 @@ h3,
   width: max-content;
   min-height: 100%;
   align-items: center;
-  animation: morni-announcement-scroll 32s linear infinite;
+  animation: morni-announcement-scroll 28s linear infinite;
+  will-change: transform;
+}
+
+.morni-announcement-segment {
+  display: flex;
+  flex-shrink: 0;
+  min-width: max-content;
+  align-items: center;
 }
 
 .morni-announcement-group {
   display: flex;
   min-width: max-content;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0 1.1rem;
-}
-
-.morni-announcement-item {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 0.22rem 0.72rem;
-  font-size: 0.58rem;
+  gap: 1.4rem;
+  padding: 0 1.4rem;
+  font-size: 0.63rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.morni-announcement-item--accent {
-  border-color: rgba(217, 151, 171, 0.42);
-  background: rgba(217, 151, 171, 0.12);
-  color: #f4d4de;
+  letter-spacing: 0.14em;
 }
 
 .morni-announcement-dot {
   color: #d997ab;
   font-size: 0.68rem;
-  padding-left: 0.35rem;
 }
 
 @keyframes morni-announcement-scroll {
