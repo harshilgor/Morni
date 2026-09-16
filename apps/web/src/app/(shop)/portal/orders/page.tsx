@@ -8,9 +8,9 @@ import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 import { formatAed, orderStatusLabel } from "@/lib/format";
 import { formatDeliverySlotShort } from "@/lib/delivery-slots";
 import { useOwnerStore } from "@/lib/use-owner-store";
-import type { Order, OrderItem, OrderStatus } from "@/lib/types";
+import type { OrderItem, OrderStatus } from "@/lib/types";
 import { formatCustomizationValues } from "@/lib/product-customization";
-import { PORTAL_ORDER_WITH_DELIVERY_SELECT } from "@/lib/portal-order-select";
+import { PORTAL_ORDER_WITH_DELIVERY_SELECT, type PortalOrder, type PortalOrderWithDelivery } from "@/lib/portal-order-select";
 
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   placed: "accepted",
@@ -30,7 +30,7 @@ const FLOW: OrderStatus[] = ["placed", "accepted", "picking", "out_for_delivery"
 type OrderFilter = "all" | "preparing" | OrderStatus;
 type DeliveryProofSummary = { id: string; storage_path: string; created_at: string };
 type DeliveryJobSummary = { id: string; status: "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled"; delivery_proofs?: DeliveryProofSummary[] | null };
-type OrderWithItems = Order & { order_items?: OrderItem[] | null; delivery_jobs?: DeliveryJobSummary[] | null };
+type OrderWithItems = PortalOrderWithDelivery;
 type PickupHandoff = { id: string; status: "pending" | "verified" | "expired"; otp_code: string; requested_at: string };
 type ProductImagePreview = { src: string; alt: string };
 
@@ -49,7 +49,7 @@ function OrderQueueStatus({ order }: { order: OrderWithItems }) {
   return <span className="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-[#fff1dc] px-2.5 py-1 text-[11px] font-semibold leading-4 text-[#9c5b05] ring-1 ring-inset ring-[#f2d4a2]">{deliveryStatus}</span>;
 }
 
-function dueText(order: Order) {
+function dueText(order: PortalOrder) {
   const due = order.delivery_slot_end
     ? new Date(order.delivery_slot_end)
     : new Date(new Date(order.placed_at).getTime() + order.delivery_eta_minutes * 60000);
@@ -67,7 +67,7 @@ function dueText(order: Order) {
   return `Due by ${clock}`;
 }
 
-function orderAddress(order: Order) {
+function orderAddress(order: PortalOrder) {
   return [order.delivery_street, order.delivery_building, order.delivery_apartment, order.delivery_area]
     .filter(Boolean)
     .join(", ");
@@ -221,7 +221,7 @@ export default function PortalOrdersPage() {
     setUpdatingId(null);
   }
 
-  async function copyAddress(order: Order) {
+  async function copyAddress(order: PortalOrder) {
     try {
       await navigator.clipboard.writeText(orderAddress(order));
       setMessage("Delivery address copied.");
@@ -294,7 +294,7 @@ function OrderItemImageStack({ items }: { items: OrderItem[] }) {
   </span>;
 }
 
-function OrderDetail({ order, pickupHandoff, proofUrls, onAdvance, onReadyForPickup, onDelete, updatingId, onCopyAddress, onPreviewProductImage }: { order: OrderWithItems | null; pickupHandoff: PickupHandoff | null; proofUrls: string[]; onAdvance: (order: OrderWithItems) => void; onReadyForPickup: (order: OrderWithItems) => void; onDelete: (order: OrderWithItems) => void; updatingId: string | null; onCopyAddress: (order: Order) => void; onPreviewProductImage: (image: ProductImagePreview) => void }) {
+function OrderDetail({ order, pickupHandoff, proofUrls, onAdvance, onReadyForPickup, onDelete, updatingId, onCopyAddress, onPreviewProductImage }: { order: OrderWithItems | null; pickupHandoff: PickupHandoff | null; proofUrls: string[]; onAdvance: (order: OrderWithItems) => void; onReadyForPickup: (order: OrderWithItems) => void; onDelete: (order: OrderWithItems) => void; updatingId: string | null; onCopyAddress: (order: PortalOrder) => void; onPreviewProductImage: (image: ProductImagePreview) => void }) {
   if (!order) return <aside className="border-l border-[#edf1ef] bg-[#fbfdfc] p-5"><p className="text-sm text-[#7b8882]">Select an order to see its delivery and fulfilment details.</p></aside>;
   const next = NEXT_STATUS[order.status];
   const currentIndex = FLOW.indexOf(order.status);

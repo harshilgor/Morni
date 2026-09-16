@@ -1,4 +1,20 @@
-/** Store portal order fields — excludes delivery_phone so owners cannot read shopper numbers. */
+import type { Order, OrderItem } from "@/lib/types";
+
+/** Store portal orders omit delivery_phone so owners cannot read shopper numbers. */
+export type PortalOrder = Omit<Order, "delivery_phone"> & { updated_at?: string };
+
+export type PortalOrderWithItems = PortalOrder & { order_items?: OrderItem[] | null };
+
+export type PortalDeliveryJobSummary = {
+  id: string;
+  status: "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled";
+  delivery_proofs?: Array<{ id: string; storage_path: string; created_at: string }> | null;
+};
+
+export type PortalOrderWithDelivery = PortalOrderWithItems & {
+  delivery_jobs?: PortalDeliveryJobSummary[] | null;
+};
+
 export const PORTAL_ORDER_COLUMNS =
   "id, order_number, shopper_id, store_id, status, payment_method, payment_status, subtotal_aed, small_order_fee_aed, delivery_fee_aed, service_fee_aed, total_aed, delivery_emirate, delivery_area, delivery_street, delivery_building, delivery_apartment, delivery_notes, delivery_eta_minutes, delivery_slot_start, delivery_slot_end, placed_at, updated_at";
 

@@ -14,7 +14,7 @@ import {
 import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import { getOnboardingChecklist } from "@/lib/onboarding";
-import { PORTAL_ORDER_SELECT } from "@/lib/portal-order-select";
+import { PORTAL_ORDER_SELECT, type PortalOrderWithItems } from "@/lib/portal-order-select";
 import { isOnboardingComplete, useOwnerStore } from "@/lib/use-owner-store";
 import type { Order, OrderItem, Product, ProductReview, Store } from "@/lib/types";
 import { InventoryNotifications } from "@/components/inventory-notifications";
@@ -23,7 +23,6 @@ import { ReturnRequestsPanel } from "@/components/return-requests-panel";
 // Dashboard thumbnails are user-uploaded Supabase media URLs.
 /* eslint-disable @next/next/no-img-element */
 
-type OrderWithItems = Order & { order_items?: OrderItem[] | null };
 type WishRow = { product_id: string; count: number; title: string };
 
 const ACTIVE_STATUSES = new Set(["placed", "accepted", "picking", "out_for_delivery"]);
@@ -43,7 +42,7 @@ function relativeTime(value: string) {
 
 export default function PortalOverviewPage() {
   const { store, loading, error, refresh } = useOwnerStore();
-  const [orders, setOrders] = useState<OrderWithItems[]>([]);
+  const [orders, setOrders] = useState<PortalOrderWithItems[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [wishlistRows, setWishlistRows] = useState<WishRow[]>([]);
@@ -59,7 +58,7 @@ export default function PortalOverviewPage() {
       supabase.from("wishlist_items").select("product_id, products!inner(store_id, title)").eq("products.store_id", storeId),
     ]);
 
-    setOrders((ordersResult.data as OrderWithItems[]) ?? []);
+    setOrders((ordersResult.data as PortalOrderWithItems[]) ?? []);
     setProducts((productsResult.data as Product[]) ?? []);
     setReviews((reviewsResult.data as ProductReview[]) ?? []);
 
@@ -276,8 +275,8 @@ function MobileOverview({
   setupComplete: boolean;
   checklist: ReturnType<typeof getOnboardingChecklist>;
   insights: {
-    activeOrders: OrderWithItems[];
-    newOrders: OrderWithItems[];
+    activeOrders: PortalOrderWithItems[];
+    newOrders: PortalOrderWithItems[];
     lowStock: Product[];
     unreplied: ProductReview[];
     todayRevenue: number;
@@ -289,7 +288,7 @@ function MobileOverview({
   };
   products: Product[];
   reviews: ProductReview[];
-  orders: OrderWithItems[];
+  orders: PortalOrderWithItems[];
   wishlistRows: WishRow[];
 }) {
   const attentionCount = insights.newOrders.length + insights.lowStock.length + insights.unreplied.length;
@@ -381,7 +380,7 @@ function MobileMetric({ label, value }: { label: string; value: string }) {
   return <div className="portal-card p-3"><p className="portal-eyebrow">{label}</p><p className="mt-1 text-lg font-bold tabular-nums text-[#17231f]">{value}</p></div>;
 }
 
-function NeedsAttention({ insights, products }: { insights: { newOrders: OrderWithItems[]; lowStock: Product[]; unreplied: ProductReview[] }; products: Product[] }) {
+function NeedsAttention({ insights, products }: { insights: { newOrders: PortalOrderWithItems[]; lowStock: Product[]; unreplied: ProductReview[] }; products: Product[] }) {
   const outOfStock = products.filter((product) => product.stock <= 0);
   const incomplete = products.filter((product) => !product.title.trim() || !product.description?.trim() || !product.category_id || Number(product.price_aed) <= 0);
   const items = [
@@ -460,7 +459,7 @@ function HealthRow({ label, value, status }: { label: string; value: string; sta
   return <div className="flex items-center justify-between gap-3 border-b border-[#edf1ef] pb-3 last:border-0 last:pb-0"><span><span className="block text-sm font-medium text-[#34423d]">{label}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{value}</span></span><StatusBadge status={status} /></div>;
 }
 
-function OrdersToFulfil({ orders, limit = 5 }: { orders: OrderWithItems[]; limit?: number }) {
+function OrdersToFulfil({ orders, limit = 5 }: { orders: PortalOrderWithItems[]; limit?: number }) {
   return <div className="portal-card overflow-hidden"><div className="p-5"><PortalSectionHeading title="Orders to fulfil" description="Your latest orders, sorted by when they arrived." action={{ label: "View all orders", href: "/portal/orders" }} /></div>{orders.length ? <div className="divide-y divide-[#edf1ef]">{orders.slice(0, limit).map((order) => { const imageUrl = order.order_items?.[0]?.image_url; return <Link key={order.id} href="/portal/orders" className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-[#f8faf9]"><div className="flex min-w-0 items-center gap-3"><div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[#f0f5f2]">{imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-[#4d766b]"><PortalIcon name="package" className="h-4 w-4" /></span>}</div><span><span className="block text-sm font-semibold text-[#263530]">{order.order_number}</span><span className="mt-0.5 block text-xs text-[#7b8882]">{order.delivery_area} - {relativeTime(order.placed_at)}</span></span></div><div className="flex items-center gap-3"><StatusBadge status={order.status} /><span className="text-sm font-semibold text-[#263530]">{formatAed(order.total_aed)}</span></div></Link>; })}</div> : <div className="px-5 pb-5"><PortalEmpty icon="orders" title="Your order queue is clear" description="New shopper orders will appear here the moment they are placed." /></div>}</div>;
 }
 
