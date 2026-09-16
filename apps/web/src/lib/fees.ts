@@ -1,5 +1,4 @@
-export const FREE_SMALL_ORDER_FEE_THRESHOLD_AED = 99;
-export const SMALL_ORDER_FEE_AED = 15;
+export const SMALL_ORDER_FEE_AED = 0;
 export const DELIVERY_FEE_AED = 7;
 export const FREE_DELIVERY_THRESHOLD_AED = 199;
 export const SERVICE_FEE_AED = 3;
@@ -19,19 +18,17 @@ export type CheckoutFees = {
   amountUntilFreeDeliveryAed: number;
   freeDeliveryProgress: number;
   progressTargetAed: number;
-  progressMessage: "small_order_fee" | "free_delivery" | "free_delivery_unlocked";
+  progressMessage: "free_delivery" | "free_delivery_unlocked";
   totalAed: number;
 };
 
 export function calculateCheckoutFees(itemSubtotalAed: number): CheckoutFees {
   const subtotal = roundAed(Math.max(0, itemSubtotalAed));
-  const hasSmallOrderFee = subtotal < FREE_SMALL_ORDER_FEE_THRESHOLD_AED;
-  const smallOrderFeeAed = hasSmallOrderFee ? SMALL_ORDER_FEE_AED : 0;
+  // Small-order surcharge removed: below AED 99 only the standard delivery fee applies.
+  const smallOrderFeeAed = SMALL_ORDER_FEE_AED;
   const qualifiesForFreeDelivery = subtotal >= FREE_DELIVERY_THRESHOLD_AED;
   const deliveryFeeAed = qualifiesForFreeDelivery ? 0 : DELIVERY_FEE_AED;
-  const progressTargetAed = hasSmallOrderFee
-    ? FREE_SMALL_ORDER_FEE_THRESHOLD_AED
-    : FREE_DELIVERY_THRESHOLD_AED;
+  const progressTargetAed = FREE_DELIVERY_THRESHOLD_AED;
 
   return {
     itemSubtotalAed: subtotal,
@@ -39,19 +36,13 @@ export function calculateCheckoutFees(itemSubtotalAed: number): CheckoutFees {
     smallOrderFeeAed,
     serviceFeeAed: SERVICE_FEE_AED,
     convenienceFeeAed: 0,
-    amountUntilNoSmallOrderFeeAed: hasSmallOrderFee
-      ? roundAed(FREE_SMALL_ORDER_FEE_THRESHOLD_AED - subtotal)
-      : 0,
+    amountUntilNoSmallOrderFeeAed: 0,
     amountUntilFreeDeliveryAed: qualifiesForFreeDelivery
       ? 0
       : roundAed(FREE_DELIVERY_THRESHOLD_AED - subtotal),
     freeDeliveryProgress: Math.min(1, subtotal / progressTargetAed),
     progressTargetAed,
-    progressMessage: qualifiesForFreeDelivery
-      ? "free_delivery_unlocked"
-      : hasSmallOrderFee
-        ? "small_order_fee"
-        : "free_delivery",
+    progressMessage: qualifiesForFreeDelivery ? "free_delivery_unlocked" : "free_delivery",
     totalAed: roundAed(
       subtotal + deliveryFeeAed + smallOrderFeeAed + SERVICE_FEE_AED,
     ),

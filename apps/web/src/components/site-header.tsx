@@ -113,13 +113,13 @@ const CATEGORY_MENU_FEATURES = [
   { name: "Gifting", href: "/categories/gifting", image: "/categories/gifting-cover.png" },
 ] as const;
 
-const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI";
+const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI  ·  NO SMALL ORDER FEE";
 
 function LaunchAnnouncement() {
   return (
     <div
       className="morni-announcement-bar"
-      aria-label="Launch sale. Delivery in Dubai."
+      aria-label="Launch sale. Delivery in Dubai. No small order fee."
       role="region"
     >
       <div className="morni-announcement-track" aria-hidden="true">

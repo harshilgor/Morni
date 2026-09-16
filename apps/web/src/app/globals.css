@@ -1115,7 +1115,7 @@ h3,
   display: flex;
   width: max-content;
   min-height: 100%;
-  animation: morni-announcement-scroll 22s linear infinite;
+  animation: morni-announcement-scroll 28s linear infinite;
 }
 
 .morni-announcement-group {

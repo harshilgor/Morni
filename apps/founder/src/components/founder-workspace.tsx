@@ -1162,7 +1162,7 @@ function FinanceView({ data }: { data: FounderData }) {
     { label: "Product sales", value: data.finance.product_sales, detail: "Merchandise before fees" },
     { label: "Delivery fees", value: data.finance.delivery_fees, detail: "Free above AED 199" },
     { label: "Service fees", value: data.finance.service_fees, detail: "Marketplace service revenue" },
-    { label: "Small order fees", value: data.finance.small_order_fees, detail: "Orders below AED 99" },
+    { label: "Small order fees", value: data.finance.small_order_fees, detail: "No longer charged on new orders" },
   ];
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
