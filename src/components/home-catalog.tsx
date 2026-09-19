@@ -8,6 +8,7 @@ import { TrendingForYou } from "@/components/trending-for-you";
 import { ShopBySize } from "@/components/shop-by-size";
 import { getCachedHomeCatalog, type ProductWithStore } from "@/lib/catalog";
 import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
+import { catalogShuffleSeed, diversifyByKey, merchandiseCatalog, shuffleCatalog } from "@/lib/catalog-random";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import type { UaeEmirate } from "@/lib/types";
 
@@ -41,6 +42,14 @@ export async function HomeCatalog({
     .map((product) => toRailProduct(product));
 
   const newIn = products.slice(0, 10).map((product) => toRailProduct(product));
+  // New & popular should not be a second copy of the newest-products rail.
+  // Shuffle the full cached candidate set once per day so older inventory gets
+  // a fair chance while the order remains stable during a browsing session.
+  const popularPool = merchandiseCatalog(products, {
+    seed: catalogShuffleSeed("home-popular"),
+    getCategoryKey: (product) => product.category?.slug ?? "uncategorized",
+    getStoreKey: (product) => product.stores?.slug ?? product.stores?.name ?? "",
+  });
 
   const topRated = [...products]
     .map((product) => ({
@@ -67,17 +76,17 @@ export async function HomeCatalog({
     },
     {
       id: "under-99",
-      label: "Under AED 99",
-      title: "Under AED 99",
-      subtitle: "Budget-friendly picks from local boutiques.",
+      label: "AED 55 – AED 99",
+      title: "AED 55 – AED 99",
+      subtitle: "Boutique picks from AED 55 to AED 99.",
       href: "/collection/under-99",
       products: under99Rail,
     },
     {
       id: "under-149",
-      label: "Under AED 149",
-      title: "Under AED 149",
-      subtitle: "More to love, still easy on the budget.",
+      label: "AED 99 – AED 149",
+      title: "AED 99 – AED 149",
+      subtitle: "More to love from AED 99 to AED 149.",
       href: "/under-149",
       products: under149Rail,
     },
@@ -117,7 +126,10 @@ export async function HomeCatalog({
         slug: category.slug,
         label: category.name,
         href: `/categories/${category.slug}`,
-        products: matches.slice(0, 10).map((p) => ({
+        products: diversifyByKey(
+          shuffleCatalog(matches, catalogShuffleSeed(`category:${category.slug}`)),
+          (product) => product.stores?.slug ?? product.stores?.name ?? "",
+        ).slice(0, 10).map((p) => ({
           id: p.id,
           title: p.title,
           price_aed: Number(p.price_aed),
@@ -130,7 +142,7 @@ export async function HomeCatalog({
     .filter((tab) => tab.products.length >= 3);
 
   const popularTabs: PopularTab[] = [
-    { slug: "all", label: "All", href: "/search", products: newIn },
+    { slug: "all", label: "All", href: "/search", products: popularPool.slice(0, 10).map((p) => toRailProduct(p)) },
     ...categoryTabs,
   ];
 

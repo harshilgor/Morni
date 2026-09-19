@@ -6,6 +6,12 @@ type CategoryMatchProduct = {
   category?: { slug?: string | null } | null;
 };
 
+const CLOTHING_TERMS = [
+  "abaya", "anarkali", "blazer", "coord", "co ord", "dress", "gown",
+  "jacket", "kaftan", "kurta", "kurti", "lehenga", "pant", "saree",
+  "sari", "salwar", "set", "sharara", "shirt", "skirt", "top", "trouser",
+];
+
 type CategoryMatchInput = Pick<BrowseCategory, "slug"> & {
   search_terms?: string[] | null;
 };
@@ -33,6 +39,13 @@ function includesAny(value: string, terms: string[]) {
   return terms.some((term) => value.includes(normalize(term)));
 }
 
+export function isJewelryOrAccessoryProduct(product: CategoryMatchProduct) {
+  const categorySlug = normalize(product.category?.slug ?? "");
+  if (categorySlug !== "jewelry" && categorySlug !== "accessories") return false;
+  const text = normalize(`${product.title} ${product.description ?? ""}`);
+  return !includesAny(text, CLOTHING_TERMS);
+}
+
 export function hasCustomBrowseCategoryRules(slug: string) {
   return CUSTOM_CATEGORY_SLUGS.has(slug);
 }
@@ -47,10 +60,7 @@ export function productMatchesBrowseCategory(
 
   switch (category.slug) {
     case "jewelry-accessories":
-      return (
-        (product.category?.slug === "jewelry" || product.category?.slug === "accessories") &&
-        !/(kurti|kurta|saree|sari|set|top|shirt|dress|gown|sharara|salwar|anarkali|co ord|coord|trouser|pant|blazer|abaya|kaftan)/.test(text)
-      );
+      return isJewelryOrAccessoryProduct(product);
 
     case "sarees":
       return (

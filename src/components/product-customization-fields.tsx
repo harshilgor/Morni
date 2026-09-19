@@ -40,6 +40,12 @@ export function ProductCustomizationFields({
           {enabled ? (
             <div className="mt-4 space-y-3 border-t border-[#f0e1db] pt-3">
               <p className="text-xs leading-5 text-muted">{config.instructions}</p>
+              <p
+                role="note"
+                className="rounded-lg border border-[#e8c5cf] bg-[#fff1f4] px-3 py-2.5 text-xs font-medium leading-5 text-[#9b3f5d]"
+              >
+                Customized products cannot be returned.
+              </p>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                 {config.fields.map((field) => (
                   <label key={field.id} className="block space-y-1 text-xs font-semibold text-ink">

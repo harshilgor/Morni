@@ -3,10 +3,11 @@ import { isProductFabric, PRODUCT_FABRICS } from "@/lib/product-fabrics";
 
 describe("product fabrics", () => {
   it("contains the complete deduplicated seller fabric catalogue", () => {
-    expect(PRODUCT_FABRICS).toHaveLength(23);
+    expect(PRODUCT_FABRICS).toHaveLength(25);
     expect(new Set(PRODUCT_FABRICS).size).toBe(PRODUCT_FABRICS.length);
     expect(PRODUCT_FABRICS).toContain("Printed Lawn");
     expect(PRODUCT_FABRICS).toContain("Kota Doriya");
+    expect(PRODUCT_FABRICS).toContain("Laykra");
   });
 
   it("accepts only canonical values", () => {

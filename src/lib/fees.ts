@@ -1,9 +1,20 @@
-export const FREE_SMALL_ORDER_FEE_THRESHOLD_AED = 99;
-export const SMALL_ORDER_FEE_AED = 15;
-export const DELIVERY_FEE_AED = 7;
-export const FREE_DELIVERY_THRESHOLD_AED = 199;
+export const SMALL_ORDER_FEE_AED = 0;
+export const FREE_DELIVERY_THRESHOLD_AED = 200;
 export const SERVICE_FEE_AED = 3;
 export const FULL_RETURN_CONVENIENCE_FEE_AED = 10;
+
+/**
+ * Delivery tiers are based on the merchandise subtotal before service fees.
+ * The requested AED 100–150 tier is extended through AED 199.99 so there is
+ * no undefined gap before free delivery starts at AED 200.
+ */
+export function deliveryFeeForSubtotal(subtotalAed: number) {
+  const subtotal = Math.max(0, subtotalAed);
+  if (subtotal >= FREE_DELIVERY_THRESHOLD_AED) return 0;
+  if (subtotal >= 100) return 3;
+  if (subtotal >= 50) return 5;
+  return 7;
+}
 
 function roundAed(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -19,19 +30,17 @@ export type CheckoutFees = {
   amountUntilFreeDeliveryAed: number;
   freeDeliveryProgress: number;
   progressTargetAed: number;
-  progressMessage: "small_order_fee" | "free_delivery" | "free_delivery_unlocked";
+  progressMessage: "free_delivery" | "free_delivery_unlocked";
   totalAed: number;
 };
 
 export function calculateCheckoutFees(itemSubtotalAed: number): CheckoutFees {
   const subtotal = roundAed(Math.max(0, itemSubtotalAed));
-  const hasSmallOrderFee = subtotal < FREE_SMALL_ORDER_FEE_THRESHOLD_AED;
-  const smallOrderFeeAed = hasSmallOrderFee ? SMALL_ORDER_FEE_AED : 0;
-  const qualifiesForFreeDelivery = subtotal >= FREE_DELIVERY_THRESHOLD_AED;
-  const deliveryFeeAed = qualifiesForFreeDelivery ? 0 : DELIVERY_FEE_AED;
-  const progressTargetAed = hasSmallOrderFee
-    ? FREE_SMALL_ORDER_FEE_THRESHOLD_AED
-    : FREE_DELIVERY_THRESHOLD_AED;
+  // Small-order surcharge removed; delivery is tiered by merchandise subtotal.
+  const smallOrderFeeAed = SMALL_ORDER_FEE_AED;
+  const deliveryFeeAed = deliveryFeeForSubtotal(subtotal);
+  const qualifiesForFreeDelivery = deliveryFeeAed === 0;
+  const progressTargetAed = FREE_DELIVERY_THRESHOLD_AED;
 
   return {
     itemSubtotalAed: subtotal,
@@ -39,19 +48,13 @@ export function calculateCheckoutFees(itemSubtotalAed: number): CheckoutFees {
     smallOrderFeeAed,
     serviceFeeAed: SERVICE_FEE_AED,
     convenienceFeeAed: 0,
-    amountUntilNoSmallOrderFeeAed: hasSmallOrderFee
-      ? roundAed(FREE_SMALL_ORDER_FEE_THRESHOLD_AED - subtotal)
-      : 0,
+    amountUntilNoSmallOrderFeeAed: 0,
     amountUntilFreeDeliveryAed: qualifiesForFreeDelivery
       ? 0
       : roundAed(FREE_DELIVERY_THRESHOLD_AED - subtotal),
     freeDeliveryProgress: Math.min(1, subtotal / progressTargetAed),
     progressTargetAed,
-    progressMessage: qualifiesForFreeDelivery
-      ? "free_delivery_unlocked"
-      : hasSmallOrderFee
-        ? "small_order_fee"
-        : "free_delivery",
+    progressMessage: qualifiesForFreeDelivery ? "free_delivery_unlocked" : "free_delivery",
     totalAed: roundAed(
       subtotal + deliveryFeeAed + smallOrderFeeAed + SERVICE_FEE_AED,
     ),

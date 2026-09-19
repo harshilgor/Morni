@@ -5,9 +5,9 @@ import { PortalEmpty, PortalMetric, PortalPageHeader, PortalSectionHeading } fro
 import { createClient } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import { useOwnerStore } from "@/lib/use-owner-store";
-import type { Order, OrderItem, Product } from "@/lib/types";
+import { PORTAL_ORDER_SELECT, type PortalOrderWithItems } from "@/lib/portal-order-select";
+import type { Product } from "@/lib/types";
 
-type OrderWithItems = Order & { order_items?: OrderItem[] | null };
 type DeliveryJob = { id: string; order_id: string; status: string; created_at: string; updated_at: string; delivered_at: string | null; assignment_expires_at: string | null };
 type Range = 7 | 30 | 90;
 type ProductSales = { id: string; title: string; units: number; revenue: number; imageUrl: string | null; stock: number | null; sizeUnits: Record<string, number> };
@@ -43,7 +43,7 @@ function Opportunity({ title, detail, action, tone = "neutral" }: { title: strin
 
 export default function PortalAnalyticsPage() {
   const { store, loading, error } = useOwnerStore();
-  const [orders, setOrders] = useState<OrderWithItems[]>([]);
+  const [orders, setOrders] = useState<PortalOrderWithItems[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [deliveryJobs, setDeliveryJobs] = useState<DeliveryJob[]>([]);
   const [range, setRange] = useState<Range>(30);
@@ -55,13 +55,13 @@ export default function PortalAnalyticsPage() {
     if (!store) return;
     const supabase = createClient();
     void Promise.all([
-      supabase.from("orders").select("*, order_items(*)").eq("store_id", store.id).order("placed_at", { ascending: false }),
+      supabase.from("orders").select(PORTAL_ORDER_SELECT).eq("store_id", store.id).order("placed_at", { ascending: false }),
       supabase.from("products").select("*").eq("store_id", store.id),
       supabase.from("delivery_jobs").select("id,order_id,status,created_at,updated_at,delivered_at,assignment_expires_at").order("updated_at", { ascending: false }),
     ]).then(([ordersResult, productsResult, jobsResult]) => {
       const firstError = ordersResult.error ?? productsResult.error ?? jobsResult.error;
       setDataError(firstError?.message ?? null);
-      setOrders((ordersResult.data as OrderWithItems[]) ?? []);
+      setOrders((ordersResult.data as PortalOrderWithItems[]) ?? []);
       setProducts((productsResult.data as Product[]) ?? []);
       setDeliveryJobs((jobsResult.data as DeliveryJob[]) ?? []);
       setRefreshedAt(new Date());
@@ -75,7 +75,7 @@ export default function PortalAnalyticsPage() {
     const active = orders.filter((order) => order.status !== "cancelled");
     const periodOrders = active.filter((order) => new Date(order.placed_at) >= start);
     const previousOrders = active.filter((order) => { const placed = new Date(order.placed_at); return placed >= previousStart && placed < start; });
-    const merchandise = (rows: OrderWithItems[]) => rows.reduce((sum, order) => sum + Number(order.subtotal_aed ?? order.total_aed ?? 0), 0);
+    const merchandise = (rows: PortalOrderWithItems[]) => rows.reduce((sum, order) => sum + Number(order.subtotal_aed ?? order.total_aed ?? 0), 0);
     const totalRevenue = merchandise(periodOrders); const previousRevenue = merchandise(previousOrders);
     const totalFees = periodOrders.reduce((sum, order) => sum + Number(order.delivery_fee_aed ?? 0) + Number(order.small_order_fee_aed ?? 0) + Number(order.service_fee_aed ?? 0), 0);
     const pendingPayment = periodOrders.filter((order) => order.payment_status === "pending").reduce((sum, order) => sum + Number(order.total_aed), 0);

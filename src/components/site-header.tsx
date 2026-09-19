@@ -10,8 +10,6 @@ import { useAuthUser } from "@/lib/use-auth-user";
 import { createClient } from "@/lib/supabase/client";
 import type { UaeEmirate } from "@/lib/types";
 import { SavedAddressPicker } from "@/components/saved-address-picker";
-import { GiveawayCountdown } from "@/components/giveaway-countdown";
-
 const SearchTypeahead = dynamic(
   () =>
     import("@/components/search-typeahead").then((module) => module.SearchTypeahead),
@@ -103,7 +101,7 @@ const CATEGORY_MENU_GROUPS = [
   },
   {
     title: "Complete the look",
-    links: [["Bags", "/categories/bags"], ["Shoes", "/categories/shoes"], ["Jewelry", "/categories/jewelry"], ["Accessories", "/categories/accessories"], ["Gifting", "/categories/gifting"]],
+    links: [["Bags", "/categories/bags"], ["Shoes", "/categories/shoes"], ["Gifting", "/categories/gifting"]],
   },
 ] as const;
 
@@ -113,24 +111,33 @@ const CATEGORY_MENU_FEATURES = [
   { name: "Gifting", href: "/categories/gifting", image: "/categories/gifting-cover.png" },
 ] as const;
 
-const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI";
+const LAUNCH_MESSAGE = "LAUNCH SALE  ·  DELIVERY IN DUBAI  ·  NO SMALL ORDER FEE";
+
+function LaunchAnnouncementSegment() {
+  return (
+    <div className="morni-announcement-segment">
+      {[0, 1, 2, 3].map((group) => (
+        <div className="morni-announcement-group" key={group}>
+          <span>{LAUNCH_MESSAGE}</span>
+          <span className="morni-announcement-dot">✦</span>
+          <span>{LAUNCH_MESSAGE}</span>
+          <span className="morni-announcement-dot">✦</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function LaunchAnnouncement() {
   return (
     <div
       className="morni-announcement-bar"
-      aria-label="Launch sale. Delivery in Dubai."
+      aria-label="Launch sale. Delivery in Dubai. No small order fee."
       role="region"
     >
       <div className="morni-announcement-track" aria-hidden="true">
-        {[0, 1, 2, 3].map((group) => (
-          <div className="morni-announcement-group" key={group}>
-            <span>{LAUNCH_MESSAGE}</span>
-            <span className="morni-announcement-dot">✦</span>
-            <span>{LAUNCH_MESSAGE}</span>
-            <span className="morni-announcement-dot">✦</span>
-          </div>
-        ))}
+        <LaunchAnnouncementSegment />
+        <LaunchAnnouncementSegment />
       </div>
     </div>
   );
@@ -577,10 +584,10 @@ export function SiteHeader() {
             Under AED 55
           </Link>
           <Link href="/under-99" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/under-99"))}>
-            Under AED 99
+            AED 55 – AED 99
           </Link>
           <Link href="/under-149" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/under-149"))}>
-            Under AED 149
+            AED 99 – AED 149
           </Link>
           {isStoreOwner ? (
             <Link href="/portal" onMouseEnter={closeCategoriesOnNavHover} className={getNavPillClasses(isActiveNavItem("/portal"))}>
@@ -591,7 +598,6 @@ export function SiteHeader() {
               Sell on Morni
             </Link>
           )}
-          <GiveawayCountdown />
           {firstName ? (
             <span className="ml-auto hidden shrink-0 text-xs text-white/60 sm:inline">
               Welcome back, {firstName}

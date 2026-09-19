@@ -1115,7 +1115,16 @@ h3,
   display: flex;
   width: max-content;
   min-height: 100%;
-  animation: morni-announcement-scroll 22s linear infinite;
+  align-items: center;
+  animation: morni-announcement-scroll 28s linear infinite;
+  will-change: transform;
+}
+
+.morni-announcement-segment {
+  display: flex;
+  flex-shrink: 0;
+  min-width: max-content;
+  align-items: center;
 }
 
 .morni-announcement-group {
@@ -1213,13 +1222,6 @@ h3,
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
-.giveaway-countdown { position: sticky; right: .5rem; z-index: 2; display: inline-flex; min-width: max-content; align-items: center; gap: .4rem; margin-left: auto; border: 1px solid #efb7c766; border-radius: 999px; background: #2a1f24f2; padding: .42rem .7rem; color: #f7dbe3; font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 4px 14px #140b1055; backdrop-filter: blur(8px); }
-.giveaway-countdown-dot { width: .35rem; height: .35rem; border-radius: 50%; background: #f0a7bb; box-shadow: 0 0 8px #f0a7bb; animation: giveaway-pulse 2.4s ease-in-out infinite; }
-.giveaway-countdown-time { font-variant-numeric: tabular-nums; letter-spacing: .1em; }
-@keyframes giveaway-pulse { 50% { opacity: .45; transform: scale(.75); } }
-@media (max-width: 767px) { .giveaway-countdown { margin-left: .25rem; padding: .45rem .58rem; font-size: .57rem; } .giveaway-countdown-label { display: none; } }
-@media (prefers-reduced-motion: reduce) { .giveaway-countdown-dot { animation: none; } }
-
 .shop-rail::-webkit-scrollbar {
   display: none;
 }

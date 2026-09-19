@@ -3,21 +3,50 @@
 import { useEffect, useState } from "react";
 import { launchNumberSequence } from "@/lib/launch-welcome";
 
+const LAUNCH_WELCOME_STORAGE_KEY = "morni:launch-welcome:v1";
+const LAUNCH_VISITOR_STORAGE_KEY = "morni:launch-visitor:v1";
+
+function launchVisitorId() {
+  try {
+    const existing = window.localStorage.getItem(LAUNCH_VISITOR_STORAGE_KEY);
+    if (existing && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existing)) {
+      return existing;
+    }
+    const created = crypto.randomUUID();
+    window.localStorage.setItem(LAUNCH_VISITOR_STORAGE_KEY, created);
+    return created;
+  } catch {
+    // The server cookie remains a fallback for browsers with storage disabled.
+    return null;
+  }
+}
+
 export function LaunchWelcome() {
   const [visible, setVisible] = useState(false);
-  const [customerNumber, setCustomerNumber] = useState(100);
+  const [customerNumber, setCustomerNumber] = useState<number | null>(null);
 
   useEffect(() => {
-    setCustomerNumber(100);
-    setVisible(true);
+    try {
+      if (window.localStorage.getItem(LAUNCH_WELCOME_STORAGE_KEY) === "seen") {
+        return;
+      }
+    } catch {
+      // If storage is unavailable, keep the launch experience usable.
+    }
+    const revealTimer = window.setTimeout(() => setVisible(true), 0);
+    const visitorId = launchVisitorId();
+    void fetch("/api/launch/customer-number", {
+      headers: visitorId ? { "x-morni-launch-visitor": visitorId } : undefined,
+    }).then((response) => response.ok ? response.json() : null).then((data) => { if (data?.customerNumber) setCustomerNumber(data.customerNumber); });
+    return () => window.clearTimeout(revealTimer);
   }, []);
 
   const [displayNumber, setDisplayNumber] = useState(90);
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || customerNumber == null) return;
     const sequence = launchNumberSequence(customerNumber);
     let index = 0;
-    setDisplayNumber(sequence[0] ?? customerNumber);
+    window.queueMicrotask(() => setDisplayNumber(sequence[0] ?? customerNumber));
     const timer = window.setInterval(() => {
       index += 1;
       const value = sequence[index] ?? customerNumber;
@@ -29,6 +58,11 @@ export function LaunchWelcome() {
 
   if (!visible) return null;
   const close = () => {
+    try {
+      window.localStorage.setItem(LAUNCH_WELCOME_STORAGE_KEY, "seen");
+    } catch {
+      // Dismissal still works when storage is blocked.
+    }
     setVisible(false);
   };
   return (

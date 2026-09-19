@@ -6,11 +6,14 @@ import { getCachedProductPage } from "@/lib/catalog";
 
 async function ProductPageContent({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; productId: string }>;
+  searchParams?: Promise<{ recent?: string }>;
 }) {
   const { slug, productId } = await params;
-  const data = await getCachedProductPage(slug, productId);
+  const recent = (await searchParams)?.recent === "1";
+  const data = await getCachedProductPage(slug, productId, recent);
   if (!data) notFound();
 
   return (
@@ -27,12 +30,14 @@ async function ProductPageContent({
 
 export default function ProductPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; productId: string }>;
+  searchParams?: Promise<{ recent?: string }>;
 }) {
   return (
     <Suspense fallback={<ProductDetailSkeleton />}>
-      <ProductPageContent params={params} />
+      <ProductPageContent params={params} searchParams={searchParams} />
     </Suspense>
   );
 }

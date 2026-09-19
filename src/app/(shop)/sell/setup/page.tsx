@@ -393,6 +393,9 @@ export default function SellSetupPage() {
           (product.image_urls?.length ?? 0) > 0,
       );
       const aggregate = aggregateFromColorDrafts(colors, hasSizes);
+      if (aggregate.stock <= 0) {
+        throw new Error("Add at least 1 unit of stock before listing this product.");
+      }
 
       if (existingComplete) {
         const { error: updateError } = await supabase
@@ -400,7 +403,7 @@ export default function SellSetupPage() {
           .update({
             title: productForm.title.trim(),
             description: productForm.description.trim(),
-            fabric: productForm.fabric || null,
+            fabric: productForm.categorySlug === "gifting" ? null : productForm.fabric || null,
             category_id: categoryId,
             price_aed: price,
             compare_at_price_aed:
@@ -428,7 +431,7 @@ export default function SellSetupPage() {
           category_id: categoryId,
           title: productForm.title.trim(),
           description: productForm.description.trim(),
-          fabric: productForm.fabric || null,
+          fabric: productForm.categorySlug === "gifting" ? null : productForm.fabric || null,
           price_aed: price,
           compare_at_price_aed:
             compareAt && Number.isFinite(compareAt) ? compareAt : null,

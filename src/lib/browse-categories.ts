@@ -9,7 +9,17 @@ export type BrowseCategory = {
   is_featured: boolean;
 };
 
-export const RETIRED_BROWSE_CATEGORY_SLUGS = new Set(["elegant-fashion"]);
+// Categories that are no longer offered in the active storefront. We keep the
+// slugs here so stale links and cached data resolve to a controlled 404 rather
+// than being re-created from the featured catalog fallback.
+export const RETIRED_BROWSE_CATEGORY_SLUGS = new Set([
+  "elegant-fashion",
+  "office-wear",
+  "casual-wear",
+  "jewelry",
+  "accessories",
+  "jewelry-accessories",
+]);
 
 const featuredCategory = (
   name: string,
@@ -134,24 +144,6 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
     "/categories/gifting-cover.png",
     ["gift", "gifting", "present", "celebration", "occasion"],
     15,
-  ),
-  featuredCategory(
-    "Jewelry / Accessories",
-    "jewelry-accessories",
-    "/categories/jewelry-accessories.png",
-    [
-      "jewelry",
-      "jewellery",
-      "accessory",
-      "accessories",
-      "necklace",
-      "earring",
-      "ring",
-      "bracelet",
-      "clutch",
-      "scarf",
-    ],
-    16,
   ),
 ];
 

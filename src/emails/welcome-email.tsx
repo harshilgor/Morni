@@ -19,7 +19,7 @@ export function WelcomeEmail({ name, ordersUrl }: WelcomeEmailProps) {
       highlights={[
         {
           title: "Boutiques near you",
-          body: "Browse curated local fashion — kurtis, sets, jewelry, and more from UAE makers.",
+          body: "Browse curated local fashion — kurtis, sets, and more from UAE makers.",
         },
         {
           title: "Doorstep delivery",

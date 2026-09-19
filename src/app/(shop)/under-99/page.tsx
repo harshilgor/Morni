@@ -5,7 +5,11 @@ import { getCachedPriceRailProducts } from "@/lib/catalog";
 
 export default async function Under99Page() {
   redirect("/collection/under-99");
-  const { products, categories, ratings } = await getCachedPriceRailProducts(99);
+  const { products, categories, ratings } = await getCachedPriceRailProducts({
+    minPriceExclusive: 55,
+    maxPrice: 99,
+    tag: "price:55-99",
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -14,13 +18,13 @@ export default async function Under99Page() {
           Home
         </Link>
         <span aria-hidden>/</span>
-        <span className="text-ink">Under AED 99</span>
+        <span className="text-ink">Products AED 55 – AED 99</span>
       </nav>
 
       <div className="mt-3 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
         <div>
           <h1 className="font-display text-3xl text-ink sm:text-4xl">
-            Under AED 99
+            Products AED 55 – AED 99
           </h1>
         </div>
       </div>
@@ -29,7 +33,7 @@ export default async function Under99Page() {
         {products.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line bg-surface/70 p-10 text-center">
             <p className="text-muted">
-              No products under AED 99 are listed yet. Explore another category
+              No products from AED 55 to AED 99 are listed yet. Explore another category
               below.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">

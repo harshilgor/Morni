@@ -20,7 +20,7 @@ export function RecentlyViewedRail() {
     const supabase = createClient();
     void supabase
       .from("products")
-      .select("id")
+      .select("id,is_available,stock")
       .in("id", items.map((item) => item.id))
       .then(({ data }) => {
         if (cancelled) return;
@@ -51,7 +51,7 @@ export function RecentlyViewedRail() {
                   compare_at_price_aed: item.compare_at_price_aed,
                   image_urls: item.image_url ? [item.image_url] : [],
                 }}
-                href={item.href}
+                href={`${item.href}${item.href.includes("?") ? "&" : "?"}recent=1`}
                 sharp
                 unoptimized
               />

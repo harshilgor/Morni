@@ -6,6 +6,7 @@ import {
   productMatchesBrowseCategory,
 } from "@/lib/product-browse-category";
 import type { UaeEmirate } from "@/lib/types";
+import { catalogShuffleSeed, diversifyByKey, shuffleCatalog } from "@/lib/catalog-random";
 
 // Five rows in the two-column mobile grid: enough to keep scrolling smooth without
 // making the first category response wait for products the shopper cannot see yet.
@@ -103,12 +104,16 @@ export async function getCategoryProductPage(
   const uniqueMatchingResults = matchingResults.filter(
     (product, index, list) => list.findIndex((item) => item.id === product.id) === index,
   );
+  const orderedResults = diversifyByKey(
+    shuffleCatalog(uniqueMatchingResults, catalogShuffleSeed(`category:${category.slug}`)),
+    (product) => product.stores?.slug ?? product.stores?.name ?? "",
+  );
   // Assigned categories are fetched in one candidate window so that products
   // can be matched across stores. They still need to honour the requested
   // offset; otherwise every "load more" request returns the first batch again.
   const products = (hasCustomRules || hasAssignedCategories)
-    ? uniqueMatchingResults.slice(offset, offset + batchSize)
-    : uniqueMatchingResults.slice(0, batchSize);
+    ? orderedResults.slice(offset, offset + batchSize)
+    : orderedResults.slice(0, batchSize);
   const ratingMap = await fetchProductRatingMap(
     supabase,
     products.map((product) => product.id),
@@ -118,7 +123,7 @@ export async function getCategoryProductPage(
     products,
     ratings: Object.fromEntries(ratingMap),
     hasMore: hasCustomRules || hasAssignedCategories
-      ? uniqueMatchingResults.length > offset + batchSize
-      : uniqueMatchingResults.length > batchSize,
+      ? orderedResults.length > offset + batchSize
+      : orderedResults.length > batchSize,
   };
 }

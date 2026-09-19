@@ -522,7 +522,7 @@ export default function PortalProductsPage() {
         title: form.title,
         product_tag: form.product_tag.trim().toUpperCase() || null,
         description: form.description || null,
-        fabric: form.fabric || null,
+        fabric: categoryHasSizes(form.categorySlug) ? form.fabric || null : null,
         price_aed: Number(form.price_aed),
         stock: aggregate.stock,
         sizes: aggregate.sizes,
@@ -632,11 +632,18 @@ export default function PortalProductsPage() {
       setSavingEdits(false);
       return;
     }
+    const { data: stockAlert } = await supabase
+      .from("store_inventory_notifications")
+      .select("id")
+      .eq("product_id", editingProduct.id)
+      .eq("kind", "out_of_stock")
+      .eq("status", "pending")
+      .maybeSingle();
     const { error: updateError } = await supabase
       .from("products")
       .update({
         category_id: categoryId,
-        fabric: editDraft.fabric || null,
+        fabric: categoryHasSizes(editDraft.categorySlug) ? editDraft.fabric || null : null,
         title: editDraft.title.trim(),
         product_tag: editDraft.product_tag.trim().toUpperCase() || null,
         description: editDraft.description.trim() || null,
@@ -657,7 +664,7 @@ export default function PortalProductsPage() {
           editDraft.customization.enabled
             ? editDraft.customization.fields
             : [],
-        is_available: aggregate.stock > 0 ? editingProduct.is_available : false,
+        is_available: aggregate.stock > 0 ? (stockAlert ? true : editingProduct.is_available) : false,
       })
       .eq("id", editingProduct.id)
       .eq("store_id", store.id);
@@ -690,6 +697,13 @@ export default function PortalProductsPage() {
         .update({ status: "accepted", resolved_at: new Date().toISOString() })
         .eq("product_id", editingProduct.id)
         .eq("kind", "legacy_size_inventory")
+        .eq("status", "pending");
+    }
+    if (stockAlert && aggregate.stock > 0) {
+      await supabase
+        .from("store_inventory_notifications")
+        .update({ status: "accepted", resolved_at: new Date().toISOString() })
+        .eq("id", stockAlert.id)
         .eq("status", "pending");
     }
 
@@ -1205,13 +1219,15 @@ export default function PortalProductsPage() {
                     ))}
                   </select>
                 </label>
-                <label className="block space-y-1.5 text-sm">
-                  <span className="font-medium text-[#40534d]">Fabric / material</span>
-                  <select className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm" value={form.fabric} onChange={(e) => setForm((current) => ({ ...current, fabric: e.target.value }))}>
-                    <option value="">Select material</option>
-                    {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
-                  </select>
-                </label>
+                {categoryHasSizes(form.categorySlug) ? (
+                  <label className="block space-y-1.5 text-sm">
+                    <span className="font-medium text-[#40534d]">Fabric / material</span>
+                    <select className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm" value={form.fabric} onChange={(e) => setForm((current) => ({ ...current, fabric: e.target.value }))}>
+                      <option value="">Select material</option>
+                      {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
+                    </select>
+                  </label>
+                ) : null}
                 <label className="block space-y-1.5 text-sm">
                   <span className="font-medium text-[#40534d]">
                     Description *
@@ -1403,13 +1419,15 @@ export default function PortalProductsPage() {
                   ))}
                 </select>
               </label>
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-[#40534d]">Fabric / material</span>
-                <select className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm" value={editDraft.fabric} onChange={(e) => setEditDraft((current) => current ? { ...current, fabric: e.target.value } : current)}>
-                  <option value="">Select material</option>
-                  {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
-                </select>
-              </label>
+              {categoryHasSizes(editDraft.categorySlug) ? (
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">Fabric / material</span>
+                  <select className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm" value={editDraft.fabric} onChange={(e) => setEditDraft((current) => current ? { ...current, fabric: e.target.value } : current)}>
+                    <option value="">Select material</option>
+                    {PRODUCT_FABRICS.map((fabric) => <option key={fabric} value={fabric}>{fabric}</option>)}
+                  </select>
+                </label>
+              ) : null}
               <ColorVariantEditor
                 value={editColors}
                 onChange={setEditColors}
