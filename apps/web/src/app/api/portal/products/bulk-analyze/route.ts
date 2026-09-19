@@ -2,37 +2,64 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { mergeBrowseCategories, type BrowseCategory } from "@/lib/browse-categories";
+import {
+  assignInternalImageIds,
+  buildVisionPrompt,
+  callVisionProvider,
+  explicitFailureGroups,
+  normalizeVisionGroups,
+  statusWarning,
+  type RawVisionGroup,
+} from "@/lib/bulk-vision";
 
-const imageSchema = z.object({ id: z.string().max(100), name: z.string().max(200), data: z.string().regex(/^data:image\/(jpeg|png|webp);base64,/i).max(6_000_000) });
+const imageSchema = z.object({
+  id: z.string().max(100),
+  name: z.string().max(200),
+  data: z.string().regex(/^data:image\/(jpeg|png|webp);base64,/i).max(6_000_000),
+});
 const MAX_ANALYSIS_IMAGES = 30;
-// Store identifiers are validated against the authenticated membership below.
-// Do not assume every deployed database uses UUID-formatted identifiers.
-const schema = z.object({ storeId: z.string().trim().min(1).max(200), images: z.array(imageSchema).min(1).max(MAX_ANALYSIS_IMAGES) });
-const suggestionSchema = z.object({ groups: z.array(z.object({ imageIds: z.array(z.string().max(100)).min(1), title: z.string().max(120), description: z.string().max(600), categorySlug: z.string().max(80), colorName: z.string().max(40), confidence: z.number().min(0).max(1), needsReview: z.boolean(), colorGroups: z.array(z.object({ imageIds: z.array(z.string().max(100)).min(1), colorName: z.string().max(40), confidence: z.number().min(0).max(1), needsReview: z.boolean() })).max(20).default([]) }).passthrough()).max(30) });
+const schema = z.object({
+  storeId: z.string().trim().min(1).max(200),
+  images: z.array(imageSchema).min(1).max(MAX_ANALYSIS_IMAGES),
+});
 
-type Suggestion = z.infer<typeof suggestionSchema>["groups"][number];
+const rawGroupSchema = z
+  .object({
+    imageIds: z.array(z.string().max(100)).min(1),
+    title: z.string().max(120).optional().default(""),
+    description: z.string().max(600).optional().default(""),
+    categorySlug: z.string().max(80).optional().default(""),
+    colorName: z.string().max(40).optional().default(""),
+    confidence: z.number().min(0).max(1).optional().default(0),
+    needsReview: z.boolean().optional().default(true),
+    colorGroups: z
+      .array(
+        z.object({
+          imageIds: z.array(z.string().max(100)).min(1),
+          colorName: z.string().max(40).optional().default(""),
+          confidence: z.number().min(0).max(1).optional().default(0),
+          needsReview: z.boolean().optional().default(true),
+        }),
+      )
+      .max(20)
+      .optional()
+      .default([]),
+  })
+  .passthrough();
 
-function fallbackTitle(fileName: string) {
-  const candidate = fileName
-    .replace(/\.[^.]+$/, "")
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!candidate || /^[0-9a-f]{8}(?:[-\s][0-9a-f]{4}){2,4}$/i.test(candidate) || /^[0-9a-f]{16,}$/.test(candidate)) return "New product";
-  return candidate.replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
+const suggestionSchema = z.object({
+  groups: z.array(rawGroupSchema).max(30),
+});
 
-function fallbackGroups(images: Array<{ label: string; name: string }>): Suggestion[] {
-  return images.map((image) => ({
-    imageIds: [image.label],
-    title: fallbackTitle(image.name),
-    description: "",
-    categorySlug: "",
-    colorName: "",
-    confidence: 0,
-    needsReview: true,
-    colorGroups: [{ imageIds: [image.label], colorName: "", confidence: 0, needsReview: true }],
-  }));
+function logBulkVision(
+  level: "info" | "warn" | "error",
+  event: string,
+  payload: Record<string, unknown>,
+) {
+  const line = { event, ...payload };
+  if (level === "error") console.error("BulkVision", line);
+  else if (level === "warn") console.warn("BulkVision", line);
+  else console.info("BulkVision", line);
 }
 
 export async function POST(request: Request) {
@@ -41,217 +68,266 @@ export async function POST(request: Request) {
   let userId: string;
   try {
     supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError) {
-      console.error("Bulk photo grouping auth verification failed", { requestId, message: authError.message });
-      return NextResponse.json({ error: "We could not verify your Supabase session. Please sign in again." }, { status: 503 });
+      logBulkVision("error", "auth_verification_failed", {
+        requestId,
+        message: authError.message,
+      });
+      return NextResponse.json(
+        { error: "We could not verify your Supabase session. Please sign in again." },
+        { status: 503 },
+      );
     }
-    if (!user) return NextResponse.json({ error: "Your session has expired. Please sign in again." }, { status: 401 });
+    if (!user) {
+      return NextResponse.json(
+        { error: "Your session has expired. Please sign in again." },
+        { status: 401 },
+      );
+    }
     userId = user.id;
   } catch (error) {
-    console.error("Bulk photo grouping Supabase client failed", { requestId, name: error instanceof Error ? error.name : "unknown" });
-    return NextResponse.json({ error: "Supabase session verification failed. Please try again." }, { status: 503 });
+    logBulkVision("error", "supabase_client_failed", {
+      requestId,
+      name: error instanceof Error ? error.name : "unknown",
+    });
+    return NextResponse.json(
+      { error: "Supabase session verification failed. Please try again." },
+      { status: 503 },
+    );
   }
+
   const requestBody = await request.json().catch(() => null);
   const parsed = schema.safeParse(requestBody);
   if (!parsed.success) {
     const imageCount =
-      typeof requestBody === "object" && requestBody !== null && "images" in requestBody && Array.isArray(requestBody.images)
+      typeof requestBody === "object" &&
+      requestBody !== null &&
+      "images" in requestBody &&
+      Array.isArray(requestBody.images)
         ? requestBody.images.length
         : 0;
     if (imageCount > MAX_ANALYSIS_IMAGES) {
       return NextResponse.json(
-        { error: `AI can analyze up to ${MAX_ANALYSIS_IMAGES} photos at a time. Your product drafts remain safe; split the AI analysis into smaller batches, then publish all products together.` },
+        {
+          error: `AI can analyze up to ${MAX_ANALYSIS_IMAGES} photos at a time. Your product drafts remain safe; split the AI analysis into smaller batches, then publish all products together.`,
+        },
         { status: 413 },
       );
     }
-    console.error("Bulk photo grouping payload validation failed", { requestId, issueCount: parsed.error.issues.length, paths: parsed.error.issues.map((issue) => issue.path.join(".")) });
-    return NextResponse.json({ error: "The photo request could not be validated. Please try selecting the images again." }, { status: 400 });
+    logBulkVision("error", "payload_validation_failed", {
+      requestId,
+      issueCount: parsed.error.issues.length,
+      paths: parsed.error.issues.map((issue) => issue.path.join(".")),
+    });
+    return NextResponse.json(
+      { error: "The photo request could not be validated. Please try selecting the images again." },
+      { status: 400 },
+    );
   }
+
   const { storeId, images } = parsed.data;
-  const labelledImages = images.map((image, index) => ({
-    ...image,
-    label: `PHOTO_${index + 1}`,
-  }));
-  const labelToId = new Map(labelledImages.map((image) => [image.label, image.id]));
-  const restoreImageIds = (groups: Suggestion[]) =>
-    groups.map((group) => ({
-      ...group,
-      imageIds: group.imageIds
-        .map((label) => labelToId.get(label))
-        .filter((id): id is string => Boolean(id)),
-    }));
-  const totalPayloadBytes = images.reduce((total, image) => total + image.data.length, 0);
-  // Gemini inline image requests have a smaller practical request limit.
-  // Keep a little headroom for the prompt and structured response.
-  if (totalPayloadBytes > (process.env.GEMINI_API_KEY ? 18_000_000 : 45_000_000)) {
-    return NextResponse.json({ error: "The selected photos are too large to analyze together. Please upload fewer photos at a time." }, { status: 413 });
+  const refs = assignInternalImageIds(images);
+  const filenamesByInternalId = new Map(
+    refs.map((ref) => [ref.internalId, ref.originalFilename]),
+  );
+
+  const totalPayloadBytes = images.reduce(
+    (total, image) => total + image.data.length,
+    0,
+  );
+  const configuredGeminiKey = process.env.GEMINI_API_KEY?.trim();
+  const geminiKey =
+    configuredGeminiKey && !/^\[[^\]]+\]$/.test(configuredGeminiKey)
+      ? configuredGeminiKey
+      : undefined;
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
+  const payloadLimit = geminiKey ? 18_000_000 : 45_000_000;
+  if (totalPayloadBytes > payloadLimit) {
+    return NextResponse.json(
+      {
+        error:
+          "The selected photos are too large to analyze together. Please upload fewer photos at a time.",
+      },
+      { status: 413 },
+    );
   }
-  const [{ data: member, error: memberError }, { data: profile, error: profileError }, { data: categories, error: categoriesError }] = await Promise.all([
-    supabase.from("store_members").select("store_id").eq("store_id", storeId).eq("user_id", userId).maybeSingle(),
+
+  const [
+    { data: member, error: memberError },
+    { data: profile, error: profileError },
+    { data: categories, error: categoriesError },
+  ] = await Promise.all([
+    supabase
+      .from("store_members")
+      .select("store_id")
+      .eq("store_id", storeId)
+      .eq("user_id", userId)
+      .maybeSingle(),
     supabase.from("profiles").select("role").eq("id", userId).maybeSingle(),
-    supabase.from("browse_categories").select("name,slug").neq("slug", "more").order("sort_order"),
+    supabase
+      .from("browse_categories")
+      .select("name,slug")
+      .neq("slug", "more")
+      .order("sort_order"),
   ]);
+
   if (memberError || profileError || categoriesError) {
-    console.error("Bulk photo grouping Supabase query failed", {
+    logBulkVision("error", "supabase_query_failed", {
       requestId,
       member: memberError?.message,
       profile: profileError?.message,
       categories: categoriesError?.message,
     });
-    return NextResponse.json({ error: "Supabase could not load the store details. Please try again." }, { status: 503 });
+    return NextResponse.json(
+      { error: "Supabase could not load the store details. Please try again." },
+      { status: 503 },
+    );
   }
-  if (!member && profile?.role !== "admin") return NextResponse.json({ error: "You do not have access to this store." }, { status: 403 });
-  const key = process.env.OPENAI_API_KEY?.trim();
-  // Treat deployment redaction placeholders as unset. Otherwise the route
-  // would always prefer Gemini and silently fall back when only OpenAI is
-  // actually configured.
-  const configuredGeminiKey = process.env.GEMINI_API_KEY?.trim();
-  const geminiKey = configuredGeminiKey && !/^\[[^\]]+\]$/.test(configuredGeminiKey)
-    ? configuredGeminiKey
-    : undefined;
-  if (!key && !geminiKey) return NextResponse.json({ error: "AI analysis is not configured. You can still review products manually." }, { status: 503 });
-  const model = geminiKey ? (process.env.GEMINI_VISION_MODEL || "gemini-3.5-flash") : (process.env.OPENAI_VISION_MODEL || "gpt-4o-mini");
-  console.info("Bulk photo grouping sending request", { requestId, provider: geminiKey ? "Gemini" : "OpenAI", model, imageCount: images.length });
-  const prompt = `You are matching product photos for a fashion marketplace. Compare EVERY uploaded image against every other image. First group photos into the same physical product using silhouette, construction, pattern, embroidery, and material. A materially different fabric, print, pattern, or design is a DIFFERENT product even if it looks similar. Within each product group, create colorGroups: photos of the same product in different colourways belong to separate colorGroups, while different angles and close-ups of one colour belong together. Never merge different fabrics into a colour group. If identity, fabric, or colour is uncertain, keep the uncertain photos separate and set needsReview true. Use ONLY the stable photo labels supplied below; every label must appear exactly once across product groups and exactly once across colorGroups. For each group, write a natural, human-sounding description of 2 to 3 complete sentences and roughly 45 to 90 words. Never invent brand, fabric, measurements, care instructions, price, stock, or sizes. Categories: ${JSON.stringify(mergeBrowseCategories((categories ?? []) as BrowseCategory[]).map(({ name, slug }) => ({ name, slug })))}. The photo labels are: ${JSON.stringify(labelledImages.map(({ label, name }) => ({ label, name })))}.`;
-  let response: Response;
-  try {
-    response = await fetch(geminiKey
-      ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`
-      : "https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(geminiKey ? {} : { Authorization: `Bearer ${key}` }) },
-      signal: AbortSignal.timeout(45_000),
-      body: JSON.stringify(geminiKey ? {
-        contents: [{ parts: [
-          { text: prompt },
-          ...labelledImages.flatMap((image) => [
-            { text: `PHOTO LABEL: ${image.label}\nFILENAME: ${image.name}` },
-            { inline_data: { mime_type: image.data.match(/^data:(image\/[a-z]+);base64,/i)?.[1] ?? "image/jpeg", data: image.data.replace(/^data:image\/[a-z]+;base64,/i, "") } },
-          ]),
-        ] }],
-        generationConfig: { responseMimeType: "application/json", responseSchema: {
-          type: "OBJECT",
-          properties: { groups: { type: "ARRAY", items: { type: "OBJECT", properties: {
-            imageIds: { type: "ARRAY", minItems: 1, items: { type: "STRING" } },
-            title: { type: "STRING" }, description: { type: "STRING" }, categorySlug: { type: "STRING" }, colorName: { type: "STRING" }, confidence: { type: "NUMBER" }, needsReview: { type: "BOOLEAN" },
-            colorGroups: { type: "ARRAY", items: { type: "OBJECT", properties: { imageIds: { type: "ARRAY", minItems: 1, items: { type: "STRING" } }, colorName: { type: "STRING" }, confidence: { type: "NUMBER" }, needsReview: { type: "BOOLEAN" } }, required: ["imageIds", "colorName", "confidence", "needsReview"] } },
-          }, required: ["imageIds", "title", "description", "categorySlug", "colorName", "confidence", "needsReview", "colorGroups"] } } },
-          required: ["groups"],
-        } },
-      } : {
-        model,
-        store: false,
-        input: [{ role: "user", content: [
-          { type: "input_text", text: prompt },
-          ...labelledImages.flatMap((image) => [
-            { type: "input_text", text: `PHOTO LABEL: ${image.label}\nFILENAME: ${image.name}` },
-            { type: "input_image", image_url: image.data, detail: "high" },
-          ]),
-        ] }],
-        text: { format: { type: "json_schema", name: "product_photo_groups", strict: false, schema: { type: "object", additionalProperties: false, properties: { groups: { type: "array", minItems: 1, maxItems: 30, items: { type: "object", additionalProperties: true, properties: { imageIds: { type: "array", minItems: 1, items: { type: "string" } }, title: { type: "string" }, description: { type: "string" }, categorySlug: { type: "string" }, colorName: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 }, needsReview: { type: "boolean" }, colorGroups: { type: "array", items: { type: "object", additionalProperties: false, properties: { imageIds: { type: "array", minItems: 1, items: { type: "string" } }, colorName: { type: "string" }, confidence: { type: "number" }, needsReview: { type: "boolean" } }, required: ["imageIds", "colorName", "confidence", "needsReview"] } } }, required: ["imageIds", "title", "description", "categorySlug", "colorName", "confidence", "needsReview"] } } }, required: ["groups"] } } },
-      }),
-    });
-  } catch (error) {
-    console.error("Bulk photo grouping provider request failed", { requestId, name: error instanceof Error ? error.name : "unknown" });
-    return NextResponse.json({
-      groups: restoreImageIds(fallbackGroups(labelledImages)),
-      warning: "AI analysis was temporarily unavailable. The photos were kept separate for manual review.",
-    });
+  if (!member && profile?.role !== "admin") {
+    return NextResponse.json(
+      { error: "You do not have access to this store." },
+      { status: 403 },
+    );
   }
-  if (!response.ok) {
-    let providerError: unknown;
-    try { providerError = await response.clone().json(); } catch { providerError = undefined; }
-    const providerType = typeof providerError === "object" && providerError !== null && "error" in providerError && typeof providerError.error === "object" && providerError.error !== null && "type" in providerError.error ? providerError.error.type : undefined;
-    console.error("Bulk photo grouping provider rejected request", {
+  if (!openAiKey && !geminiKey) {
+    return NextResponse.json(
+      {
+        error:
+          "AI analysis is not configured. You can still review products manually.",
+      },
+      { status: 503 },
+    );
+  }
+
+  const provider = geminiKey ? ("Gemini" as const) : ("OpenAI" as const);
+  const apiKey = (geminiKey ?? openAiKey)!;
+  const model = geminiKey
+    ? process.env.GEMINI_VISION_MODEL || "gemini-3.5-flash"
+    : process.env.OPENAI_VISION_MODEL || "gpt-4o-mini";
+  const categoryList = mergeBrowseCategories(
+    (categories ?? []) as BrowseCategory[],
+  ).map(({ name, slug }) => ({ name, slug }));
+  const categorySlugs = new Set(categoryList.map((category) => category.slug));
+
+  logBulkVision("info", "provider_request_start", {
+    requestId,
+    provider,
+    model,
+    imageCount: images.length,
+    internalIds: refs.map((ref) => ref.internalId),
+    payloadBytes: totalPayloadBytes,
+  });
+
+  const prompt = buildVisionPrompt({
+    categories: categoryList,
+    internalIds: refs.map((ref) => ref.internalId),
+  });
+
+  const providerResult = await callVisionProvider({
+    provider,
+    apiKey,
+    model,
+    prompt,
+    refs,
+    images,
+  });
+
+  if (!providerResult.ok) {
+    logBulkVision("error", "provider_failed", {
       requestId,
-      status: response.status,
-      statusText: response.statusText,
-      type: providerType,
+      provider,
       model,
+      kind: providerResult.kind,
+      status: providerResult.status,
+      latencyMs: providerResult.latencyMs,
+      attempts: providerResult.attempts,
+      message: providerResult.message,
     });
+    const groups = explicitFailureGroups(refs, providerResult.kind);
     return NextResponse.json({
-      groups: restoreImageIds(fallbackGroups(labelledImages)),
-      warning: response.status === 401 || response.status === 403
-        ? `${geminiKey ? "Gemini" : "OpenAI"} rejected the configured API key. The photos were kept separate for manual review.`
-        : response.status === 404
-          ? `${geminiKey ? "Gemini" : "OpenAI"} model "${model}" is not available. The photos were kept separate for manual review.`
-          : `${geminiKey ? "Gemini" : "OpenAI"} could not analyze these photos. The photos were kept separate for manual review.`,
+      groups,
+      status: "failed",
+      failureKind: providerResult.kind,
+      warning: statusWarning("failed", providerResult.kind),
     });
   }
-  const payload = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const outputText = payload.output_text ?? payload.output?.flatMap((item) => item.content ?? []).map((part) => part.text ?? "").join("") ?? payload.candidates?.flatMap((candidate) => candidate.content?.parts ?? []).map((part) => part.text ?? "").join("");
+
+  logBulkVision("info", "provider_response_received", {
+    requestId,
+    provider,
+    model,
+    latencyMs: providerResult.latencyMs,
+    attempts: providerResult.attempts,
+    outputChars: providerResult.text.length,
+  });
+
   let parsedOutput: unknown;
   try {
-    parsedOutput = JSON.parse(outputText || "{}");
+    parsedOutput = JSON.parse(providerResult.text);
   } catch {
-    console.warn("Bulk photo grouping returned non-JSON output", { requestId, imageCount: images.length });
-    return NextResponse.json({
-      groups: restoreImageIds(fallbackGroups(labelledImages)),
-      warning: "AI returned an incomplete grouping. The photos were kept separate for manual review.",
-    });
-  }
-  const output = suggestionSchema.safeParse(parsedOutput);
-  if (!output.success) {
-    console.error("Bulk photo grouping returned an invalid schema", {
+    logBulkVision("warn", "parser_failure", {
       requestId,
       imageCount: images.length,
+      outputPreview: providerResult.text.slice(0, 240),
     });
     return NextResponse.json({
-      groups: restoreImageIds(fallbackGroups(labelledImages)),
-      warning: "AI returned an incomplete grouping. The photos were kept separate for manual review.",
+      groups: explicitFailureGroups(refs, "parser_failure"),
+      status: "failed",
+      failureKind: "parser_failure",
+      warning: statusWarning("failed", "parser_failure"),
     });
   }
-  const expected = new Set(labelledImages.map((image) => image.label));
-  const seen = new Set<string>();
-  const validGroups = output.data.groups
-    .map((group) => ({
-      ...group,
-      imageIds: group.imageIds.filter((id) => expected.has(id) && !seen.has(id) && Boolean(seen.add(id))),
-    }))
-    .filter((group) => group.imageIds.length > 0);
-  const missing = labelledImages.filter((image) => !seen.has(image.label));
-  let colourReviewCount = 0;
-  const normalizedGroups = validGroups.map((group) => {
-    const groupImageIds = new Set(group.imageIds);
-    const colourSeen = new Set<string>();
-    const colorGroups = group.colorGroups
-      .map((colorGroup) => ({
-        ...colorGroup,
-        imageIds: colorGroup.imageIds.filter(
-          (id) => groupImageIds.has(id) && !colourSeen.has(id) && Boolean(colourSeen.add(id)),
-        ),
-      }))
-      .filter((colorGroup) => colorGroup.imageIds.length > 0);
-    const missingColourIds = group.imageIds.filter((id) => !colourSeen.has(id));
-    if (missingColourIds.length > 0) {
-      colourReviewCount += missingColourIds.length;
-      colorGroups.push({
-        imageIds: missingColourIds,
-        colorName: "Unassigned colour",
-        confidence: 0,
-        needsReview: true,
-      });
-    }
-    return { ...group, colorGroups };
-  });
-  if (missing.length > 0 || seen.size !== expected.size) {
-    console.warn("Bulk photo grouping recovered incomplete image coverage", {
+
+  const output = suggestionSchema.safeParse(parsedOutput);
+  if (!output.success) {
+    logBulkVision("error", "schema_validation_failure", {
       requestId,
-      expected: expected.size,
-      returned: seen.size,
-      missing: missing.map((image) => image.label),
+      imageCount: images.length,
+      issueCount: output.error.issues.length,
+      paths: output.error.issues.slice(0, 8).map((issue) => issue.path.join(".")),
+    });
+    return NextResponse.json({
+      groups: explicitFailureGroups(refs, "parser_failure"),
+      status: "failed",
+      failureKind: "parser_failure",
+      warning: statusWarning("failed", "parser_failure"),
     });
   }
-  const groups = [...normalizedGroups, ...fallbackGroups(missing)].map((group) => ({
-    ...group,
-    imageIds: group.imageIds.map((label) => labelToId.get(label)).filter((id): id is string => Boolean(id)),
-  }));
-  const incompleteFields = groups.reduce((count, group) => count + (!group.title.trim() || group.title === "New product" ? 1 : 0) + (!group.description.trim() ? 1 : 0) + (!group.categorySlug.trim() ? 1 : 0), 0);
+
+  const normalized = normalizeVisionGroups({
+    refs,
+    rawGroups: output.data.groups as RawVisionGroup[],
+    categorySlugs,
+    filenamesByInternalId,
+  });
+
+  logBulkVision(
+    normalized.status === "failed" ? "warn" : "info",
+    "normalization_complete",
+    {
+      requestId,
+      provider,
+      model,
+      status: normalized.status,
+      failureKind: normalized.failureKind,
+      groupCount: normalized.groups.length,
+      missingInternalIds: normalized.missingInternalIds,
+      rejectedIdCount: normalized.rejectedIds.length,
+      rejectedIds: normalized.rejectedIds.slice(0, 20),
+      duplicateAssignments: normalized.duplicateAssignments.slice(0, 20),
+      validationFailures: normalized.validationFailures.slice(0, 20),
+      aiGeneratedCount: normalized.groups.filter((group) => group.aiGenerated).length,
+    },
+  );
+
   return NextResponse.json({
-    groups,
-    warning: missing.length > 0 || colourReviewCount > 0 || incompleteFields > 0
-      ? "AI grouping finished, but some listing fields still need your review. Add a clear product name, description, and category before publishing."
-      : undefined,
+    groups: normalized.groups,
+    status: normalized.status,
+    failureKind: normalized.failureKind,
+    warning: statusWarning(normalized.status, normalized.failureKind),
   });
 }

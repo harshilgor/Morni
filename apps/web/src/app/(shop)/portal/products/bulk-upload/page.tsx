@@ -46,6 +46,10 @@ type Draft = {
   customization: ProductCustomizationConfig;
   confidence?: number;
   needsReview?: boolean;
+  /** True only when the title came from validated vision output. */
+  aiGenerated?: boolean;
+  generationStatus?: "ok" | "partial" | "failed" | "manual";
+  failureReason?: string;
   colors: ColorGroup[];
 };
 
@@ -197,7 +201,7 @@ function PhotoStack({
           Cover photo
         </span>
         <span className="absolute bottom-4 left-4 text-xs font-semibold text-white drop-shadow">
-          {expanded ? "Choose a photo below to change the cover" : draft.confidence && draft.confidence > 0 ? "AI-selected cover" : "Selected cover"}
+          {expanded ? "Choose a photo below to change the cover" : draft.aiGenerated && draft.confidence && draft.confidence > 0 ? "AI-selected cover" : "Selected cover"}
         </span>
       </div>
 
@@ -356,13 +360,27 @@ function ColorGroupingPanel({
 const noSizes = (slug: string) =>
   ["gifting", "hamper", "hampers"].includes(slug);
 const uid = () => crypto.randomUUID();
-const productKey = (name: string) =>
-  name
-    .replace(/\.[^.]+$/, "")
-    .replace(/(?:[-_\s]+)(?:view|image|img|photo)?[-_\s]*\d+$/i, "")
-    .replace(/[-_]+/g, " ")
-    .trim()
-    .toLowerCase();
+
+function emptyDraft(photos: Photo[] = []): Draft {
+  return {
+    id: uid(),
+    photos,
+    title: "",
+    productTag: "",
+    description: "",
+    fabric: "",
+    categorySlug: "",
+    colorName: "",
+    priceAed: "",
+    stock: "",
+    sizes: ["S", "M", "L"],
+    sizeStock: { S: 0, M: 0, L: 0 },
+    customization: defaultCustomizationConfig(),
+    aiGenerated: false,
+    generationStatus: "manual",
+    colors: photos.length ? [] : [createColorGroup()],
+  };
+}
 
 async function imageDataForAnalysis(file: File) {
   try {
@@ -496,33 +514,19 @@ export default function BulkUploadPage() {
       setMessage(`Upload up to ${BULK_UPLOAD_MAX_PHOTOS} valid JPG, PNG, or WebP images.`);
       return;
     }
-    const grouped = new Map<string, Photo[]>();
-    accepted.forEach((file) => {
-      const photo = { id: uid(), file, preview: URL.createObjectURL(file) };
-      const key = productKey(file.name) || file.name;
-      grouped.set(key, [...(grouped.get(key) ?? []), photo]);
-    });
-    const nextDrafts = [
-      ...drafts,
-      ...Array.from(grouped, ([key, photos]) => ({
-        id: uid(),
-        photos,
-        title: key.replace(/\b\w/g, (letter) => letter.toUpperCase()),
-        productTag: "",
-        description: "",
-        fabric: "",
-        categorySlug: "",
-        colorName: "",
-        priceAed: "",
-        stock: "",
-        sizes: ["S", "M", "L"],
-        sizeStock: { S: 0, M: 0, L: 0 },
-        customization: defaultCustomizationConfig(),
-        colors: [],
-      })),
-    ];
+    // Stage photos only — never derive product titles/groups from filenames.
+    // Vision analysis creates the product groups.
+    const stagedPhotos = accepted.map((file) => ({
+      id: uid(),
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    const stagedDrafts = stagedPhotos.map((photo) => emptyDraft([photo]));
+    const nextDrafts = [...drafts, ...stagedDrafts];
     setDrafts(nextDrafts);
-    setMessage("AI is grouping these photos by product… Your draft is saved locally while you work.");
+    setMessage(
+      `Uploading ${stagedPhotos.length} photo${stagedPhotos.length === 1 ? "" : "s"}… AI is analysing your photos.`,
+    );
     void analyze(nextDrafts);
   }
   function patch(draftId: string, changes: Partial<Draft>) {
@@ -625,38 +629,27 @@ export default function BulkUploadPage() {
           : [
               { ...item, photos: item.photos.filter((p) => p.id !== photoId) },
               {
-                ...item,
-                id: uid(),
-                photos: [photo],
-                title: `${item.title} (new)`,
+                ...emptyDraft([photo]),
+                generationStatus: "manual",
+                needsReview: true,
               },
             ],
       ),
     );
   }
   function addRow() {
-    setDrafts((current) => [
-      ...current,
-      {
-        id: uid(),
-        photos: [],
-        title: "",
-        productTag: "",
-        description: "",
-        fabric: "",
-        categorySlug: "",
-        colorName: "",
-        priceAed: "",
-        stock: "",
-        sizes: ["S", "M", "L"],
-        sizeStock: { S: 0, M: 0, L: 0 },
-        customization: defaultCustomizationConfig(),
-        colors: [createColorGroup()],
-      },
-    ]);
+    setDrafts((current) => [...current, emptyDraft()]);
   }
   async function analyze(draftsToAnalyze: Draft[] = drafts) {
     if (!store || !draftsToAnalyze.length || busy) return;
+    const photoCount = draftsToAnalyze.reduce(
+      (total, draft) => total + draft.photos.length,
+      0,
+    );
+    if (!photoCount) {
+      setMessage("Add product photos before running AI.");
+      return;
+    }
     setBusy(true);
     setBusyPhase("reading");
     setMessage("Preparing photos securely…");
@@ -665,6 +658,7 @@ export default function BulkUploadPage() {
         draftsToAnalyze.flatMap((draft) =>
           draft.photos.map(async (photo) => ({
             id: photo.id,
+            // Filename is metadata for the API only — never used as a title.
             name: photo.file.name,
             data: await imageDataForAnalysis(photo.file),
           })),
@@ -678,21 +672,27 @@ export default function BulkUploadPage() {
       );
       const batches = Array.from(
         { length: Math.ceil(images.length / AI_ANALYSIS_MAX_PHOTOS) },
-        (_, index) => images.slice(index * AI_ANALYSIS_MAX_PHOTOS, (index + 1) * AI_ANALYSIS_MAX_PHOTOS),
+        (_, index) =>
+          images.slice(
+            index * AI_ANALYSIS_MAX_PHOTOS,
+            (index + 1) * AI_ANALYSIS_MAX_PHOTOS,
+          ),
       );
       const grouped: Draft[] = [];
       const warnings: string[] = [];
+      let overallStatus: "ok" | "partial" | "failed" | "manual" = "ok";
       for (const [batchIndex, batch] of batches.entries()) {
         setBusyPhase("analyzing");
         setMessage(
           batches.length > 1
-            ? `Analyzing batch ${batchIndex + 1} of ${batches.length} (${batch.length} photos)…`
-            : `Analyzing ${batch.length} photos and grouping matching product views…`,
+            ? `AI is analysing batch ${batchIndex + 1} of ${batches.length} (${batch.length} photos)…`
+            : `AI is analysing ${batch.length} photos…`,
         );
         const response = await fetch("/api/portal/products/bulk-analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          signal: AbortSignal.timeout(60_000),
+          // Client allowance above provider timeout (45s) + one retry.
+          signal: AbortSignal.timeout(110_000),
           body: JSON.stringify({ storeId: store.id, images: batch }),
         });
         const result = await response.json();
@@ -701,53 +701,81 @@ export default function BulkUploadPage() {
             result.error ?? "AI grouping failed. You can continue manually.",
           );
         if (result.warning) warnings.push(result.warning);
+        if (result.status === "failed") overallStatus = "failed";
+        else if (result.status === "partial" && overallStatus === "ok")
+          overallStatus = "partial";
         grouped.push(
-          ...result.groups.map(
-          (group: {
-            imageIds: string[];
-            title: string;
-            description: string;
-            categorySlug: string | null;
-            colorName: string;
-            confidence: number;
-            needsReview: boolean;
-            colorGroups?: Array<{ imageIds: string[]; colorName: string; confidence: number; needsReview: boolean }>;
-          }) => ({
-            id: uid(),
-            photos: group.imageIds
-              .map((imageId) => photoMap.get(imageId))
-              .filter(Boolean),
-            title: group.title,
-            description: group.description,
-            fabric: "",
-            categorySlug: group.categorySlug ?? "",
-            colorName: group.colorName ?? "",
-            productTag: "",
-            priceAed: "",
-            stock: "",
-            sizes: ["S", "M", "L"],
-            sizeStock: { S: 0, M: 0, L: 0 },
-            customization: defaultCustomizationConfig(),
-            confidence: group.confidence,
-            needsReview: group.needsReview,
-            // Colourways are intentionally manual; AI only groups photos into products.
-            colors: [],
-          }),
-          ).filter((draft: Draft) => draft.photos.length),
+          ...result.groups
+            .map(
+              (group: {
+                imageIds: string[];
+                title: string;
+                description: string;
+                categorySlug: string | null;
+                colorName: string;
+                confidence: number;
+                needsReview: boolean;
+                aiGenerated?: boolean;
+                generationStatus?: Draft["generationStatus"];
+                failureReason?: string;
+              }) => ({
+                id: uid(),
+                photos: group.imageIds
+                  .map((imageId) => photoMap.get(imageId))
+                  .filter(Boolean) as Photo[],
+                title: group.title ?? "",
+                description: group.description ?? "",
+                fabric: "",
+                categorySlug: group.categorySlug ?? "",
+                colorName: group.colorName ?? "",
+                productTag: "",
+                priceAed: "",
+                stock: "",
+                sizes: ["S", "M", "L"] as string[],
+                sizeStock: { S: 0, M: 0, L: 0 },
+                customization: defaultCustomizationConfig(),
+                confidence: group.confidence,
+                needsReview: group.needsReview,
+                aiGenerated: Boolean(group.aiGenerated),
+                generationStatus: group.generationStatus ?? "manual",
+                failureReason: group.failureReason,
+                // Colourways are intentionally manual; AI only groups photos into products.
+                colors: [] as ColorGroup[],
+              }),
+            )
+            .filter((draft: Draft) => draft.photos.length),
         );
       }
       const safeGroups = grouped.map((draft) => ({
         ...draft,
-        needsReview: draft.needsReview || draft.colors.some((color) => color.needsReview),
+        needsReview:
+          draft.needsReview ||
+          draft.generationStatus === "failed" ||
+          draft.generationStatus === "partial" ||
+          draft.colors.some((color) => color.needsReview),
       }));
-      const incompleteCount = safeGroups.reduce(
-        (count, draft) => count + (!draft.title.trim() || draft.title === "New product" ? 1 : 0) + (!draft.description.trim() ? 1 : 0) + (!draft.categorySlug ? 1 : 0),
-        0,
-      );
+      const failedCount = safeGroups.filter(
+        (draft) => draft.generationStatus === "failed" || !draft.title.trim(),
+      ).length;
       setDrafts(safeGroups);
-      setMessage(
-        `${warnings[0] ? `${warnings[0]} ` : ""}AI grouped ${images.length} photos into ${safeGroups.length} product candidates.${batches.length > 1 ? " Photos were analyzed in separate batches, so review any matching product views that landed in different batches." : ""}${incompleteCount ? ` ${incompleteCount} required listing field${incompleteCount === 1 ? " is" : "s are"} incomplete—fill them in before publishing.` : " Review flagged groups before publishing."}`,
-      );
+      const summary = `AI grouped ${images.length} photos into ${safeGroups.length} product${safeGroups.length === 1 ? "" : "s"}.`;
+      const batchNote =
+        batches.length > 1
+          ? " Photos were analysed in separate batches — review any matching views that landed apart."
+          : "";
+      if (overallStatus === "failed") {
+        setMessage(
+          `${warnings[0] ?? "AI details couldn't be generated."} ${summary} Edit titles manually or tap Retry AI.`,
+        );
+      } else {
+        setMessage(
+          `${warnings[0] ? `${warnings[0]} ` : ""}${summary}${batchNote}${
+            failedCount
+              ? ` ${failedCount} product${failedCount === 1 ? " needs" : "s need"} a name before publishing.`
+              : " Review flagged groups before publishing."
+          }`,
+        );
+      }
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -1058,6 +1086,16 @@ export default function BulkUploadPage() {
         >
           + New product row
         </button>
+        {drafts.some((draft) => draft.photos.length) ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void analyze(drafts)}
+            className="border border-[#245448] bg-[#245448] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            Retry AI analysis
+          </button>
+        ) : null}
       </div>
       {busy ? (
         <div
@@ -1126,10 +1164,14 @@ export default function BulkUploadPage() {
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep">
                 Product {index + 1}
-                {draft.confidence != null && draft.confidence > 0
+                {draft.aiGenerated && draft.confidence != null && draft.confidence > 0
                   ? ` · AI confidence ${Math.round(draft.confidence * 100)}%`
                   : ""}
-                {draft.needsReview ? " · Review grouping" : ""}
+                {draft.generationStatus === "failed"
+                  ? " · AI failed"
+                  : draft.needsReview
+                    ? " · Review grouping"
+                    : ""}
               </p>
               <button
                 type="button"
@@ -1143,6 +1185,15 @@ export default function BulkUploadPage() {
                 <span className="inline-flex items-center gap-1.5"><PortalIcon name="trash" className="h-3.5 w-3.5" /><span>Delete product</span></span>
               </button>
             </div>
+            {draft.generationStatus === "failed" ||
+            (!draft.aiGenerated && !draft.title.trim() && draft.photos.length > 0) ? (
+              <div className="mt-3 rounded-lg border border-[#e7c7d4] bg-[#fff7fa] px-3 py-2 text-xs text-[#7b3e55]">
+                <p className="font-semibold">AI details couldn&apos;t be generated.</p>
+                <p className="mt-1">
+                  Add a product name manually, or use Retry AI analysis above.
+                </p>
+              </div>
+            ) : null}
             {draft.photos.length ? (
               <PhotoStack
                 draft={draft}
@@ -1166,7 +1217,16 @@ export default function BulkUploadPage() {
                 <input
                   value={draft.title}
                   onChange={(event) =>
-                    patch(draft.id, { title: event.target.value })
+                    patch(draft.id, {
+                      title: event.target.value,
+                      aiGenerated: false,
+                      generationStatus: event.target.value.trim()
+                        ? "manual"
+                        : draft.generationStatus === "failed"
+                          ? "failed"
+                          : "manual",
+                      failureReason: undefined,
+                    })
                   }
                   aria-invalid={hasValidationError(draft.id, "product name")}
                   className={`min-w-0 flex-1 bg-transparent font-display text-xl outline-none ${hasValidationError(draft.id, "product name") ? "placeholder:text-red-400" : ""}`}
