@@ -1,8 +1,20 @@
 export const SMALL_ORDER_FEE_AED = 0;
-export const DELIVERY_FEE_AED = 7;
-export const FREE_DELIVERY_THRESHOLD_AED = 199;
+export const FREE_DELIVERY_THRESHOLD_AED = 200;
 export const SERVICE_FEE_AED = 3;
 export const FULL_RETURN_CONVENIENCE_FEE_AED = 10;
+
+/**
+ * Delivery tiers are based on the merchandise subtotal before service fees.
+ * The requested AED 100–150 tier is extended through AED 199.99 so there is
+ * no undefined gap before free delivery starts at AED 200.
+ */
+export function deliveryFeeForSubtotal(subtotalAed: number) {
+  const subtotal = Math.max(0, subtotalAed);
+  if (subtotal >= FREE_DELIVERY_THRESHOLD_AED) return 0;
+  if (subtotal >= 100) return 3;
+  if (subtotal >= 50) return 5;
+  return 7;
+}
 
 function roundAed(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -24,10 +36,10 @@ export type CheckoutFees = {
 
 export function calculateCheckoutFees(itemSubtotalAed: number): CheckoutFees {
   const subtotal = roundAed(Math.max(0, itemSubtotalAed));
-  // Small-order surcharge removed: below AED 99 only the standard delivery fee applies.
+  // Small-order surcharge removed; delivery is tiered by merchandise subtotal.
   const smallOrderFeeAed = SMALL_ORDER_FEE_AED;
-  const qualifiesForFreeDelivery = subtotal >= FREE_DELIVERY_THRESHOLD_AED;
-  const deliveryFeeAed = qualifiesForFreeDelivery ? 0 : DELIVERY_FEE_AED;
+  const deliveryFeeAed = deliveryFeeForSubtotal(subtotal);
+  const qualifiesForFreeDelivery = deliveryFeeAed === 0;
   const progressTargetAed = FREE_DELIVERY_THRESHOLD_AED;
 
   return {
