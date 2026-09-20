@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
+import { AnalyticsPageView } from "@/components/analytics-hooks";
 import { ProductGridSkeleton } from "@/components/catalog-skeletons";
 import { getCachedCategoryPage } from "@/lib/catalog";
 
@@ -21,6 +22,11 @@ async function CategoryPageContent({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-8">
+      <AnalyticsPageView
+        event="category_view"
+        onceKey={`category_view:${category.slug}`}
+        metadata={{ category: category.slug, product_count: products.length }}
+      />
       <nav className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
         <Link href="/" className="hover:text-ink">
           Home
@@ -80,6 +86,8 @@ async function CategoryPageContent({
             ratings={ratings}
             hasMore={productPage.hasMore}
             loadMoreUrl={`/api/categories/${category.slug}/products`}
+            analyticsSurface="category"
+            analyticsCategory={category.slug}
           />
         )}
       </div>

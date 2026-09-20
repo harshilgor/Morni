@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { StoreCard } from "@/components/cards";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
+import { AnalyticsPageView, SearchAnalytics } from "@/components/analytics-hooks";
 import { getCachedBrowseCategories } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
@@ -158,6 +159,17 @@ export default async function SearchPage({
 
   return (
     <div className="square-catalog mx-auto max-w-[1600px] px-4 py-8 sm:px-6">
+      <SearchAnalytics
+        query={query}
+        resultCount={productList.length}
+        filters={{
+          max: maxPrice,
+          min: minPrice,
+          size: sizeFilter,
+          sort: sort ?? null,
+          instock: instock === "1",
+        }}
+      />
       <h1 className="font-display text-3xl text-ink sm:text-4xl">{heading}</h1>
       <p className="mt-2 text-sm text-muted">
         Stores and products across UAE retail floors.
@@ -208,7 +220,14 @@ export default async function SearchPage({
             {browseProducts.length === 0 ? (
               <p className="text-sm text-muted">No products matched.</p>
             ) : (
-              <ProductBrowser products={browseProducts} categories={categories} ratings={ratingRecord} showInStockFilter />
+              <ProductBrowser
+                products={browseProducts}
+                categories={categories}
+                ratings={ratingRecord}
+                showInStockFilter
+                analyticsSurface="search"
+                analyticsQuery={query || null}
+              />
             )}
           </section>
       </div>

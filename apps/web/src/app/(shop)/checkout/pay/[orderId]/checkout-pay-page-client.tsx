@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import type { Order } from "@/lib/types";
+import { track, trackOnce } from "@/lib/analytics/track";
 import AfsPaymentWidget from "./afs-payment-widget";
 
 type CheckoutSession = {
@@ -65,6 +66,11 @@ export default function CheckoutPayPageClient({ orderId }: { orderId: string }) 
         return;
       }
       if (typedOrder.payment_status === "paid") {
+        trackOnce(
+          `checkout_payment_success:${orderId}`,
+          "checkout_payment_success",
+          { metadata: { order_id: orderId } },
+        );
         router.replace(`/orders/${orderId}?paid=1`);
         return;
       }
@@ -96,9 +102,16 @@ export default function CheckoutPayPageClient({ orderId }: { orderId: string }) 
 
       if (!checkoutRes.ok || !checkoutPayload?.checkoutId) {
         setError(checkoutPayload?.error ?? "Unable to start payment.");
+        trackOnce(`checkout_payment_fail:${orderId}:start`, "checkout_payment_fail", {
+          metadata: { order_id: orderId, stage: "session_create" },
+        });
         setLoading(false);
         return;
       }
+
+      trackOnce(`checkout_payment_start:${orderId}`, "checkout_payment_start", {
+        metadata: { order_id: orderId },
+      });
 
       setSession({
         ...checkoutPayload,

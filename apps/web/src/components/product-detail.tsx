@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { track } from "@/lib/analytics/track";
 import { useCart } from "@/lib/cart";
 import { formatAed } from "@/lib/format";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
@@ -103,7 +104,17 @@ function ProductAccordion({
 function RelatedProductCard({ product }: { product: RelatedProduct }) {
   const image = product.image_urls?.[0];
   return (
-    <Link href={`/stores/${product.stores.slug}/products/${product.id}`} className="group block min-w-0">
+    <Link
+      href={`/stores/${product.stores.slug}/products/${product.id}`}
+      className="group block min-w-0"
+      onClick={() =>
+        track("pdp_related_click", {
+          product_id: product.id,
+          store_id: product.store_id,
+          metadata: { surface: "pdp_related" },
+        })
+      }
+    >
       <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-[#f4f1ed] lg:aspect-[3/4] lg:rounded-lg">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -250,7 +261,12 @@ export function ProductDetail({
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [product.id]);
+    track("product_view", {
+      product_id: product.id,
+      store_id: product.store_id,
+      metadata: { path: "pdp" },
+    });
+  }, [product.id, product.store_id]);
 
   async function loadReviewEligibility(productId: string) {
     const supabase = createClient();
@@ -367,6 +383,23 @@ export function ProductDetail({
     setSelectedSize((size) => (size && variant.sizes.includes(size) ? size : null));
     setActiveImage(0);
     setAdded(false);
+    track("variant_selected", {
+      product_id: product.id,
+      store_id: product.store_id,
+      metadata: {
+        variant_id: variant.id,
+        color: variant.color_name.slice(0, 80),
+      },
+    });
+  }
+
+  function selectSize(size: string) {
+    setSelectedSize(size);
+    track("size_selected", {
+      product_id: product.id,
+      store_id: product.store_id,
+      metadata: { size },
+    });
   }
 
   // "Default" is an internal synthetic variant, not a shopper-facing colour.
@@ -378,8 +411,29 @@ export function ProductDetail({
   const needsColor = hasColorVariants;
   const canAdd = availableStock > 0 && (!needsColor || Boolean(selectedVariant));
   const addToBag = (size = selectedSize) => {
+    if (availableStock <= 0) {
+      track("add_to_cart_blocked", {
+        product_id: product.id,
+        store_id: product.store_id,
+        metadata: { reason: "out_of_stock" },
+      });
+      return;
+    }
+    if (needsColor && !selectedVariant) {
+      track("add_to_cart_blocked", {
+        product_id: product.id,
+        store_id: product.store_id,
+        metadata: { reason: "variant_required" },
+      });
+      return;
+    }
     if (!canAdd) return;
     if (availableSizes.length > 0 && !size) {
+      track("add_to_cart_blocked", {
+        product_id: product.id,
+        store_id: product.store_id,
+        metadata: { reason: "size_required" },
+      });
       setBagSheet("size");
       return;
     }
@@ -388,6 +442,11 @@ export function ProductDetail({
       : {};
     if (customizationSelected && Object.keys(customization).length === 0) {
       setCustomizationError("Add at least one measurement or turn customization off.");
+      track("add_to_cart_blocked", {
+        product_id: product.id,
+        store_id: product.store_id,
+        metadata: { reason: "invalid_customization" },
+      });
       return;
     }
     const customizationValidation = customizationSelected
@@ -395,6 +454,11 @@ export function ProductDetail({
       : null;
     if (customizationValidation) {
       setCustomizationError(customizationValidation);
+      track("add_to_cart_blocked", {
+        product_id: product.id,
+        store_id: product.store_id,
+        metadata: { reason: "invalid_customization" },
+      });
       return;
     }
     addItem(product, store.name, 1, {
@@ -534,7 +598,7 @@ export function ProductDetail({
                   {availableSizes.map((size) => {
                     const quantity = sizeQuantity(size);
                     const sizeAvailable = quantity !== null ? quantity > 0 : selectedVariant ? selectedVariant.stock > 0 : product.stock > 0;
-                    return <button key={size} type="button" onClick={() => { setSelectedSize(size); setAdded(false); }} disabled={!sizeAvailable} aria-pressed={selectedSize === size} className={`min-h-10 rounded-md border px-2 text-sm font-semibold transition lg:min-h-9 lg:text-[13px] ${selectedSize === size ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"} disabled:cursor-not-allowed disabled:opacity-35`}>
+                    return <button key={size} type="button" onClick={() => { selectSize(size); setAdded(false); }} disabled={!sizeAvailable} aria-pressed={selectedSize === size} className={`min-h-10 rounded-md border px-2 text-sm font-semibold transition lg:min-h-9 lg:text-[13px] ${selectedSize === size ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink/45"} disabled:cursor-not-allowed disabled:opacity-35`}>
                       {sizeAvailable ? <span>{size}{quantity !== null ? <span className="ml-1 text-xs font-normal opacity-75">({quantity})</span> : null}</span> : <span aria-label="Not available">{size} ×</span>}
                     </button>;
                   })}
@@ -638,7 +702,7 @@ export function ProductDetail({
           relatedProducts={relatedProducts}
           onClose={() => setBagSheet(null)}
           onSizeSelect={(size) => {
-            setSelectedSize(size);
+            selectSize(size);
             setAdded(false);
             addToBag(size);
           }}

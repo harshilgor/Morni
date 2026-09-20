@@ -11,6 +11,7 @@ import { useOwnerStore } from "@/lib/use-owner-store";
 import type { OrderItem, OrderStatus } from "@/lib/types";
 import { formatCustomizationValues } from "@/lib/product-customization";
 import { PORTAL_ORDER_WITH_DELIVERY_SELECT, type PortalOrder, type PortalOrderWithDelivery } from "@/lib/portal-order-select";
+import { isNewPaidOrder, isPaidOrder } from "@/lib/order-payment-state";
 
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   placed: "accepted",
@@ -101,7 +102,7 @@ export default function PortalOrdersPage() {
     setSelectedId((current) => {
       if (current && rows.some((order) => order.id === current)) return current;
       if (!current && detailDismissedRef.current) return null;
-      return rows.find((order) => order.status === "placed")?.id ?? rows[0]?.id ?? null;
+      return rows.find((order) => isNewPaidOrder(order))?.id ?? rows.find((order) => isPaidOrder(order))?.id ?? rows[0]?.id ?? null;
     });
   }, []);
 
@@ -151,21 +152,27 @@ export default function PortalOrdersPage() {
         statusFilter === "all"
           ? order.status !== "cancelled"
           : statusFilter === "preparing"
-            ? ["accepted", "picking"].includes(order.status)
-            : order.status === statusFilter;
+            ? ["accepted", "picking"].includes(order.status) && isPaidOrder(order)
+            : statusFilter === "placed"
+              ? isNewPaidOrder(order)
+              : order.status === statusFilter && isPaidOrder(order);
       const matchesQuery = !q || [order.order_number, order.delivery_area, ...(order.order_items ?? []).map((item) => item.title)].filter(Boolean).some((value) => String(value).toLowerCase().includes(q));
       return matchesStatus && matchesQuery;
     });
   }, [deferredQuery, orders, statusFilter]);
   const mobileOrder = visibleOrders.find((order) => order.id === mobileOrderId) ?? null;
   const stats = useMemo(() => ({
-    newOrders: orders.filter((order) => order.status === "placed").length,
-    preparing: orders.filter((order) => ["accepted", "picking"].includes(order.status)).length,
-    delivery: orders.filter((order) => order.status === "out_for_delivery").length,
-    today: orders.filter((order) => new Date(order.placed_at).toDateString() === new Date().toDateString() && order.status !== "cancelled").reduce((sum, order) => sum + Number(order.total_aed), 0),
+    newOrders: orders.filter((order) => isNewPaidOrder(order)).length,
+    preparing: orders.filter((order) => ["accepted", "picking"].includes(order.status) && isPaidOrder(order)).length,
+    delivery: orders.filter((order) => order.status === "out_for_delivery" && isPaidOrder(order)).length,
+    today: orders.filter((order) => new Date(order.placed_at).toDateString() === new Date().toDateString() && order.status !== "cancelled" && isPaidOrder(order)).reduce((sum, order) => sum + Number(order.total_aed), 0),
   }), [orders]);
 
   async function advance(order: OrderWithItems) {
+    if (!isPaidOrder(order)) {
+      setMessage("This checkout has not been paid yet, so it is not a fulfilment order.");
+      return;
+    }
     const next = NEXT_STATUS[order.status];
     if (!next) return;
     setUpdatingId(order.id);

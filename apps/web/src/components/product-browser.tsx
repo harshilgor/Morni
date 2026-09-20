@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ProductCard } from "@/components/cards";
+import { TrackedProductCard } from "@/components/tracked-product-card";
+import { track } from "@/lib/analytics/track";
 import { emirateLabel } from "@/lib/format";
 import { FEATURED_CATEGORY_CATALOG } from "@/lib/browse-categories";
 import {
@@ -298,6 +299,11 @@ export function ProductBrowser({
   sharp = false,
   collectionLinks,
   square = false,
+  analyticsSurface = "browse",
+  analyticsCategory = null,
+  analyticsCollection = null,
+  analyticsQuery = null,
+  analyticsStoreId = null,
 }: {
   products: BrowsableProduct[];
   categories?: { name: string; slug: string }[];
@@ -310,6 +316,11 @@ export function ProductBrowser({
   sharp?: boolean;
   collectionLinks?: { label: string; href: string; active?: boolean }[];
   square?: boolean;
+  analyticsSurface?: string;
+  analyticsCategory?: string | null;
+  analyticsCollection?: string | null;
+  analyticsQuery?: string | null;
+  analyticsStoreId?: string | null;
 }) {
   const isStore = variant === "store";
   const supabase = useMemo(() => createClient(), []);
@@ -331,6 +342,39 @@ export function ProductBrowser({
   const [tasteProfile, setTasteProfile] = useState<TasteProfile | null>(null);
   const [dismissedProductIds, setDismissedProductIds] = useState<string[]>([]);
   const [forYouActive, setForYouActive] = useState(false);
+  const filtersReady = useRef(false);
+
+  useEffect(() => {
+    if (!filtersReady.current) {
+      filtersReady.current = true;
+      return;
+    }
+    track("filter_apply", {
+      metadata: {
+        surface: analyticsSurface,
+        category: analyticsCategory,
+        collection: analyticsCollection,
+        query: analyticsQuery,
+        active_filters: Object.entries(filters)
+          .filter(([, value]) => (Array.isArray(value) ? value.length > 0 : Boolean(value)))
+          .map(([key]) => key)
+          .join(",")
+          .slice(0, 160) || null,
+      },
+    });
+  }, [filters, analyticsSurface, analyticsCategory, analyticsCollection, analyticsQuery]);
+
+  useEffect(() => {
+    if (!filtersReady.current) return;
+    track("sort_change", {
+      metadata: {
+        surface: analyticsSurface,
+        sort,
+        category: analyticsCategory,
+        collection: analyticsCollection,
+      },
+    });
+  }, [sort, analyticsSurface, analyticsCategory, analyticsCollection]);
 
   useEffect(() => {
     let mounted = true;
@@ -1097,8 +1141,8 @@ export function ProductBrowser({
         ) : (
           <>
             <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
-              {sorted.slice(0, visible).map((product) => (
-                <ProductCard
+              {sorted.slice(0, visible).map((product, index) => (
+                <TrackedProductCard
                   key={product.id}
                   product={{
                     id: product.id,
@@ -1106,10 +1150,18 @@ export function ProductBrowser({
                     price_aed: Number(product.price_aed),
                     compare_at_price_aed: product.compare_at_price_aed,
                     image_urls: product.image_urls ?? [],
+                    store_id: product.store_id,
                   }}
                   rating={loadedRatings[product.id] ?? null}
                   href={`/stores/${product.stores.slug}/products/${product.id}`}
                   sharp={sharp}
+                  surface={analyticsSurface}
+                  position={index}
+                  category={analyticsCategory ?? activeSlug ?? null}
+                  collection={analyticsCollection}
+                  query={analyticsQuery}
+                  storeId={analyticsStoreId ?? product.store_id}
+                  storeSlug={product.stores.slug}
                 />
               ))}
             </div>

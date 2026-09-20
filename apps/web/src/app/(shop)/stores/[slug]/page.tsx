@@ -6,6 +6,7 @@ import {
   ProductBrowser,
   type BrowsableProduct,
 } from "@/components/product-browser";
+import { AnalyticsPageView } from "@/components/analytics-hooks";
 import {
   StoreProfileHeader,
   type StorePromo,
@@ -168,6 +169,12 @@ async function StorePageContent({
 
   return (
     <div className="min-h-screen bg-[#f8f7f4] pb-12">
+      <AnalyticsPageView
+        event="store_view"
+        onceKey={`store_view:${s.id}`}
+        storeId={s.id}
+        metadata={{ store_slug: s.slug, store_name: s.name.slice(0, 80) }}
+      />
       <div className="mx-auto hidden max-w-7xl px-4 pt-4 sm:px-6 lg:block">
         <nav className="flex items-center gap-1.5 text-xs text-muted">
           <Link href="/" className="hover:text-ink">
@@ -226,6 +233,8 @@ async function StorePageContent({
             ratings={ratings}
             variant="store"
             sharp
+            analyticsSurface="store"
+            analyticsStoreId={s.id}
           />
         )}
       </div>

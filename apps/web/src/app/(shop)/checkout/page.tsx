@@ -27,6 +27,7 @@ import {
   type BookableDeliverySlot,
 } from "@/lib/delivery-slots";
 import { navigateToPaymentPage } from "@/lib/payment-navigation";
+import { track, trackOnce } from "@/lib/analytics/track";
 
 const CHECKOUT_DRAFT_KEY = "morni.checkout.delivery.v1";
 
@@ -109,6 +110,40 @@ export default function CheckoutPage() {
       window.removeEventListener("offline", offlineHandler);
     };
   }, []);
+
+  useEffect(() => {
+    if (!items.length) {
+      trackOnce("empty_cart_view:checkout", "empty_cart_view", {
+        metadata: { surface: "checkout" },
+      });
+      return;
+    }
+    trackOnce("checkout_start:visit", "checkout_start", {
+      quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+      metadata: { lines: items.length },
+    });
+    // Fire once per checkout page visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!mobileAddressReady) return;
+    trackOnce("checkout_address_complete", "checkout_address_complete", {
+      metadata: {
+        source: selectedAddressId ? "saved" : "form",
+      },
+    });
+  }, [mobileAddressReady, selectedAddressId]);
+
+  useEffect(() => {
+    if (!selectedSlot) return;
+    trackOnce(`checkout_slot:${selectedSlot.id}`, "checkout_slot_selected", {
+      metadata: {
+        slot_id: selectedSlot.id,
+        date_label: selectedSlot.dateLabel.slice(0, 80),
+      },
+    });
+  }, [selectedSlot]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -232,8 +267,20 @@ export default function CheckoutPage() {
       }
       if (!response.ok || !payload?.order?.id) {
         setPlaceError(payload?.error ?? "Unable to place this order.");
+        track("error", {
+          metadata: {
+            category: "checkout_place_order",
+            status: response.status,
+          },
+        });
         return;
       }
+      trackOnce(`checkout_place_order:${payload.order.id}`, "checkout_place_order", {
+        metadata: {
+          order_id: payload.order.id,
+          payment_method: method,
+        },
+      });
       clear();
       if (typeof window !== "undefined") window.localStorage.removeItem(CHECKOUT_DRAFT_KEY);
       if (payload.next === "pay" || method === "card") {

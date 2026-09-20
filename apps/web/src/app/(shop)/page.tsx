@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { HomeCatalog } from "@/components/home-catalog";
 import { CatalogSectionSkeleton } from "@/components/catalog-skeletons";
+import { AnalyticsPageView } from "@/components/analytics-hooks";
 import type { UaeEmirate } from "@/lib/types";
 
 async function HomeCatalogFromParams({
@@ -20,6 +21,7 @@ export default function HomePage({
 }) {
   return (
     <div>
+      <AnalyticsPageView event="home_view" onceKey="home_view" metadata={{ surface: "home" }} />
       <HeroCarousel />
       <Suspense fallback={<CatalogSectionSkeleton />}>
         <HomeCatalogFromParams searchParams={searchParams} />

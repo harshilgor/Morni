@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy } from "@/lib/content-security-policy";
+import {
+  classifyFounderPath,
+  founderProtectedRedirectNext,
+} from "@/lib/founder-auth-proxy";
 import { updateSession } from "@/lib/supabase/middleware";
 
 function withContentSecurityPolicy(response: NextResponse, pathname: string) {
@@ -10,7 +14,7 @@ function withContentSecurityPolicy(response: NextResponse, pathname: string) {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isFounderRoute = pathname === "/founder" || pathname.startsWith("/founder/");
+  const { isFounderProtectedRoute } = classifyFounderPath(pathname);
   const hasAuthCookie = request.cookies
     .getAll()
     .some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
@@ -28,15 +32,15 @@ export async function proxy(request: NextRequest) {
     "/wishlist",
   ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 
-  // Redirect direct visits to Founder into the auth flow before the route can
-  // be served from the static cache. The original destination survives login.
-  if (
-    isFounderRoute &&
-    !hasAuthCookie
-  ) {
+  // Protect Founder pages, but never intercept /founder/auth itself — doing so
+  // replaced a valid ?next=/founder with ?next=/founder/auth… and bounced
+  // successful logins to the storefront fallback.
+  if (isFounderProtectedRoute && !hasAuthCookie) {
     const authUrl = request.nextUrl.clone();
     authUrl.pathname = "/founder/auth";
-    authUrl.search = `?next=${encodeURIComponent(`${pathname}${request.nextUrl.search}`)}`;
+    authUrl.search = `?next=${encodeURIComponent(
+      founderProtectedRedirectNext(pathname, request.nextUrl.search),
+    )}`;
     return withContentSecurityPolicy(NextResponse.redirect(authUrl), pathname);
   }
 

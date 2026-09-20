@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
+import { AnalyticsPageView } from "@/components/analytics-hooks";
 import {
   getCachedBrowseCategories,
   getCachedHomeCatalog,
@@ -56,6 +57,11 @@ export default async function CollectionPage({
 
   return (
     <div className="square-catalog mx-auto max-w-[1600px] px-4 py-8 sm:px-6">
+      <AnalyticsPageView
+        event="collection_view"
+        onceKey={`collection_view:${slug}`}
+        metadata={{ collection: slug }}
+      />
       <nav className="flex items-center gap-1.5 text-xs text-muted">
         <Link href="/" className="hover:text-ink">Home</Link>
         <span aria-hidden>/</span>
@@ -72,6 +78,8 @@ export default async function CollectionPage({
           showInStockFilter={false}
           sharp
           square
+          analyticsSurface="collection"
+          analyticsCollection={slug}
         />
       </div>
     </div>

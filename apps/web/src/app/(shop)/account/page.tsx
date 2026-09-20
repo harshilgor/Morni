@@ -131,7 +131,7 @@ export default function AccountPage() {
 
     Promise.all([
       supabase.from("orders").select("id", { count: "exact", head: true }).eq("shopper_id", userId),
-      supabase.from("wishlist_items").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      supabase.from("wishlist_items").select("id", { count: "exact", head: true }).eq("shopper_id", userId),
       supabase.from("addresses").select("id", { count: "exact", head: true }).eq("user_id", userId),
       supabase.from("product_reviews").select("id", { count: "exact", head: true }).eq("user_id", userId),
     ]).then(([orders, wishlist, addresses, reviews]) => {
