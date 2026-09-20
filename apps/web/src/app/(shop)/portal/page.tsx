@@ -87,8 +87,32 @@ export default function PortalOverviewPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "products", filter: `store_id=eq.${store.id}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "product_reviews", filter: `store_id=eq.${store.id}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "wishlist_items" }, (payload) => {
-        const row = (payload.new as { product_id?: string })?.product_id ? payload.new as { product_id: string } : payload.old as { product_id?: string };
-        if (row.product_id && productIdsRef.current.has(row.product_id)) load();
+        // Wishlist changes must refresh demand stats only — never look like a new order.
+        const row = (payload.new as { product_id?: string })?.product_id
+          ? (payload.new as { product_id: string })
+          : (payload.old as { product_id?: string });
+        if (row.product_id && productIdsRef.current.has(row.product_id)) {
+          void createClient()
+            .from("wishlist_items")
+            .select("product_id, products!inner(store_id, title)")
+            .eq("products.store_id", store.id)
+            .then(({ data }) => {
+              if (!active) return;
+              const counts = ((data ?? []) as { product_id: string; products: { title: string }[] }[]).reduce<
+                Record<string, WishRow>
+              >((acc, row) => {
+                const item = acc[row.product_id] ?? {
+                  product_id: row.product_id,
+                  count: 0,
+                  title: row.products?.[0]?.title ?? "Product",
+                };
+                item.count += 1;
+                acc[row.product_id] = item;
+                return acc;
+              }, {});
+              setWishlistRows(Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 4));
+            });
+        }
       })
       .subscribe();
 
@@ -103,7 +127,9 @@ export default function PortalOverviewPage() {
   }, [products]);
 
   const insights = useMemo(() => {
-    const activeOrders = orders.filter((order) => order.status !== "cancelled");
+    const activeOrders = orders.filter(
+      (order) => order.status !== "cancelled" && order.payment_status === "paid",
+    );
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const weekStart = new Date(today);
@@ -144,8 +170,12 @@ export default function PortalOverviewPage() {
     });
 
     return {
-      activeOrders: orders.filter((order) => ACTIVE_STATUSES.has(order.status)),
-      newOrders: orders.filter((order) => order.status === "placed"),
+      activeOrders: orders.filter(
+        (order) => ACTIVE_STATUSES.has(order.status) && order.payment_status === "paid",
+      ),
+      newOrders: orders.filter(
+        (order) => order.status === "placed" && order.payment_status === "paid",
+      ),
       lowStock: products.filter((product) => product.stock <= 5 || Object.values(product.size_stock ?? {}).some((quantity) => quantity <= 5)),
       unreplied: reviews.filter((review) => !review.owner_reply?.trim()),
       todayRevenue: todayOrders.reduce((sum, order) => sum + Number(order.total_aed), 0),

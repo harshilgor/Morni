@@ -73,13 +73,15 @@ export default function PortalAnalyticsPage() {
     const start = new Date(today); start.setDate(start.getDate() - (range - 1));
     const previousStart = new Date(start); previousStart.setDate(previousStart.getDate() - range);
     const active = orders.filter((order) => order.status !== "cancelled");
-    const periodOrders = active.filter((order) => new Date(order.placed_at) >= start);
-    const previousOrders = active.filter((order) => { const placed = new Date(order.placed_at); return placed >= previousStart && placed < start; });
+    const unpaidPeriod = active.filter((order) => new Date(order.placed_at) >= start && order.payment_status !== "paid");
+    // Sales / order counts only include paid checkouts — unpaid drafts are not real orders.
+    const periodOrders = active.filter((order) => new Date(order.placed_at) >= start && order.payment_status === "paid");
+    const previousOrders = active.filter((order) => { const placed = new Date(order.placed_at); return placed >= previousStart && placed < start && order.payment_status === "paid"; });
     const merchandise = (rows: PortalOrderWithItems[]) => rows.reduce((sum, order) => sum + Number(order.subtotal_aed ?? order.total_aed ?? 0), 0);
     const totalRevenue = merchandise(periodOrders); const previousRevenue = merchandise(previousOrders);
     const totalFees = periodOrders.reduce((sum, order) => sum + Number(order.delivery_fee_aed ?? 0) + Number(order.small_order_fee_aed ?? 0) + Number(order.service_fee_aed ?? 0), 0);
-    const pendingPayment = periodOrders.filter((order) => order.payment_status === "pending").reduce((sum, order) => sum + Number(order.total_aed), 0);
-    const paidOrders = periodOrders.filter((order) => order.payment_status === "paid").length;
+    const pendingPayment = unpaidPeriod.filter((order) => order.payment_status === "pending").reduce((sum, order) => sum + Number(order.total_aed), 0);
+    const paidOrders = periodOrders.length;
     const salesByDay = Array.from({ length: range }, (_, index) => { const date = new Date(start); date.setDate(start.getDate() + index); const matching = periodOrders.filter((order) => dayKey(new Date(order.placed_at)) === dayKey(date)); return { key: dayKey(date), label: dateLabel(date, range), revenue: merchandise(matching), orders: matching.length }; });
     const productsById = new Map(products.map((product) => [product.id, product]));
     const productSales = new Map<string, ProductSales>(); const categorySales = new Map<string, number>();

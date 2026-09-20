@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { founderAuthNext, safeInternalPath } from "@/lib/auth-redirect";
 import { sendWelcomeEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
-
-function safeNextPath(value: string | null, fallback = "/") {
-  return value && /^\/(?!\/)/.test(value) ? value : fallback;
-}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -17,9 +14,14 @@ export async function GET(request: Request) {
   // Supabase's standard `type=recovery` marker. Never let either form fall
   // through to the normal homepage/sign-in destination.
   const isPasswordRecovery = flow === "password-reset" || type === "recovery";
+  const rawNext = searchParams.get("next");
   const next = isPasswordRecovery
     ? "/auth/reset-password"
-    : safeNextPath(searchParams.get("next"), flow === "driver" ? "/driver" : "/");
+    : flow === "driver"
+      ? safeInternalPath(rawNext, "/driver")
+      : rawNext && rawNext.includes("/founder")
+        ? founderAuthNext(rawNext)
+        : safeInternalPath(rawNext, "/");
 
   if (code || (tokenHash && type)) {
     const supabase = await createClient();

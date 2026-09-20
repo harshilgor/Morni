@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { syncCartSnapshot, track } from "@/lib/analytics/track";
 import type { Product } from "@/lib/types";
 import type { ProductCustomizationValues } from "@/lib/product-customization";
 
@@ -58,6 +59,20 @@ function itemLineId(item: CartItem) {
   return item.lineId ?? cartLineId(item.productId, item.size, item.variantId, item.customization);
 }
 
+function publishCartAnalytics(items: CartItem[]) {
+  const subtotalAed = items.reduce((sum, item) => sum + item.priceAed * item.quantity, 0);
+  syncCartSnapshot({
+    subtotalAed,
+    items: items.map((item) => ({
+      product_id: item.productId,
+      store_id: item.storeId,
+      quantity: item.quantity,
+      price_aed: item.priceAed,
+      title: item.title,
+    })),
+  });
+}
+
 export const useCart = create<CartState>()(
   persist(
     (set, get) => ({
@@ -73,39 +88,34 @@ export const useCart = create<CartState>()(
         const imageUrl =
           options?.imageUrl ?? product.image_urls?.[0] ?? undefined;
         const otherStore = existing.find((i) => i.storeId !== product.store_id);
+        let nextItems: CartItem[];
         if (otherStore) {
-          set({
-            items: [
-              {
-                lineId,
-                productId: product.id,
-                variantId: options?.variantId,
-                storeId: product.store_id,
-                storeName,
-                title: product.title,
-                priceAed: Number(product.price_aed),
-                imageUrl,
-                size: options?.size,
-                colorName: options?.colorName,
-                customization: options?.customization,
-                quantity: qty,
-              },
-            ],
-          });
-          return;
-        }
-        const found = existing.find((i) => itemLineId(i) === lineId);
-        if (found) {
-          set({
-            items: existing.map((i) =>
+          nextItems = [
+            {
+              lineId,
+              productId: product.id,
+              variantId: options?.variantId,
+              storeId: product.store_id,
+              storeName,
+              title: product.title,
+              priceAed: Number(product.price_aed),
+              imageUrl,
+              size: options?.size,
+              colorName: options?.colorName,
+              customization: options?.customization,
+              quantity: qty,
+            },
+          ];
+        } else {
+          const found = existing.find((i) => itemLineId(i) === lineId);
+          if (found) {
+            nextItems = existing.map((i) =>
               itemLineId(i) === lineId
                 ? { ...i, quantity: i.quantity + qty }
                 : i,
-            ),
-          });
-        } else {
-          set({
-            items: [
+            );
+          } else {
+            nextItems = [
               ...existing,
               {
                 lineId,
@@ -121,26 +131,70 @@ export const useCart = create<CartState>()(
                 customization: options?.customization,
                 quantity: qty,
               },
-            ],
+            ];
+          }
+        }
+        set({ items: nextItems });
+        track("cart_add", {
+          product_id: product.id,
+          store_id: product.store_id,
+          quantity: qty,
+        });
+        try {
+          if (typeof window !== "undefined" && window.sessionStorage.getItem("morni-from-wishlist") === "1") {
+            track("wishlist_to_cart", {
+              product_id: product.id,
+              store_id: product.store_id,
+              quantity: qty,
+            });
+            window.sessionStorage.removeItem("morni-from-wishlist");
+          }
+        } catch {
+          // ignore
+        }
+        publishCartAnalytics(nextItems);
+      },
+      removeItem: (lineId) => {
+        const removed = get().items.find((i) => itemLineId(i) === lineId);
+        const nextItems = get().items.filter((i) => itemLineId(i) !== lineId);
+        set({ items: nextItems });
+        if (removed) {
+          track("cart_remove", {
+            product_id: removed.productId,
+            store_id: removed.storeId,
+            quantity: removed.quantity,
           });
         }
+        publishCartAnalytics(nextItems);
       },
-      removeItem: (lineId) =>
-        set({ items: get().items.filter((i) => itemLineId(i) !== lineId) }),
       setQuantity: (lineId, quantity) => {
         if (quantity <= 0) {
           get().removeItem(lineId);
           return;
         }
-        set({
-          items: get().items.map((i) =>
-            itemLineId(i) === lineId ? { ...i, quantity } : i,
-          ),
-        });
+        const target = get().items.find((i) => itemLineId(i) === lineId);
+        const nextItems = get().items.map((i) =>
+          itemLineId(i) === lineId ? { ...i, quantity } : i,
+        );
+        set({ items: nextItems });
+        if (target) {
+          track("cart_update", {
+            product_id: target.productId,
+            store_id: target.storeId,
+            quantity,
+          });
+        }
+        publishCartAnalytics(nextItems);
       },
-      clear: () => set({ items: [] }),
-      clearStore: (storeId) =>
-        set({ items: get().items.filter((i) => i.storeId !== storeId) }),
+      clear: () => {
+        set({ items: [] });
+        publishCartAnalytics([]);
+      },
+      clearStore: (storeId) => {
+        const nextItems = get().items.filter((i) => i.storeId !== storeId);
+        set({ items: nextItems });
+        publishCartAnalytics(nextItems);
+      },
       subtotal: () =>
         get().items.reduce((sum, i) => sum + i.priceAed * i.quantity, 0),
       count: () => get().items.reduce((sum, i) => sum + i.quantity, 0),

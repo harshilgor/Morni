@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UaeEmirate } from "@/lib/types";
 import { EMIRATES } from "@/lib/format";
+import { track } from "@/lib/analytics/track";
 
 export const DELIVERY_EMIRATE: UaeEmirate = "dubai";
 export const DEFAULT_DELIVERY_AREA = "Dubai Marina";
@@ -109,6 +110,13 @@ export const useLocation = create<LocationState>()(
       setLocation: (emirate, area) => {
         if (!isDeliverableEmirate(emirate)) return;
         set({ emirate, area });
+        try {
+          track("location_set", {
+            metadata: { emirate, area: area.slice(0, 80) },
+          });
+        } catch {
+          // analytics must never block location updates
+        }
       },
       label: () => {
         const { emirate, area } = get();

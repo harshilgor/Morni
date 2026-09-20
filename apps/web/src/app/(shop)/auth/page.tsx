@@ -1,18 +1,20 @@
 "use client";
 
-import { FormEvent, Suspense, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PortalIcon } from "@/components/portal-icons";
+import { founderAuthNext, safeInternalPath } from "@/lib/auth-redirect";
 import { createClient } from "@/lib/supabase/client";
-
-function safeNextPath(value: string | null) {
-  return value && /^\/(?!\/)/.test(value) ? value : "/";
-}
+import { track, trackOnce } from "@/lib/analytics/track";
 
 export function AuthForm() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const next = safeNextPath(searchParams.get("next"));
+  const isFounderAuth = pathname === "/founder/auth" || pathname.startsWith("/founder/auth/");
+  const next = isFounderAuth
+    ? founderAuthNext(searchParams.get("next"))
+    : safeInternalPath(searchParams.get("next"), "/");
   const authError = searchParams.get("error");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [resetMode, setResetMode] = useState(false);
@@ -33,9 +35,42 @@ export function AuthForm() {
   const [linkLoading, setLinkLoading] = useState(false);
 
   const title = useMemo(
-    () => (mode === "signin" ? "Welcome back" : "Create your Morni account"),
-    [mode],
+    () =>
+      isFounderAuth
+        ? mode === "signin"
+          ? "Founder sign in"
+          : "Create your Morni account"
+        : mode === "signin"
+          ? "Welcome back"
+          : "Create your Morni account",
+    [isFounderAuth, mode],
   );
+
+  useEffect(() => {
+    let active = true;
+    trackOnce(
+      `auth_view:${isFounderAuth ? "founder" : "shop"}`,
+      "auth_view",
+      {
+        metadata: {
+          surface: isFounderAuth ? "founder_auth" : "auth",
+          next: next.slice(0, 120),
+        },
+      },
+    );
+    void createClient()
+      .auth.getSession()
+      .then(({ data: { session } }) => {
+        if (!active || !session) return;
+        // Already signed in — complete the intended redirect instead of
+        // leaving the user on the auth form (which used to fall through home).
+        router.replace(next);
+        router.refresh();
+      });
+    return () => {
+      active = false;
+    };
+  }, [isFounderAuth, next, router]);
 
   async function signInWithGoogle() {
     setGoogleLoading(true);
@@ -107,11 +142,15 @@ export function AuthForm() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         setMessage(error.message);
+        track("auth_fail", {
+          metadata: { method: "password", category: "signin" },
+        });
         setLoading(false);
         return;
       }
+      track("auth_login_success", { metadata: { method: "password" } });
       void fetch("/api/emails/welcome", { method: "POST" });
-      router.push(next);
+      router.replace(next);
       router.refresh();
       return;
     }
@@ -133,6 +172,9 @@ export function AuthForm() {
 
     if (error) {
       setMessage(error.message);
+      track("auth_fail", {
+        metadata: { method: "password", category: "signup" },
+      });
       setLoading(false);
       return;
     }
@@ -143,11 +185,15 @@ export function AuthForm() {
     if (data.user?.identities?.length === 0) {
       setMessage("An account has already been created with this email. Please sign in instead.");
       setMode("signin");
+      track("auth_fail", {
+        metadata: { method: "password", category: "signup_exists" },
+      });
       setLoading(false);
       return;
     }
 
     void fetch("/api/emails/welcome", { method: "POST" });
+    track("auth_signup_success", { metadata: { method: "password" } });
     setMessage("Account created. You can sign in now.");
     setMode("signin");
     setLoading(false);

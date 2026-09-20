@@ -16,9 +16,63 @@ type FounderOrderProduct = {
   image_url: string | null;
 };
 
-type FounderView = "overview" | "operations" | "delivery" | "stores" | "customers" | "catalogue" | "finance" | "settlements" | "refunds" | "alerts";
+type FounderView = "overview" | "demand" | "operations" | "delivery" | "stores" | "customers" | "catalogue" | "finance" | "settlements" | "refunds" | "alerts";
+type FounderDiscoveryData = {
+  generated_at: string;
+  range_days: number;
+  has_data: boolean;
+  funnel: {
+    product_views: number;
+    listing_impressions: number;
+    listing_clicks: number;
+    cart_adds: number;
+    checkout_starts: number;
+    checkout_address_complete: number;
+    checkout_slot_selected: number;
+    checkout_place_order: number;
+    payment_start: number;
+    payment_fail: number;
+    payment_success: number;
+  };
+  search: {
+    searches: number;
+    zero_results: number;
+    result_clicks: number;
+    top_queries: Array<{ query: string; count: number }>;
+    zero_result_queries: Array<{ query: string; count: number }>;
+  };
+  friction: {
+    add_to_cart_blocked: number;
+    blocked_reasons: Array<{ reason: string; count: number }>;
+    auth_fails: number;
+    auth_logins: number;
+    auth_signups: number;
+  };
+  surfaces: {
+    home_views: number;
+    category_views: number;
+    collection_views: number;
+    store_views: number;
+    top_categories: Array<{ category: string; count: number }>;
+  };
+  acquisition: {
+    sessions: number;
+    top_sources: Array<{ source: string; count: number }>;
+  };
+};
 type FounderTone = "urgent" | "warning" | "default";
 type DeliveryJobStatus = "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled";
+
+type FounderProductSignal = {
+  id: string;
+  title: string;
+  store_name: string;
+  wishlist_count?: number;
+  unpaid_units?: number;
+  paid_units?: number;
+  views?: number;
+  cart_adds?: number;
+};
 
 type FounderDeliveryData = {
   generated_at: string;
@@ -31,7 +85,27 @@ type FounderDeliveryData = {
 type FounderData = {
   generated_at: string;
   range_days: number;
-  metrics: { today_orders: number; today_revenue: number; average_order_value: number; new_shoppers: number; new_stores: number; active_stores: number; open_orders: number; delivery_rate: number };
+  metrics: {
+    today_orders: number;
+    today_revenue: number;
+    average_order_value: number;
+    new_shoppers: number;
+    new_stores: number;
+    active_stores: number;
+    open_orders: number;
+    delivery_rate: number;
+    total_shoppers?: number;
+    buyers?: number;
+    period_orders?: number;
+    period_revenue?: number;
+    prior_period_orders?: number;
+    prior_period_revenue?: number;
+    unpaid_checkouts?: number;
+    unpaid_checkout_value?: number;
+    wishlist_users?: number;
+    wishlist_items?: number;
+    wishlist_adds_period?: number;
+  };
   daily_sales: Array<{ day: string; label: string; revenue: number; orders: number; shoppers: number }>;
   status_breakdown: Partial<Record<OrderStatus, number>>;
   recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; customer_phone: string | null; delivery_area: string; products?: FounderOrderProduct[] }>;
@@ -40,13 +114,34 @@ type FounderData = {
   customers: Array<{ id: string; full_name: string; phone: string | null; created_at: string; orders: number; revenue: number; last_order_at: string | null }>;
   finance: { gross_sales: number; product_sales: number; delivery_fees: number; service_fees: number; small_order_fees: number; paid_orders: number; pending_orders: number };
   alerts: Array<{ tone: FounderTone; title: string; detail: string; href: string }>;
+  demand?: {
+    funnel: { wishlist_users: number; checkout_started: number; paid_orders: number };
+    top_wishlisted: FounderProductSignal[];
+    intent_without_purchase: FounderProductSignal[];
+    product_funnel: FounderProductSignal[];
+  };
+  intent?: {
+    tracking_live: boolean;
+    has_data: boolean;
+    product_views_period: number;
+    cart_adds_period: number;
+    active_users_period: number;
+    users_with_cart_snapshot: number;
+    products_in_carts: number;
+    cart_subtotal_aed: number;
+    top_viewed: FounderProductSignal[];
+    top_carted: FounderProductSignal[];
+  };
 };
-type SettlementStore = { store_id: string; store_name: string; commission_rate: number; order_count: number; gross_sales: number; commission: number; net_payout: number; paid_amount: number };
-type SettlementData = { period_start: string; period_end: string; default_commission_rate: number; stores: SettlementStore[]; history: Array<{ id: string; store_name: string; period_start: string; period_end: string; order_count: number; net_payout: number; payment_method: string; payment_reference: string | null; paid_at: string }> };
-type FounderRefund = { refund_id: string; return_request_id: string; order_number: string; store_name: string; shopper_name: string; shopper_phone: string | null; amount_aed: number; method: string; status: "pending_processor" | "processed" | "failed"; reason: string; created_at: string; processed_at: string | null; processor_reference: string | null; processor_note: string | null };
+
+const insightNav: Array<{ id: FounderView; label: string; icon: PortalIconName }> = [
+  { id: "overview", label: "Overview", icon: "overview" },
+  { id: "demand", label: "Demand", icon: "sparkle" },
+  { id: "customers", label: "Customers", icon: "reviews" },
+  { id: "catalogue", label: "Products", icon: "products" },
+];
 
 const operateNav: Array<{ id: FounderView; label: string; icon: PortalIconName }> = [
-  { id: "overview", label: "Today", icon: "overview" },
   { id: "operations", label: "Orders", icon: "orders" },
   { id: "delivery", label: "Delivery", icon: "location" },
   { id: "alerts", label: "Action centre", icon: "bell" },
@@ -54,8 +149,6 @@ const operateNav: Array<{ id: FounderView; label: string; icon: PortalIconName }
 
 const growNav: Array<{ id: FounderView; label: string; icon: PortalIconName }> = [
   { id: "stores", label: "Stores", icon: "store" },
-  { id: "customers", label: "Customers", icon: "reviews" },
-  { id: "catalogue", label: "Catalogue", icon: "products" },
   { id: "finance", label: "Finance", icon: "analytics" },
   { id: "settlements", label: "Settlements", icon: "analytics" },
   { id: "refunds", label: "Refunds", icon: "refresh" },
@@ -66,6 +159,27 @@ const statusOrder: OrderStatus[] = ["placed", "accepted", "picking", "out_for_de
 function number(value: number | null | undefined) {
   return new Intl.NumberFormat("en-AE").format(Number(value ?? 0));
 }
+
+function percentDelta(current: number, previous: number) {
+  if (!previous && !current) return { label: "vs prior", direction: "neutral" as const, value: "—" };
+  if (!previous) return { label: "vs prior", direction: "up" as const, value: "New" };
+  const change = ((current - previous) / previous) * 100;
+  return {
+    label: "vs prior",
+    direction: change > 0.5 ? ("up" as const) : change < -0.5 ? ("down" as const) : ("neutral" as const),
+    value: `${change > 0 ? "+" : ""}${change.toFixed(0)}%`,
+  };
+}
+
+function abandonmentRate(unpaid: number, paid: number) {
+  const total = unpaid + paid;
+  if (!total) return null;
+  return Math.round((1000 * unpaid) / total) / 10;
+}
+
+type SettlementStore = { store_id: string; store_name: string; commission_rate: number; order_count: number; gross_sales: number; commission: number; net_payout: number; paid_amount: number };
+type SettlementData = { period_start: string; period_end: string; default_commission_rate: number; stores: SettlementStore[]; history: Array<{ id: string; store_name: string; period_start: string; period_end: string; order_count: number; net_payout: number; payment_method: string; payment_reference: string | null; paid_at: string }> };
+type FounderRefund = { refund_id: string; return_request_id: string; order_number: string; store_name: string; shopper_name: string; shopper_phone: string | null; amount_aed: number; method: string; status: "pending_processor" | "processed" | "failed"; reason: string; created_at: string; processed_at: string | null; processor_reference: string | null; processor_note: string | null };
 
 function dateTime(value: string | null) {
   if (!value) return "—";
@@ -399,6 +513,13 @@ function FounderSidebar({ activeView, onViewChange, alertCount }: { activeView: 
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block lg:overflow-visible lg:px-3 lg:py-4">
+          <p className="hidden px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#82908a] lg:block">Insight</p>
+          <div className="flex shrink-0 gap-1 lg:block lg:space-y-1">
+            {insightNav.map((item) => (
+              <NavButton key={item.id} item={item} active={item.id === activeView} alertCount={alertCount} onViewChange={onViewChange} />
+            ))}
+          </div>
+          <p className="hidden px-3 pb-1 pt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#82908a] lg:block">Operate</p>
           <div className="flex shrink-0 gap-1 lg:block lg:space-y-1">
             {operateNav.map((item) => (
               <NavButton key={item.id} item={item} active={item.id === activeView} alertCount={alertCount} onViewChange={onViewChange} />
@@ -423,31 +544,500 @@ function FounderSidebar({ activeView, onViewChange, alertCount }: { activeView: 
 }
 
 function Overview({ data, ownerName, onViewChange }: { data: FounderData; ownerName?: string; onViewChange: (view: FounderView) => void }) {
+  const periodOrders = data.metrics.period_orders ?? data.finance.paid_orders;
+  const periodRevenue = data.metrics.period_revenue ?? data.finance.gross_sales;
+  const priorOrders = data.metrics.prior_period_orders ?? 0;
+  const priorRevenue = data.metrics.prior_period_revenue ?? 0;
+  const unpaid = data.metrics.unpaid_checkouts ?? data.finance.pending_orders;
+  const abandon = abandonmentRate(unpaid, periodOrders);
+  const revenueDelta = percentDelta(periodRevenue, priorRevenue);
+  const orderDelta = percentDelta(periodOrders, priorOrders);
+  const wishlistUsers = data.metrics.wishlist_users ?? data.demand?.funnel.wishlist_users ?? 0;
+  const topWishlisted = data.demand?.top_wishlisted ?? [];
+
   return (
     <div className="space-y-5">
       <DailyBriefing data={data} ownerName={ownerName} onViewChange={onViewChange} />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.85fr)]">
-        <ActionCentre alerts={data.alerts} onViewChange={onViewChange} limit={4} />
-        <OperationsSummary data={data} onViewChange={onViewChange} />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <MetricCard
+          label="Paid GMV"
+          value={formatAed(periodRevenue)}
+          detail={`${revenueDelta.value} ${revenueDelta.label} · last ${data.range_days}d`}
+          icon="analytics"
+        />
+        <MetricCard
+          label="Paid orders"
+          value={number(periodOrders)}
+          detail={`${orderDelta.value} ${orderDelta.label}`}
+          icon="orders"
+        />
+        <MetricCard
+          label="Average order"
+          value={formatAed(data.metrics.average_order_value)}
+          detail="Paid checkouts only"
+          icon="sparkle"
+        />
+        <MetricCard
+          label="Buyers"
+          value={number(data.metrics.buyers ?? 0)}
+          detail={`${number(data.metrics.total_shoppers ?? 0)} shoppers total`}
+          icon="reviews"
+        />
+        <MetricCard
+          label="Checkout abandonment"
+          value={abandon == null ? "—" : `${abandon}%`}
+          detail={`${number(unpaid)} unpaid drafts · ${formatAed(data.metrics.unpaid_checkout_value ?? 0)}`}
+          tone={abandon && abandon >= 40 ? "attention" : "default"}
+          icon="warning"
+        />
+        <MetricCard
+          label="Wishlist users"
+          value={number(wishlistUsers)}
+          detail={`${number(data.metrics.wishlist_adds_period ?? 0)} adds in range`}
+          icon="products"
+        />
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Average order" value={formatAed(data.metrics.average_order_value)} detail={`Last ${data.range_days} days`} icon="analytics" />
-        <MetricCard label="New shoppers" value={number(data.metrics.new_shoppers)} detail="Joined today" icon="reviews" />
-        <MetricCard label="Open orders" value={number(data.metrics.open_orders)} detail="Across active boutiques" tone={data.metrics.open_orders ? "attention" : "default"} icon="orders" />
-        <MetricCard label="New boutiques" value={number(data.metrics.new_stores)} detail="Joined today" icon="store" />
-      </div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.85fr)]">
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.85fr)]">
         <Panel className="p-5 sm:p-6">
-          <SectionTitle title="Sales over time" detail={`Gross order value · last ${data.range_days} days`} action={<TextLink onClick={() => onViewChange("finance")}>Open finance</TextLink>} />
-          <RevenueChart days={data.daily_sales} />
+          <SectionTitle
+            title="Revenue & orders"
+            detail={`Paid GMV · last ${data.range_days} days · Dubai time`}
+            action={<TextLink onClick={() => onViewChange("finance")}>Open finance</TextLink>}
+          />
+          {periodOrders || data.daily_sales.some((day) => Number(day.revenue) > 0) ? (
+            <RevenueChart days={data.daily_sales} />
+          ) : (
+            <div className="mt-8 rounded-xl border border-dashed border-[#d5ddd9] bg-[#f8faf9] px-4 py-10 text-center">
+              <p className="text-sm font-semibold text-[#17231f]">No paid orders in this range</p>
+              <p className="mt-1 text-sm text-[#687770]">Trends appear once card payments complete successfully.</p>
+            </div>
+          )}
         </Panel>
-        <StoreHealth stores={data.stores} onViewChange={onViewChange} />
+        <Panel className="p-5 sm:p-6">
+          <SectionTitle
+            title="Demand snapshot"
+            detail="Wishlist interest and unpaid checkouts."
+            action={<TextLink onClick={() => onViewChange("demand")}>Open demand</TextLink>}
+          />
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              { label: "Wishlist", value: number(data.demand?.funnel.wishlist_users ?? wishlistUsers) },
+              { label: "Checkout started", value: number(data.demand?.funnel.checkout_started ?? unpaid) },
+              { label: "Paid", value: number(data.demand?.funnel.paid_orders ?? periodOrders) },
+            ].map((step) => (
+              <div key={step.label} className="rounded-lg border border-[#e2e7e4] bg-[#f7faf8] px-3 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">{step.label}</p>
+                <p className="mt-1.5 text-lg font-bold tabular-nums tracking-[-0.03em] text-[#17231f]">{step.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 divide-y divide-[#eef2f0]">
+            {topWishlisted.slice(0, 5).map((product) => (
+              <div key={product.id} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-[#31443d]">{product.title}</span>
+                  <span className="block truncate text-xs text-[#7b8882]">{product.store_name}</span>
+                </span>
+                <span className="shrink-0 text-xs font-semibold tabular-nums text-[#3c685c]">{number(product.wishlist_count)} saved</span>
+              </div>
+            ))}
+            {!topWishlisted.length ? (
+              <p className="py-6 text-center text-sm text-[#687770]">No wishlist demand yet.</p>
+            ) : null}
+          </div>
+        </Panel>
       </div>
-      <Panel>
-        <div className="p-5 sm:p-6">
-          <SectionTitle title="Latest orders" detail="Recent marketplace activity." action={<TextLink onClick={() => onViewChange("operations")}>View all</TextLink>} />
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.9fr)]">
+        <div className="grid gap-5">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(16rem,0.85fr)]">
+            <ActionCentre alerts={data.alerts} onViewChange={onViewChange} limit={4} />
+            <OperationsSummary data={data} onViewChange={onViewChange} />
+          </div>
+          <Panel>
+            <div className="p-5 sm:p-6">
+              <SectionTitle title="Latest paid orders" detail="Operational queue — unpaid drafts are excluded." action={<TextLink onClick={() => onViewChange("operations")}>View all</TextLink>} />
+            </div>
+            {data.recent_orders.length ? (
+              <OrderTable orders={data.recent_orders.slice(0, 6)} compact />
+            ) : (
+              <div className="px-5 pb-8 text-center text-sm text-[#687770]">No paid orders yet.</div>
+            )}
+          </Panel>
         </div>
-        <OrderTable orders={data.recent_orders.slice(0, 6)} compact />
+        <div className="space-y-5">
+          <StoreHealth stores={data.stores} onViewChange={onViewChange} />
+          <IntentTrackingCard intent={data.intent} onViewChange={onViewChange} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IntentTrackingCard({
+  intent,
+  onViewChange,
+}: {
+  intent: FounderData["intent"];
+  onViewChange: (view: FounderView) => void;
+}) {
+  const hasData = Boolean(intent?.has_data);
+  return (
+    <Panel className="p-5 sm:p-6">
+      <SectionTitle
+        title="Browse & cart intent"
+        detail={hasData ? "Live product views and cart snapshots." : "Tracking is live — waiting for storefront events."}
+        action={<TextLink onClick={() => onViewChange("demand")}>Details</TextLink>}
+      />
+      {hasData ? (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-[#f7faf8] px-3 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Views</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-[#17231f]">{number(intent?.product_views_period)}</p>
+          </div>
+          <div className="rounded-lg bg-[#f7faf8] px-3 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Cart adds</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-[#17231f]">{number(intent?.cart_adds_period)}</p>
+          </div>
+          <div className="rounded-lg bg-[#f7faf8] px-3 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Active carts</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-[#17231f]">{number(intent?.users_with_cart_snapshot)}</p>
+          </div>
+          <div className="rounded-lg bg-[#f7faf8] px-3 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">In carts</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-[#17231f]">{number(intent?.products_in_carts)}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-xl border border-dashed border-[#d5ddd9] bg-[#f8faf9] px-4 py-6 text-center">
+          <p className="text-sm font-semibold text-[#17231f]">Instrumented, awaiting data</p>
+          <p className="mt-1 text-xs leading-5 text-[#687770]">
+            Product views and cart snapshots appear here as shoppers browse and add to bag. Numbers are never fabricated.
+          </p>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function DemandView({ data, discovery }: { data: FounderData; discovery: FounderDiscoveryData | null }) {
+  const funnel = data.demand?.funnel ?? {
+    wishlist_users: data.metrics.wishlist_users ?? 0,
+    checkout_started: data.metrics.unpaid_checkouts ?? 0,
+    paid_orders: data.metrics.period_orders ?? data.finance.paid_orders,
+  };
+  const productFunnel = data.demand?.product_funnel ?? [];
+  const intentWithoutPurchase = data.demand?.intent_without_purchase ?? [];
+  const intent = data.intent;
+  const hasIntent = Boolean(intent?.has_data || discovery?.has_data);
+  const eventFunnel = discovery?.funnel;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricCard label="Wishlist users" value={number(funnel.wishlist_users)} detail={`${number(data.metrics.wishlist_items ?? 0)} saved items`} icon="products" />
+        <MetricCard label="Checkout started" value={number(funnel.checkout_started)} detail={`${formatAed(data.metrics.unpaid_checkout_value ?? 0)} unpaid`} tone={funnel.checkout_started ? "attention" : "default"} icon="orders" />
+        <MetricCard label="Paid orders" value={number(funnel.paid_orders)} detail={`Last ${data.range_days} days`} icon="analytics" />
+      </div>
+
+      {eventFunnel ? (
+        <Panel className="p-5 sm:p-6">
+          <SectionTitle
+            title="UI conversion funnel"
+            detail={discovery?.has_data ? "From marketplace events in this range." : "Tracking is live — waiting for browse/checkout events."}
+          />
+          {discovery?.has_data ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                { label: "Views", value: eventFunnel.product_views },
+                { label: "Cart adds", value: eventFunnel.cart_adds },
+                { label: "Checkout", value: eventFunnel.checkout_starts },
+                { label: "Place order", value: eventFunnel.checkout_place_order },
+                { label: "Paid", value: eventFunnel.payment_success },
+              ].map((step) => (
+                <div key={step.label} className="rounded-lg border border-[#e2e7e4] bg-[#f7faf8] px-3 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">{step.label}</p>
+                  <p className="mt-1.5 text-lg font-bold tabular-nums text-[#17231f]">{number(step.value)}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-[#d5ddd9] bg-[#f8faf9] px-4 py-6 text-center text-sm text-[#687770]">
+              Funnel steps appear once shoppers browse and check out with tracking enabled.
+            </div>
+          )}
+          {discovery?.has_data ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg bg-white px-3 py-3 ring-1 ring-[#e2e7e4]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Address complete</p>
+                <p className="mt-1 text-base font-bold tabular-nums">{number(eventFunnel.checkout_address_complete)}</p>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-3 ring-1 ring-[#e2e7e4]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Slot selected</p>
+                <p className="mt-1 text-base font-bold tabular-nums">{number(eventFunnel.checkout_slot_selected)}</p>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-3 ring-1 ring-[#e2e7e4]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Payment fail</p>
+                <p className="mt-1 text-base font-bold tabular-nums text-[#9c5b05]">{number(eventFunnel.payment_fail)}</p>
+              </div>
+            </div>
+          ) : null}
+        </Panel>
+      ) : null}
+
+      <Panel className="p-5 sm:p-6">
+        <SectionTitle
+          title="Proven conversion funnel"
+          detail="Wishlist demand → checkout draft (unpaid) → paid order. Pre-checkout cart leave is not counted here."
+        />
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+          {[
+            { label: "Wishlisted", value: funnel.wishlist_users, note: "Users with ≥1 save" },
+            { label: "Checkout started", value: funnel.checkout_started, note: "Unpaid placed orders" },
+            { label: "Paid", value: funnel.paid_orders, note: "Successful card payment" },
+          ].map((step, index) => (
+            <div key={step.label} className="relative flex-1 rounded-xl border border-[#e2e7e4] bg-white p-4">
+              {index < 2 ? (
+                <span className="absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 text-[#9aa8a2] sm:block" aria-hidden>
+                  →
+                </span>
+              ) : null}
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">{step.label}</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums tracking-[-0.04em] text-[#17231f]">{number(step.value)}</p>
+              <p className="mt-1 text-xs text-[#687770]">{step.note}</p>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Panel className="p-5 sm:p-6">
+          <SectionTitle title="Search demand" detail="What shoppers type — including zero-result queries." />
+          {discovery?.has_data && (discovery.search.top_queries.length || discovery.search.zero_result_queries.length) ? (
+            <div className="mt-4 grid gap-5 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#82908a]">Top queries</p>
+                <div className="mt-2 divide-y divide-[#eef2f0]">
+                  {discovery.search.top_queries.map((row) => (
+                    <div key={row.query} className="flex justify-between gap-3 py-2 text-sm">
+                      <span className="min-w-0 truncate font-medium text-[#31443d]">“{row.query}”</span>
+                      <span className="tabular-nums text-[#687770]">{number(row.count)}</span>
+                    </div>
+                  ))}
+                  {!discovery.search.top_queries.length ? <p className="py-3 text-sm text-[#687770]">No searches yet.</p> : null}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#82908a]">Zero results</p>
+                <div className="mt-2 divide-y divide-[#eef2f0]">
+                  {discovery.search.zero_result_queries.map((row) => (
+                    <div key={row.query} className="flex justify-between gap-3 py-2 text-sm">
+                      <span className="min-w-0 truncate font-medium text-[#31443d]">“{row.query}”</span>
+                      <span className="tabular-nums text-[#9c5b05]">{number(row.count)}</span>
+                    </div>
+                  ))}
+                  {!discovery.search.zero_result_queries.length ? <p className="py-3 text-sm text-[#687770]">No zero-result searches.</p> : null}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-[#d5ddd9] bg-[#f8faf9] px-4 py-8 text-center text-sm text-[#687770]">
+              Search queries appear here once shoppers use storefront search.
+            </div>
+          )}
+          {discovery?.has_data ? (
+            <p className="mt-3 text-xs text-[#687770]">
+              {number(discovery.search.searches)} searches · {number(discovery.search.zero_results)} zero-result · {number(discovery.search.result_clicks)} result clicks
+            </p>
+          ) : null}
+        </Panel>
+
+        <Panel className="p-5 sm:p-6">
+          <SectionTitle title="Friction" detail="Blocked add-to-cart and auth barriers." />
+          {discovery?.has_data && (discovery.friction.add_to_cart_blocked || discovery.friction.auth_fails) ? (
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-lg bg-[#f7faf8] px-3 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">ATC blocked</p>
+                  <p className="mt-1 text-lg font-bold tabular-nums">{number(discovery.friction.add_to_cart_blocked)}</p>
+                </div>
+                <div className="rounded-lg bg-[#f7faf8] px-3 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Auth fails</p>
+                  <p className="mt-1 text-lg font-bold tabular-nums">{number(discovery.friction.auth_fails)}</p>
+                </div>
+                <div className="rounded-lg bg-[#f7faf8] px-3 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Logins</p>
+                  <p className="mt-1 text-lg font-bold tabular-nums">{number(discovery.friction.auth_logins)}</p>
+                </div>
+              </div>
+              <div className="divide-y divide-[#eef2f0]">
+                {discovery.friction.blocked_reasons.map((row) => (
+                  <div key={row.reason} className="flex justify-between gap-3 py-2 text-sm">
+                    <span className="font-medium text-[#31443d]">{row.reason.replace(/_/g, " ")}</span>
+                    <span className="tabular-nums text-[#687770]">{number(row.count)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-[#d5ddd9] bg-[#f8faf9] px-4 py-8 text-center text-sm text-[#687770]">
+              Friction signals appear when shoppers hit size/stock/auth blockers.
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Panel className="overflow-hidden">
+          <div className="p-5 sm:p-6">
+            <SectionTitle title="Product intent funnel" detail="Wishlist vs unpaid checkout lines vs paid units." />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left">
+              <thead className="border-y border-[#e2e7e4] bg-[#f7faf8]">
+                <tr>
+                  {["Product", "Wishlist", "Unpaid", "Paid"].map((heading) => (
+                    <th key={heading} className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#eef2f0]">
+                {productFunnel.map((row) => (
+                  <tr key={row.id}>
+                    <td className="px-4 py-3">
+                      <p className="text-sm font-semibold text-[#17231f]">{row.title}</p>
+                      <p className="text-xs text-[#687770]">{row.store_name}</p>
+                    </td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#31443d]">{number(row.wishlist_count)}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#9c5b05]">{number(row.unpaid_units)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold tabular-nums text-[#277044]">{number(row.paid_units)}</td>
+                  </tr>
+                ))}
+                {!productFunnel.length ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-[#687770]">
+                      No wishlist product demand yet.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        <Panel className="overflow-hidden">
+          <div className="p-5 sm:p-6">
+            <SectionTitle title="Interest without purchase" detail="Wishlisted in period data, zero paid units." />
+          </div>
+          <div className="divide-y divide-[#eef2f0]">
+            {intentWithoutPurchase.map((row) => (
+              <div key={row.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-[#17231f]">{row.title}</span>
+                  <span className="block truncate text-xs text-[#687770]">{row.store_name}</span>
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-[#9c5b05]">{number(row.wishlist_count)} saves</span>
+              </div>
+            ))}
+            {!intentWithoutPurchase.length ? (
+              <p className="px-5 py-10 text-center text-sm text-[#687770]">No unmatched wishlist demand right now.</p>
+            ) : null}
+          </div>
+        </Panel>
+      </div>
+
+      <Panel className="p-5 sm:p-6">
+        <SectionTitle
+          title="Browse and cart tracking"
+          detail={hasIntent ? "Populated from marketplace_events and cart_snapshots." : "Pipeline is live. Panels stay empty until real events arrive."}
+        />
+        {hasIntent ? (
+          <div className="mt-5 grid gap-5 lg:grid-cols-2">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#82908a]">Most viewed</p>
+              <div className="mt-3 divide-y divide-[#eef2f0]">
+                {(intent?.top_viewed ?? []).map((row) => (
+                  <div key={row.id} className="flex justify-between gap-3 py-2.5 text-sm">
+                    <span className="min-w-0 truncate font-medium text-[#31443d]">{row.title}</span>
+                    <span className="tabular-nums text-[#687770]">{number(row.views)}</span>
+                  </div>
+                ))}
+                {!(intent?.top_viewed ?? []).length ? <p className="py-4 text-sm text-[#687770]">No views in this range.</p> : null}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#82908a]">Most added to cart</p>
+              <div className="mt-3 divide-y divide-[#eef2f0]">
+                {(intent?.top_carted ?? []).map((row) => (
+                  <div key={row.id} className="flex justify-between gap-3 py-2.5 text-sm">
+                    <span className="min-w-0 truncate font-medium text-[#31443d]">{row.title}</span>
+                    <span className="tabular-nums text-[#687770]">{number(row.cart_adds)}</span>
+                  </div>
+                ))}
+                {!(intent?.top_carted ?? []).length ? <p className="py-4 text-sm text-[#687770]">No cart adds in this range.</p> : null}
+              </div>
+            </div>
+            {discovery?.has_data ? (
+              <div className="rounded-xl border border-[#e2e7e4] bg-[#f7faf8] p-4 lg:col-span-2">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Listing impressions</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums">{number(discovery.funnel.listing_impressions)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Listing clicks</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums">{number(discovery.funnel.listing_clicks)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Sessions</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums">{number(discovery.acquisition.sessions)}</p>
+                  </div>
+                </div>
+                {discovery.acquisition.top_sources.length ? (
+                  <div className="mt-4 divide-y divide-[#e2e7e4]">
+                    {discovery.acquisition.top_sources.map((row) => (
+                      <div key={row.source} className="flex justify-between gap-3 py-2 text-sm">
+                        <span className="min-w-0 truncate font-medium text-[#31443d]">{row.source}</span>
+                        <span className="tabular-nums text-[#687770]">{number(row.count)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="rounded-xl border border-[#e2e7e4] bg-[#f7faf8] p-4 lg:col-span-2">
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Active users</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums">{number(intent?.active_users_period)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Users with carts</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums">{number(intent?.users_with_cart_snapshot)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Items in carts</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums">{number(intent?.products_in_carts)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#82908a]">Cart value</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums">{formatAed(intent?.cart_subtotal_aed ?? 0)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl border border-dashed border-[#d5ddd9] bg-[#f8faf9] px-4 py-10 text-center">
+            <p className="text-sm font-semibold text-[#17231f]">Tracking live — no browse/cart events yet</p>
+            <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#687770]">
+              Views, cart adds, search, and checkout-step events will fill this section as shoppers use the storefront. Until then, use wishlist and unpaid checkout metrics above — those are already real.
+            </p>
+          </div>
+        )}
       </Panel>
     </div>
   );
@@ -1271,7 +1861,8 @@ function RefundsView() {
   </div>;
 }
 
-function WorkspaceContent({ data, deliveryData, activeView, ownerName, onViewChange, onRefresh }: { data: FounderData; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void }) {
+function WorkspaceContent({ data, discovery, deliveryData, activeView, ownerName, onViewChange, onRefresh }: { data: FounderData; discovery: FounderDiscoveryData | null; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void }) {
+  if (activeView === "demand") return <DemandView data={data} discovery={discovery} />;
   if (activeView === "operations") return <Panel><OrderTable orders={data.recent_orders} /></Panel>;
   if (activeView === "delivery") return <DeliveryView data={deliveryData} onRefresh={onRefresh} />;
   if (activeView === "stores") return <StoresView stores={data.stores} />;
@@ -1288,6 +1879,7 @@ export function FounderWorkspace() {
   const { auth, loading: authLoading } = useAuthUser();
   const [data, setData] = useState<FounderData | null>(null);
   const [deliveryData, setDeliveryData] = useState<FounderDeliveryData | null>(null);
+  const [discovery, setDiscovery] = useState<FounderDiscoveryData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [range, setRange] = useState<7 | 30>(7);
@@ -1299,12 +1891,17 @@ export function FounderWorkspace() {
     if (!isAdmin) return;
     let active = true;
     const client = createClient();
-    void Promise.all([client.rpc("founder_workspace_data", { p_range_days: range }), client.rpc("founder_delivery_workspace_data")]).then(async ([workspaceResponse, deliveryResponse]) => {
+    void Promise.all([
+      client.rpc("founder_workspace_data", { p_range_days: range }),
+      client.rpc("founder_delivery_workspace_data"),
+      client.rpc("founder_discovery_metrics", { p_range_days: range }),
+    ]).then(async ([workspaceResponse, deliveryResponse, discoveryResponse]) => {
       if (!active) return;
       if (workspaceResponse.error || deliveryResponse.error) {
         setError(workspaceResponse.error?.message ?? deliveryResponse.error?.message ?? "Unable to load Founder data.");
         setData(null);
         setDeliveryData(null);
+        setDiscovery(null);
       } else {
         const founderData = workspaceResponse.data as unknown as FounderData;
         const orderIds = founderData.recent_orders.map((order) => order.id);
@@ -1319,6 +1916,7 @@ export function FounderWorkspace() {
         }
         setData({ ...founderData, recent_orders: founderData.recent_orders.map((order) => ({ ...order, products: productsByOrder.get(order.id) ?? [] })) });
         setDeliveryData(deliveryResponse.data as unknown as FounderDeliveryData);
+        setDiscovery(discoveryResponse.error ? null : (discoveryResponse.data as unknown as FounderDiscoveryData));
         setError(null);
       }
       setLoadingData(false);
@@ -1346,12 +1944,13 @@ export function FounderWorkspace() {
     () =>
       (
         ({
-          overview: ["Today at Morni", "Daily marketplace briefing and priority actions."],
-          operations: ["Orders", "Live order queue across every boutique."],
+          overview: ["Marketplace overview", "Paid revenue, demand signals, and priorities across Morni."],
+          demand: ["Demand & intent", "Search, funnel, friction, wishlist, and checkout abandonment."],
+          operations: ["Orders", "Live paid-order queue across every boutique."],
           delivery: ["Delivery", "Jobs, partners, riders, and exceptions."],
           stores: ["Stores", "Commercial and catalogue health across the network."],
           customers: ["Customers", "Shopper relationships growing Morni."],
-          catalogue: ["Catalogue", "Demand and inventory signals."],
+          catalogue: ["Products", "Paid demand and inventory signals."],
           finance: ["Finance", "Sales, fees, and payment readiness."],
           settlements: ["Settlements", "Store payouts, balances, and payment history."],
           refunds: ["Refunds", "Manual refund queue for completed returns."],
@@ -1362,7 +1961,7 @@ export function FounderWorkspace() {
   );
 
   if (authLoading) return <FounderLoading />;
-  if (!auth) return <FounderAccess title="Sign in to open Founder" description="Use the Morni administrator account to access the company workspace." action="Sign in" href="/auth?next=/founder" />;
+  if (!auth) return <FounderAccess title="Sign in to open Founder" description="Use the Morni administrator account to access the company workspace." action="Sign in" href="/founder/auth?next=%2Ffounder" />;
   if (!isAdmin) return <FounderAccess title="Founder access is restricted" description="This workspace is available only to Morni administrator accounts. Seller accounts continue to use the Seller Portal." action="Open Seller Portal" href="/portal" />;
 
   return (
@@ -1415,7 +2014,7 @@ export function FounderWorkspace() {
           {error ? <FounderError error={error} onRetry={refreshData} /> : null}
           {data && deliveryData ? (
             <div key={activeView}>
-              <WorkspaceContent data={data} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} />
+              <WorkspaceContent data={data} discovery={discovery} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} />
             </div>
           ) : null}
         </main>

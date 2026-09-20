@@ -18,6 +18,11 @@ export default function WishlistPage() {
 
   useEffect(() => {
     let active = true;
+    try {
+      window.sessionStorage.setItem("morni-from-wishlist", "1");
+    } catch {
+      // ignore
+    }
     const supabase = createClient();
 
     (async () => {

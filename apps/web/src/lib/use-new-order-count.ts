@@ -19,6 +19,7 @@ export function useNewOrderCount(storeId?: string, channelScope = "portal") {
         .select("id", { count: "exact", head: true })
         .eq("store_id", storeId)
         .eq("status", "placed")
+        .eq("payment_status", "paid")
         .then(({ count: nextCount }) => {
           if (active) setCount(nextCount ?? 0);
         });

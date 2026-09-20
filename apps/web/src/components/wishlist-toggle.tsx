@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { track } from "@/lib/analytics/track";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUser } from "@/lib/use-auth-user";
 import { cn } from "@/lib/utils";
@@ -108,6 +109,7 @@ export function WishlistToggle({
         if (!error) {
           setIsWished(false);
           onChange?.(false);
+          track("wishlist_remove", { product_id: productId });
         }
       } else {
         const { error } = await supabase
@@ -117,6 +119,7 @@ export function WishlistToggle({
         if (!error) {
           setIsWished(true);
           onChange?.(true);
+          track("wishlist_add", { product_id: productId });
           btnRef.current?.animate(
             [{ transform: "scale(1)" }, { transform: "scale(1.12)" }, { transform: "scale(1)" }],
             { duration: 280, easing: "ease-out" },
