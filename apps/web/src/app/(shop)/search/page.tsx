@@ -1,16 +1,13 @@
 import Link from "next/link";
 import { StoreCard } from "@/components/cards";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
-import { AnalyticsPageView, SearchAnalytics } from "@/components/analytics-hooks";
+import { SearchAnalytics } from "@/components/analytics-hooks";
 import { getCachedBrowseCategories } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
+import { searchCatalog } from "@/lib/search/catalog-search";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import type { Product, Store } from "@/lib/types";
-
-type BrowseCategoryMatch = {
-  search_terms: string[] | null;
-};
 
 function searchTerms(value: string) {
   const phrase = value
@@ -55,19 +52,6 @@ export default async function SearchPage({
   const minPrice = min ? Number(min) : null;
   const supabase = await createClient();
 
-  const { data: matchingCategories } =
-    queryTerms.length > 0
-      ? await supabase
-          .from("browse_categories")
-          .select("search_terms")
-          .or(ilikeAny(["name", "slug"], queryTerms))
-      : { data: [] as BrowseCategoryMatch[] };
-
-  const categoryTerms = ((matchingCategories ?? []) as BrowseCategoryMatch[])
-    .flatMap((category) => category.search_terms ?? [])
-    .flatMap(searchTerms);
-  const productTerms = [...new Set([...queryTerms, ...categoryTerms])];
-
   let storesQuery = supabase.from("stores").select("*").eq("is_active", true);
   let productsQuery = supabase
     .from("storefront_products")
@@ -83,9 +67,8 @@ export default async function SearchPage({
       storesQuery = storesQuery.or(
         ilikeAny(["name", "area", "description"], queryTerms),
       );
-      productsQuery = productsQuery.or(
-        ilikeAny(["title", "description"], productTerms),
-      );
+      // Product retrieval is handled by the shared hybrid search service below.
+      productsQuery = productsQuery.is("id", null);
     }
   }
 
@@ -108,15 +91,29 @@ export default async function SearchPage({
 
   productsQuery = productsQuery.order("created_at", { ascending: false });
 
-  const [{ data: stores }, { data: products }] = await Promise.all([
+  const hybridSearchPromise = query
+    ? searchCatalog(query, { limit: 100, semantic: true })
+    : Promise.resolve(null);
+  const [hybridSearch, { data: stores }, { data: fallbackProducts }] = await Promise.all([
+    hybridSearchPromise,
     storesQuery.order("name").limit(24),
-    productsQuery.limit(48),
+    query ? Promise.resolve({ data: [] }) : productsQuery.limit(48),
   ]);
 
   const storeList = (stores ?? []) as Store[];
-  let productList = (products ?? []) as (Product & {
+  let productList = (hybridSearch?.products ?? fallbackProducts ?? []) as (Product & {
     stores: { slug: string; name: string };
   })[];
+
+  if (maxPrice != null && !Number.isNaN(maxPrice)) {
+    productList = productList.filter((product) => Number(product.price_aed) <= maxPrice);
+  }
+  if (minPrice != null && !Number.isNaN(minPrice)) {
+    productList = productList.filter((product) => Number(product.price_aed) >= minPrice);
+  }
+  if (instock === "1") productList = productList.filter((product) => product.stock > 0);
+  if (sizeFilter) productList = productList.filter((product) => product.sizes?.includes(sizeFilter));
+  productList = productList.slice(0, 48);
 
   const ratingMap = await fetchProductRatingMap(
     supabase,
@@ -162,6 +159,9 @@ export default async function SearchPage({
       <SearchAnalytics
         query={query}
         resultCount={productList.length}
+        interpretedIntent={hybridSearch?.intent ?? null}
+        candidateCounts={hybridSearch?.candidateCounts ?? null}
+        latencyMs={hybridSearch?.latencyMs ?? null}
         filters={{
           max: maxPrice,
           min: minPrice,
@@ -174,6 +174,25 @@ export default async function SearchPage({
       <p className="mt-2 text-sm text-muted">
         Stores and products across UAE retail floors.
       </p>
+      {query && hybridSearch?.intent ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Search interpretation">
+          <span>Understood as</span>
+          {[
+            hybridSearch.intent.category?.replace(/-/g, " "),
+            hybridSearch.intent.color,
+            hybridSearch.intent.fabric,
+            hybridSearch.intent.style,
+            hybridSearch.intent.occasion,
+          ].filter(Boolean).map((facet) => (
+            <span key={facet} className="border border-line bg-surface px-2.5 py-1 capitalize text-ink">{facet}</span>
+          ))}
+        </div>
+      ) : null}
+      {query && hybridSearch && hybridSearch.exactCount === 0 && hybridSearch.substituteCount > 0 ? (
+        <div className="mt-5 border-l-2 border-accent bg-surface px-4 py-3 text-sm text-ink">
+          No exact matches are available right now. Showing the closest product-type alternatives; requested attributes may differ.
+        </div>
+      ) : null}
 
       <div className="mt-5 flex flex-wrap gap-2 lg:hidden">
         {[
@@ -218,7 +237,10 @@ export default async function SearchPage({
               Products ({productList.length})
             </h2>
             {browseProducts.length === 0 ? (
-              <p className="text-sm text-muted">No products matched.</p>
+              <div className="border-y border-line py-10">
+                <p className="font-medium text-ink">No exact products matched “{query}”.</p>
+                <p className="mt-2 text-sm text-muted">Try removing a colour or style, or check the spelling. We won’t replace your search with unrelated products.</p>
+              </div>
             ) : (
               <ProductBrowser
                 products={browseProducts}

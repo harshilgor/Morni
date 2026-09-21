@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { track } from "@/lib/analytics/track";
+import { getSearchAttribution } from "@/lib/analytics/search-attribution";
 import { useCart } from "@/lib/cart";
 import { formatAed } from "@/lib/format";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
@@ -264,7 +265,7 @@ export function ProductDetail({
     track("product_view", {
       product_id: product.id,
       store_id: product.store_id,
-      metadata: { path: "pdp" },
+      metadata: { path: "pdp", ...(getSearchAttribution(product.id) ?? {}) },
     });
   }, [product.id, product.store_id]);
 

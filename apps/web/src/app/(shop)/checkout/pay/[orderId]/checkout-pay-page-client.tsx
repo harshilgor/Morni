@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatAed } from "@/lib/format";
 import type { Order } from "@/lib/types";
 import { track, trackOnce } from "@/lib/analytics/track";
+import { getSearchAttribution } from "@/lib/analytics/search-attribution";
 import AfsPaymentWidget from "./afs-payment-widget";
 
 type CheckoutSession = {
@@ -69,7 +70,7 @@ export default function CheckoutPayPageClient({ orderId }: { orderId: string }) 
         trackOnce(
           `checkout_payment_success:${orderId}`,
           "checkout_payment_success",
-          { metadata: { order_id: orderId } },
+          { metadata: { order_id: orderId, ...(getSearchAttribution() ?? {}) } },
         );
         router.replace(`/orders/${orderId}?paid=1`);
         return;
@@ -110,7 +111,7 @@ export default function CheckoutPayPageClient({ orderId }: { orderId: string }) 
       }
 
       trackOnce(`checkout_payment_start:${orderId}`, "checkout_payment_start", {
-        metadata: { order_id: orderId },
+        metadata: { order_id: orderId, ...(getSearchAttribution() ?? {}) },
       });
 
       setSession({

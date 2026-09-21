@@ -60,6 +60,33 @@ type FounderDiscoveryData = {
     top_sources: Array<{ source: string; count: number }>;
   };
 };
+type FounderSearchConversionData = {
+  generated_at: string;
+  range_days: number;
+  searches: number;
+  zero_results: number;
+  has_data: boolean;
+  funnel: {
+    searches: number;
+    zero_results: number;
+    result_clicks: number;
+    product_views: number;
+    wishlist_adds: number;
+    cart_adds: number;
+    checkout_starts: number;
+    purchases: number;
+    revenue: number;
+    click_searches: number;
+    view_searches: number;
+    wishlist_searches: number;
+    cart_searches: number;
+    checkout_searches: number;
+    purchase_searches: number;
+  };
+  rates: { click: number | null; view: number | null; wishlist: number | null; cart: number | null; checkout: number | null; purchase: number | null; zero_result: number | null };
+  top_converting_queries: Array<{ query: string; searches: number; purchases: number; revenue: number }>;
+  highest_volume_queries: Array<{ query: string; searches: number; click_searches: number; cart_searches: number }>;
+};
 type FounderTone = "urgent" | "warning" | "default";
 type DeliveryJobStatus = "unassigned" | "assigned" | "accepted" | "at_pickup" | "collected" | "delivered" | "failed" | "cancelled";
 
@@ -722,7 +749,7 @@ function IntentTrackingCard({
   );
 }
 
-function DemandView({ data, discovery }: { data: FounderData; discovery: FounderDiscoveryData | null }) {
+function DemandView({ data, discovery, searchConversion }: { data: FounderData; discovery: FounderDiscoveryData | null; searchConversion: FounderSearchConversionData | null }) {
   const funnel = data.demand?.funnel ?? {
     wishlist_users: data.metrics.wishlist_users ?? 0,
     checkout_started: data.metrics.unpaid_checkouts ?? 0,
@@ -733,6 +760,7 @@ function DemandView({ data, discovery }: { data: FounderData; discovery: Founder
   const intent = data.intent;
   const hasIntent = Boolean(intent?.has_data || discovery?.has_data);
   const eventFunnel = discovery?.funnel;
+  const searchFunnel = searchConversion?.funnel;
 
   return (
     <div className="space-y-5">
@@ -786,6 +814,37 @@ function DemandView({ data, discovery }: { data: FounderData; discovery: Founder
           ) : null}
         </Panel>
       ) : null}
+
+      <Panel className="p-5 sm:p-6">
+        <SectionTitle title="Conversion from Search" detail={searchConversion?.has_data ? `Search-attributed actions · last ${searchConversion.range_days} days` : "Search attribution is live and will populate as shoppers search and continue to products."} />
+        {searchFunnel && searchConversion?.has_data ? (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="Search conversion" value={`${searchConversion.rates.purchase ?? 0}%`} detail={`${number(searchFunnel.purchase_searches)} searches reached purchase`} icon="sparkle" />
+              <MetricCard label="Search → cart" value={`${searchConversion.rates.cart ?? 0}%`} detail={`${number(searchFunnel.cart_adds)} attributed cart adds`} icon="products" />
+              <MetricCard label="Search revenue" value={formatAed(searchFunnel.revenue)} detail={`${number(searchFunnel.purchases)} attributed purchases`} icon="analytics" />
+              <MetricCard label="Zero-result rate" value={`${searchConversion.rates.zero_result ?? 0}%`} detail={`${number(searchFunnel.zero_results)} searches returned nothing`} tone={searchConversion.rates.zero_result && searchConversion.rates.zero_result > 20 ? "attention" : "default"} icon="search" />
+            </div>
+            <div className="mt-5 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#82908a]">Search funnel</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                  {[["Searches", searchFunnel.searches], ["Clicks", searchFunnel.result_clicks], ["Views", searchFunnel.product_views], ["Hearts", searchFunnel.wishlist_adds], ["Carts", searchFunnel.cart_adds], ["Purchases", searchFunnel.purchases]].map(([label, value]) => <div key={String(label)} className="rounded-lg border border-[#e2e7e4] bg-[#f7faf8] px-3 py-3"><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#82908a]">{label}</p><p className="mt-1.5 text-lg font-bold tabular-nums text-[#17231f]">{number(Number(value))}</p></div>)}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#82908a]">Top converting searches</p>
+                <div className="mt-2 divide-y divide-[#eef2f0]">
+                  {searchConversion.top_converting_queries.slice(0, 5).map((row) => <div key={row.query} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="min-w-0 truncate font-medium text-[#31443d]">“{row.query}”</span><span className="shrink-0 text-right text-xs tabular-nums text-[#687770]">{number(row.purchases)} purchases · {formatAed(row.revenue)}</span></div>)}
+                  {!searchConversion.top_converting_queries.length ? <p className="py-3 text-sm text-[#687770]">No attributed purchases yet.</p> : null}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-[#d5ddd9] bg-[#f8faf9] px-4 py-6 text-center text-sm text-[#687770]">Search conversion metrics will appear after shoppers search, click a result, and continue through the funnel.</div>
+        )}
+      </Panel>
 
       <Panel className="p-5 sm:p-6">
         <SectionTitle
@@ -1861,8 +1920,8 @@ function RefundsView() {
   </div>;
 }
 
-function WorkspaceContent({ data, discovery, deliveryData, activeView, ownerName, onViewChange, onRefresh }: { data: FounderData; discovery: FounderDiscoveryData | null; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void }) {
-  if (activeView === "demand") return <DemandView data={data} discovery={discovery} />;
+function WorkspaceContent({ data, discovery, searchConversion, deliveryData, activeView, ownerName, onViewChange, onRefresh }: { data: FounderData; discovery: FounderDiscoveryData | null; searchConversion: FounderSearchConversionData | null; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void }) {
+  if (activeView === "demand") return <DemandView data={data} discovery={discovery} searchConversion={searchConversion} />;
   if (activeView === "operations") return <Panel><OrderTable orders={data.recent_orders} /></Panel>;
   if (activeView === "delivery") return <DeliveryView data={deliveryData} onRefresh={onRefresh} />;
   if (activeView === "stores") return <StoresView stores={data.stores} />;
@@ -1880,6 +1939,7 @@ export function FounderWorkspace() {
   const [data, setData] = useState<FounderData | null>(null);
   const [deliveryData, setDeliveryData] = useState<FounderDeliveryData | null>(null);
   const [discovery, setDiscovery] = useState<FounderDiscoveryData | null>(null);
+  const [searchConversion, setSearchConversion] = useState<FounderSearchConversionData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [range, setRange] = useState<7 | 30>(7);
@@ -1895,13 +1955,15 @@ export function FounderWorkspace() {
       client.rpc("founder_workspace_data", { p_range_days: range }),
       client.rpc("founder_delivery_workspace_data"),
       client.rpc("founder_discovery_metrics", { p_range_days: range }),
-    ]).then(async ([workspaceResponse, deliveryResponse, discoveryResponse]) => {
+      client.rpc("founder_search_conversion_metrics", { p_range_days: range }),
+    ]).then(async ([workspaceResponse, deliveryResponse, discoveryResponse, searchConversionResponse]) => {
       if (!active) return;
       if (workspaceResponse.error || deliveryResponse.error) {
         setError(workspaceResponse.error?.message ?? deliveryResponse.error?.message ?? "Unable to load Founder data.");
         setData(null);
         setDeliveryData(null);
         setDiscovery(null);
+        setSearchConversion(null);
       } else {
         const founderData = workspaceResponse.data as unknown as FounderData;
         const orderIds = founderData.recent_orders.map((order) => order.id);
@@ -1917,6 +1979,7 @@ export function FounderWorkspace() {
         setData({ ...founderData, recent_orders: founderData.recent_orders.map((order) => ({ ...order, products: productsByOrder.get(order.id) ?? [] })) });
         setDeliveryData(deliveryResponse.data as unknown as FounderDeliveryData);
         setDiscovery(discoveryResponse.error ? null : (discoveryResponse.data as unknown as FounderDiscoveryData));
+        setSearchConversion(searchConversionResponse.error ? null : (searchConversionResponse.data as unknown as FounderSearchConversionData));
         setError(null);
       }
       setLoadingData(false);
@@ -2014,7 +2077,7 @@ export function FounderWorkspace() {
           {error ? <FounderError error={error} onRetry={refreshData} /> : null}
           {data && deliveryData ? (
             <div key={activeView}>
-              <WorkspaceContent data={data} discovery={discovery} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} />
+              <WorkspaceContent data={data} discovery={discovery} searchConversion={searchConversion} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} />
             </div>
           ) : null}
         </main>

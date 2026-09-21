@@ -42,6 +42,9 @@ export type BrowsableProduct = {
   fabric?: string | null;
   stock: number;
   created_at?: string | null;
+  search_score?: number;
+  search_relevance?: "exact" | "substitute";
+  search_sources?: string[];
   category?: { name: string; slug: string } | null;
   stores: {
     slug: string;
@@ -1162,6 +1165,9 @@ export function ProductBrowser({
                   query={analyticsQuery}
                   storeId={analyticsStoreId ?? product.store_id}
                   storeSlug={product.stores.slug}
+                  searchScore={product.search_score}
+                  searchRelevance={product.search_relevance}
+                  searchSources={product.search_sources}
                 />
               ))}
             </div>
