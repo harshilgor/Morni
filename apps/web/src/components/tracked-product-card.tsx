@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { ProductCard } from "@/components/cards";
 import { trackListingClick } from "@/components/analytics-hooks";
 import { track } from "@/lib/analytics/track";
+import { getSearchAttribution } from "@/lib/analytics/search-attribution";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 
 type ListingProduct = {
@@ -31,6 +32,9 @@ export function TrackedProductCard({
   priority,
   unoptimized,
   onWishlistChange,
+  searchScore,
+  searchRelevance,
+  searchSources,
 }: {
   product: ListingProduct;
   href: string;
@@ -46,10 +50,14 @@ export function TrackedProductCard({
   priority?: boolean;
   unoptimized?: boolean;
   onWishlistChange?: (isWished: boolean) => void;
+  searchScore?: number;
+  searchRelevance?: "exact" | "substitute";
+  searchSources?: string[];
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const seen = useRef(false);
   const resolvedStoreId = storeId ?? product.store_id ?? null;
+  const searchSourcesKey = searchSources?.join(",").slice(0, 120) ?? null;
   const context = useMemo(
     () => ({
       productId: product.id,
@@ -60,8 +68,11 @@ export function TrackedProductCard({
       collection: collection ?? null,
       storeSlug: storeSlug ?? null,
       query: query ?? null,
+      searchScore: searchScore ?? null,
+      searchRelevance: searchRelevance ?? null,
+      searchSources: searchSourcesKey,
     }),
-    [product.id, resolvedStoreId, surface, position, category, collection, storeSlug, query],
+    [product.id, resolvedStoreId, surface, position, category, collection, storeSlug, query, searchScore, searchRelevance, searchSourcesKey],
   );
 
   useEffect(() => {
@@ -83,6 +94,11 @@ export function TrackedProductCard({
             collection: context.collection,
             store_slug: context.storeSlug,
             query: context.query,
+            search_score: context.searchScore,
+            relevance_class: context.searchRelevance,
+            candidate_sources: context.searchSources,
+            ranker_version: context.query ? "hybrid-v1" : null,
+            ...(context.query ? (getSearchAttribution() ?? {}) : {}),
           },
         });
         observer.disconnect();

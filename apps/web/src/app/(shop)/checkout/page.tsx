@@ -28,6 +28,7 @@ import {
 } from "@/lib/delivery-slots";
 import { navigateToPaymentPage } from "@/lib/payment-navigation";
 import { track, trackOnce } from "@/lib/analytics/track";
+import { getSearchAttribution } from "@/lib/analytics/search-attribution";
 
 const CHECKOUT_DRAFT_KEY = "morni.checkout.delivery.v1";
 
@@ -120,7 +121,7 @@ export default function CheckoutPage() {
     }
     trackOnce("checkout_start:visit", "checkout_start", {
       quantity: items.reduce((sum, item) => sum + item.quantity, 0),
-      metadata: { lines: items.length },
+      metadata: { lines: items.length, ...(getSearchAttribution() ?? {}) },
     });
     // Fire once per checkout page visit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -279,6 +280,7 @@ export default function CheckoutPage() {
         metadata: {
           order_id: payload.order.id,
           payment_method: method,
+          ...(getSearchAttribution() ?? {}),
         },
       });
       clear();

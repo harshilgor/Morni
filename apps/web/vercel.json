@@ -3,6 +3,7 @@
   "regions": ["bom1"],
   "crons": [
     { "path": "/api/cron/email-outbox", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/bulk-import-cleanup", "schedule": "30 0 * * *" }
+    { "path": "/api/cron/bulk-import-cleanup", "schedule": "30 0 * * *" },
+    { "path": "/api/cron/search-embeddings", "schedule": "*/10 * * * *" }
   ]
 }

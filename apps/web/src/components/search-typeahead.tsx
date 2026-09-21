@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { formatAed } from "@/lib/format";
 
 type Suggestion = {
-  type: "store" | "product";
+  type: "query" | "store" | "product";
   id: string;
   label: string;
   meta: string;
@@ -96,71 +94,28 @@ export function SearchTypeahead({
     const q = cleanSearchTerm(query);
     if (q.length < 2) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
-      if (cancelled) return;
       setLoading(true);
-      const supabase = createClient();
-      const [{ data: stores }, { data: products }] = await Promise.all([
-        supabase
-          .from("stores")
-          .select("id, name, slug, area, emirate")
-          .eq("is_active", true)
-          .or(`name.ilike.%${q}%,area.ilike.%${q}%`)
-          .limit(4),
-        supabase
-          .from("storefront_products")
-          .select("id, title, price_aed, stores!inner(slug, name, is_active)")
-          .eq("is_available", true)
-          .eq("stores.is_active", true)
-          .ilike("title", `%${q}%`)
-          .limit(5),
-      ]);
-
-      if (cancelled) return;
-
-      const productRows = (products ?? []) as unknown as {
-        id: string;
-        title: string;
-        price_aed: number;
-        stores: { slug: string; name: string } | { slug: string; name: string }[];
-      }[];
-
-      const next: Suggestion[] = [
-        ...((stores ?? []) as {
-          id: string;
-          name: string;
-          slug: string;
-          area: string;
-        }[]).map((store) => ({
-          type: "store" as const,
-          id: store.id,
-          label: store.name,
-          meta: store.area,
-          href: `/stores/${store.slug}`,
-        })),
-        ...productRows.map((product) => {
-          const store = Array.isArray(product.stores)
-            ? product.stores[0]
-            : product.stores;
-          return {
-            type: "product" as const,
-            id: product.id,
-            label: product.title,
-            meta: `${store?.name ?? "Store"} · ${formatAed(product.price_aed)}`,
-            href: `/stores/${store?.slug ?? "store"}/products/${product.id}`,
-          };
-        }),
-      ];
-
-      setSuggestions(next);
-      setLoading(false);
-      setOpen(true);
+      try {
+        const response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(q)}`, {
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error("Suggestion request failed");
+        const payload = (await response.json()) as { suggestions?: Suggestion[] };
+        setSuggestions(payload.suggestions ?? []);
+        setOpen(true);
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") setSuggestions([]);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }, 220);
 
     return () => {
-      cancelled = true;
       clearTimeout(timer);
+      controller.abort();
     };
   }, [query]);
 
@@ -271,9 +226,7 @@ export function SearchTypeahead({
                       <span className="block text-sm font-medium text-ink">
                         {item.label}
                       </span>
-                      <span className="mt-0.5 block text-xs text-muted">
-                        {item.type === "store" ? "Store" : "Product"} · {item.meta}
-                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">{item.meta}</span>
                     </span>
                   </Link>
                 </li>

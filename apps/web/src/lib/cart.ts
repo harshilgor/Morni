@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { syncCartSnapshot, track } from "@/lib/analytics/track";
+import { getSearchAttribution } from "@/lib/analytics/search-attribution";
 import type { Product } from "@/lib/types";
 import type { ProductCustomizationValues } from "@/lib/product-customization";
 
@@ -139,6 +140,7 @@ export const useCart = create<CartState>()(
           product_id: product.id,
           store_id: product.store_id,
           quantity: qty,
+          metadata: getSearchAttribution(product.id) ?? undefined,
         });
         try {
           if (typeof window !== "undefined" && window.sessionStorage.getItem("morni-from-wishlist") === "1") {

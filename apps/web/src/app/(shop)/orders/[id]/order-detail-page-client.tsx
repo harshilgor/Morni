@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient, createRealtimeChannelName } from "@/lib/supabase/client";
 import { trackOnce } from "@/lib/analytics/track";
+import { getSearchAttribution } from "@/lib/analytics/search-attribution";
 import { emirateLabel, formatAed, orderStatusLabel } from "@/lib/format";
 import { formatDeliverySlotWindow } from "@/lib/delivery-slots";
 import type { Order, OrderItem, ProductReview } from "@/lib/types";
@@ -93,7 +94,7 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
   useEffect(() => {
     if (paymentFlash === "paid") {
       trackOnce(`checkout_payment_success:${orderId}`, "checkout_payment_success", {
-        metadata: { order_id: orderId, source: "order_detail" },
+        metadata: { order_id: orderId, source: "order_detail", ...(getSearchAttribution() ?? {}) },
       });
     } else if (paymentFlash === "failed") {
       trackOnce(`checkout_payment_fail:${orderId}:result`, "checkout_payment_fail", {
