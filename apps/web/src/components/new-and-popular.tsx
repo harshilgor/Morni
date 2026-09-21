@@ -26,7 +26,6 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
   const active = tabs.find((tab) => tab.slug === activeSlug) ?? tabs[0];
   const activeProducts = active ? productsByTab[active.slug] ?? active.products : [];
 
-  useEffect(() => setHasMore(true), [activeSlug]);
   useEffect(() => {
     const trigger = loadTriggerRef.current;
     if (!trigger || !active || !hasMore || loading) return;
@@ -64,7 +63,10 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
                 <button
                   key={tab.slug}
                   type="button"
-                  onClick={() => setActiveSlug(tab.slug)}
+                  onClick={() => {
+                    setActiveSlug(tab.slug);
+                    setHasMore(true);
+                  }}
                   aria-pressed={isActive}
                   className={`shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] transition sm:text-[11px] sm:tracking-[0.12em] ${
                     isActive
@@ -88,7 +90,7 @@ export function NewAndPopular({ tabs }: { tabs: PopularTab[] }) {
             className="group relative flex flex-col bg-white"
           >
             <div className="relative aspect-[3/4] w-full overflow-hidden bg-sand">
-              <ProductCardImage src={product.image_urls?.[0]} alt={product.title} unoptimized />
+              <ProductCardImage src={product.image_urls?.[0]} alt={product.title} />
             </div>
             <div className="space-y-0 p-1.5 sm:p-3">
               <div className="flex items-start gap-0.5">

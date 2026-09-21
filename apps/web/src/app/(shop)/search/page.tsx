@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { StoreCard } from "@/components/cards";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
 import { SearchAnalytics } from "@/components/analytics-hooks";
 import { getCachedBrowseCategories } from "@/lib/catalog";
@@ -7,36 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
 import { searchCatalog } from "@/lib/search/catalog-search";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
-import type { Product, Store } from "@/lib/types";
-
-function searchTerms(value: string) {
-  const phrase = value
-    .replace(/[,%().]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!phrase) return [];
-
-  return [
-    ...new Set([
-      phrase,
-      ...phrase.split(" ").filter((word) => word.length > 1),
-    ]),
-  ];
-}
-
-function ilikeAny(fields: string[], terms: string[]) {
-  return terms
-    .flatMap((term) => fields.map((field) => `${field}.ilike.%${term}%`))
-    .join(",");
-}
+import type { Product } from "@/lib/types";
 
 export default async function SearchPage({
   searchParams,
 }: {
   searchParams: Promise<{
     q?: string;
-    emirate?: string;
     max?: string;
     min?: string;
     size?: string;
@@ -44,15 +20,13 @@ export default async function SearchPage({
     instock?: string;
   }>;
 }) {
-  const { q = "", emirate, max, min, size, sort, instock } = await searchParams;
+  const { q = "", max, min, size, sort, instock } = await searchParams;
   const query = q.trim();
   const sizeFilter = size?.trim().slice(0, 40) || null;
-  const queryTerms = searchTerms(query);
   const maxPrice = max ? Number(max) : null;
   const minPrice = min ? Number(min) : null;
   const supabase = await createClient();
 
-  let storesQuery = supabase.from("stores").select("*").eq("is_active", true);
   let productsQuery = supabase
     .from("storefront_products")
     .select("*, category:categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)")
@@ -60,20 +34,8 @@ export default async function SearchPage({
     .eq("stores.is_active", true);
 
   if (query) {
-    if (queryTerms.length === 0) {
-      storesQuery = storesQuery.is("id", null);
-      productsQuery = productsQuery.is("id", null);
-    } else {
-      storesQuery = storesQuery.or(
-        ilikeAny(["name", "area", "description"], queryTerms),
-      );
-      // Product retrieval is handled by the shared hybrid search service below.
-      productsQuery = productsQuery.is("id", null);
-    }
-  }
-
-  if (emirate) {
-    storesQuery = storesQuery.eq("emirate", emirate);
+    // Product retrieval is handled by the shared hybrid search service below.
+    productsQuery = productsQuery.is("id", null);
   }
 
   if (maxPrice != null && !Number.isNaN(maxPrice)) {
@@ -94,13 +56,11 @@ export default async function SearchPage({
   const hybridSearchPromise = query
     ? searchCatalog(query, { limit: 100, semantic: true })
     : Promise.resolve(null);
-  const [hybridSearch, { data: stores }, { data: fallbackProducts }] = await Promise.all([
+  const [hybridSearch, { data: fallbackProducts }] = await Promise.all([
     hybridSearchPromise,
-    storesQuery.order("name").limit(24),
     query ? Promise.resolve({ data: [] }) : productsQuery.limit(48),
   ]);
 
-  const storeList = (stores ?? []) as Store[];
   let productList = (hybridSearch?.products ?? fallbackProducts ?? []) as (Product & {
     stores: { slug: string; name: string };
   })[];
@@ -171,23 +131,6 @@ export default async function SearchPage({
         }}
       />
       <h1 className="font-display text-3xl text-ink sm:text-4xl">{heading}</h1>
-      <p className="mt-2 text-sm text-muted">
-        Stores and products across UAE retail floors.
-      </p>
-      {query && hybridSearch?.intent ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Search interpretation">
-          <span>Understood as</span>
-          {[
-            hybridSearch.intent.category?.replace(/-/g, " "),
-            hybridSearch.intent.color,
-            hybridSearch.intent.fabric,
-            hybridSearch.intent.style,
-            hybridSearch.intent.occasion,
-          ].filter(Boolean).map((facet) => (
-            <span key={facet} className="border border-line bg-surface px-2.5 py-1 capitalize text-ink">{facet}</span>
-          ))}
-        </div>
-      ) : null}
       {query && hybridSearch && hybridSearch.exactCount === 0 && hybridSearch.substituteCount > 0 ? (
         <div className="mt-5 border-l-2 border-accent bg-surface px-4 py-3 text-sm text-ink">
           No exact matches are available right now. Showing the closest product-type alternatives; requested attributes may differ.
@@ -215,23 +158,6 @@ export default async function SearchPage({
       </div>
 
       <div className="mt-10 space-y-12">
-          {query ? (
-            <section>
-              <h2 className="mb-5 font-display text-2xl text-ink">
-                Stores ({storeList.length})
-              </h2>
-              {storeList.length === 0 ? (
-                <p className="text-sm text-muted">No stores matched.</p>
-              ) : (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {storeList.map((store) => (
-                    <StoreCard key={store.id} store={store} />
-                  ))}
-                </div>
-              )}
-            </section>
-          ) : null}
-
           <section>
             <h2 className="mb-5 font-display text-2xl text-ink lg:hidden">
               Products ({productList.length})
@@ -249,13 +175,15 @@ export default async function SearchPage({
                 showInStockFilter
                 analyticsSurface="search"
                 analyticsQuery={query || null}
+                sharp
+                square
               />
             )}
           </section>
       </div>
 
       <Link href="/" className="mt-10 inline-block text-sm text-accent-deep underline">
-        Back to all stores
+        Back to home
       </Link>
     </div>
   );

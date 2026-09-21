@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Suggestion = {
-  type: "query" | "store" | "product";
+  type: "query" | "product";
   id: string;
   label: string;
   meta: string;
@@ -13,7 +13,7 @@ type Suggestion = {
 };
 
 const DEFAULT_PLACEHOLDER_SUGGESTIONS = [
-  '"stores"',
+  '"tops"',
   '"items under AED 99"',
   '"kurtis"',
   '"lehengas"',
@@ -91,7 +91,7 @@ export function SearchTypeahead({
   }, [previousPlaceholder]);
 
   useEffect(() => {
-    const q = cleanSearchTerm(query);
+    const q = cleanSearchTerm(query).toLowerCase();
     if (q.length < 2) return;
 
     const controller = new AbortController();
