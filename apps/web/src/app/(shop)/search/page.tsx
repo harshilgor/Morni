@@ -1,12 +1,36 @@
 import Link from "next/link";
 import { ProductBrowser, type BrowsableProduct } from "@/components/product-browser";
 import { SearchAnalytics } from "@/components/analytics-hooks";
+import { SearchRelatedRecommendations, type SearchRecommendation } from "@/components/search-related-recommendations";
 import { getCachedBrowseCategories } from "@/lib/catalog";
+import { BROWSABLE_PRODUCT_CATALOG_SELECT } from "@/lib/catalog-projections";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProductRatingMap } from "@/lib/product-ratings";
 import { searchCatalog } from "@/lib/search/catalog-search";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import type { Product } from "@/lib/types";
+
+const RELATED_CATEGORY_SLUGS: Record<string, string[]> = {
+  shararas: ["salwar-kameez", "party-wear", "lehengas", "anarkalis", "pakistani-suits"],
+  lehengas: ["shararas", "party-wear", "anarkalis", "sarees"],
+  sarees: ["lehengas", "party-wear", "shararas", "pakistani-suits"],
+  "salwar-kameez": ["shararas", "pakistani-suits", "anarkalis", "party-wear"],
+  kurtis: ["short-kurtis", "chikankari", "sets", "indo-western"],
+  "short-kurtis": ["kurtis", "chikankari", "tops", "sets"],
+  chikankari: ["kurtis", "short-kurtis", "party-wear", "salwar-kameez"],
+  "pakistani-suits": ["salwar-kameez", "shararas", "anarkalis", "party-wear"],
+  "party-wear": ["lehengas", "shararas", "anarkalis", "sarees"],
+  anarkalis: ["party-wear", "salwar-kameez", "lehengas", "shararas"],
+  sets: ["kurtis", "short-kurtis", "indo-western", "tops"],
+  "indo-western": ["sets", "party-wear", "tops", "kaftan"],
+  kaftan: ["indo-western", "party-wear", "sarees", "gifting"],
+};
+
+function medianPrice(products: Array<{ price_aed: number }>) {
+  const prices = products.map((product) => Number(product.price_aed)).filter(Number.isFinite).sort((a, b) => a - b);
+  if (!prices.length) return null;
+  return prices[Math.floor(prices.length / 2)] ?? null;
+}
 
 export default async function SearchPage({
   searchParams,
@@ -75,9 +99,39 @@ export default async function SearchPage({
   if (sizeFilter) productList = productList.filter((product) => product.sizes?.includes(sizeFilter));
   productList = productList.slice(0, 48);
 
+  const categories = await getCachedBrowseCategories();
+  const searchProductIds = new Set(productList.map((product) => product.id));
+  const categoryCounts = new Map<string, number>();
+  productList.forEach((product) => {
+    const slug = product.category?.slug;
+    if (slug) categoryCounts.set(slug, (categoryCounts.get(slug) ?? 0) + 1);
+  });
+  const sourceCategory = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+    ?? hybridSearch?.intent.category
+    ?? null;
+  const relatedSlugs = sourceCategory ? RELATED_CATEGORY_SLUGS[sourceCategory] ?? [] : [];
+  const relatedCategoryIds = relatedSlugs.length
+    ? (await supabase.from("categories").select("id").in("slug", relatedSlugs)).data?.map((category) => category.id) ?? []
+    : [];
+  const { data: relatedRows } = relatedCategoryIds.length && query && productList.length
+    ? await supabase.from("storefront_products").select(BROWSABLE_PRODUCT_CATALOG_SELECT).in("category_id", relatedCategoryIds).eq("is_available", true).gt("stock", 0).eq("stores.is_active", true).limit(96)
+    : { data: [] };
+  const targetPrice = medianPrice(productList);
+  const relatedProducts = ((relatedRows ?? []) as unknown as SearchRecommendation[])
+    .filter((product) => !searchProductIds.has(product.id))
+    .map((product) => {
+      const categoryIndex = relatedSlugs.indexOf(product.category?.slug ?? "");
+      const categoryScore = categoryIndex < 0 ? 0 : (relatedSlugs.length - categoryIndex) * 4;
+      const priceScore = targetPrice == null ? 0 : Math.max(0, 4 - Math.abs(Number(product.price_aed) - targetPrice) / Math.max(targetPrice, 1) * 4);
+      const fabricScore = hybridSearch?.intent.fabric && product.fabric?.toLowerCase() === hybridSearch.intent.fabric ? 2 : 0;
+      return { ...product, recommendation_score: categoryScore + priceScore + fabricScore };
+    })
+    .sort((a, b) => b.recommendation_score - a.recommendation_score)
+    .slice(0, 36);
+
   const ratingMap = await fetchProductRatingMap(
     supabase,
-    productList.map((product) => product.id),
+    [...productList, ...relatedProducts].map((product) => product.id),
   );
   const ratingRecord = Object.fromEntries(ratingMap) as Record<
     string,
@@ -111,7 +165,6 @@ export default async function SearchPage({
               ? "In stock"
               : "All products";
 
-  const categories = await getCachedBrowseCategories();
   const browseProducts = productList as unknown as BrowsableProduct[];
 
   return (
@@ -180,6 +233,14 @@ export default async function SearchPage({
               />
             )}
           </section>
+          {query && productList.length > 0 && relatedProducts.length > 0 ? (
+            <SearchRelatedRecommendations
+              query={query}
+              products={relatedProducts}
+              categories={categories}
+              ratings={ratingRecord}
+            />
+          ) : null}
       </div>
 
       <Link href="/" className="mt-10 inline-block text-sm text-accent-deep underline">
