@@ -50,7 +50,7 @@ export default async function ClearancePage() {
           </div>
         ) : (
           <ProductBrowser
-            products={products as BrowsableProduct[]}
+          products={products as unknown as BrowsableProduct[]}
             categories={categories}
             ratings={ratings}
           />

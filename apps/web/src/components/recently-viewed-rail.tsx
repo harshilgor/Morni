@@ -53,7 +53,6 @@ export function RecentlyViewedRail() {
                 }}
                 href={`${item.href}${item.href.includes("?") ? "&" : "?"}recent=1`}
                 sharp
-                unoptimized
               />
             </div>
           ))}

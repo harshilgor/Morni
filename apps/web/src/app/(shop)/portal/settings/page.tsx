@@ -20,6 +20,7 @@ import { uploadStoreMedia } from "@/lib/media-upload";
 import { ImageUploadField } from "@/components/image-upload-field";
 import { PortalEmpty, PortalPageHeader, StatusBadge } from "@/components/portal-ui";
 import type { StorePickupLocation } from "@/lib/types";
+import { revalidatePublicCatalog } from "@/lib/revalidate-catalog";
 
 export default function PortalSettingsPage() {
   const { store, loading, error, refresh, storeRole } = useOwnerStore();
@@ -264,6 +265,7 @@ export default function PortalSettingsPage() {
       }
     }
 
+    await revalidatePublicCatalog();
     setForm((current) => ({
       ...current,
       is_active: nextActive,

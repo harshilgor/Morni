@@ -129,7 +129,9 @@ export async function HomeCatalog({
         products: diversifyByKey(
           shuffleCatalog(matches, catalogShuffleSeed(`category:${category.slug}`)),
           (product) => product.stores?.slug ?? product.stores?.name ?? "",
-        ).slice(0, 10).map((p) => ({
+        // Only the first visible desktop row is hydrated up front; subsequent
+        // products continue through the existing paginated endpoint.
+        ).slice(0, 5).map((p) => ({
           id: p.id,
           title: p.title,
           price_aed: Number(p.price_aed),
@@ -151,7 +153,7 @@ export async function HomeCatalog({
       <FeaturedCategories categories={featured} />
       <ShopBySize />
       <HomeDiscovery intents={intentRails} />
-      <TrendingForYou products={products} />
+      <TrendingForYou products={popularPool.slice(0, 60)} />
       {topRated.length > 0 ? (
         <ProductRail
           id="top-rated"
@@ -159,10 +161,9 @@ export async function HomeCatalog({
           subtitle="Looks shoppers love — sorted by verified ratings."
           products={topRated}
           href="/search?sort=rated"
-          unoptimized
         />
       ) : null}
-      <ProductRail title="New in" products={newIn} href="/search?sort=new" sharp unoptimized />
+      <ProductRail title="New in" products={newIn} href="/search?sort=new" sharp />
       <RecentlyViewedRail />
       <HomeStores
         stores={stores}

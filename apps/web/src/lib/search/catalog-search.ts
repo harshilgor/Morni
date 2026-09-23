@@ -1,9 +1,9 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { productSatisfiesCentralIntent, understandSearchQuery, type SearchIntent } from "./query-understanding";
+import { createPublicClient } from "@/lib/supabase/public";
+import { productSatisfiesCentralIntent, semanticSearchPlan, understandSearchQuery, type SearchIntent } from "./query-understanding";
 import type { BrowsableProduct } from "@/components/product-browser";
+import { BROWSABLE_PRODUCT_CATALOG_SELECT } from "@/lib/catalog-projections";
 
 type LexicalCandidate = {
   product_id: string;
@@ -33,7 +33,7 @@ export type CatalogSearchResult = {
 const queryEmbeddingCache = new Map<string, { embedding: number[]; expires: number }>();
 
 async function safeLexicalFallback(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createPublicClient>,
   intent: SearchIntent,
 ) {
   const candidates = new Map<string, LexicalCandidate>();
@@ -41,7 +41,7 @@ async function safeLexicalFallback(
     const { data: categories } = await supabase.from("categories").select("id").eq("slug", intent.category);
     const categoryIds = (categories ?? []).map((category) => category.id);
     if (categoryIds.length > 0) {
-      const { data } = await supabase.from("storefront_products").select("id").in("category_id", categoryIds).eq("is_available", true).limit(200);
+      const { data } = await supabase.from("storefront_products").select("id").in("category_id", categoryIds).eq("is_available", true).limit(80);
       (data ?? []).forEach((product) => candidates.set(product.id, {
         product_id: product.id,
         lexical_rank: 0.5,
@@ -57,7 +57,7 @@ async function safeLexicalFallback(
     : intent.tokens;
   if (titleTerms.length > 0) {
     const titleFilter = titleTerms.map((token) => `title.ilike.%${token.replace(/[,%().]/g, " ")}%`).join(",");
-    const { data } = await supabase.from("storefront_products").select("id").eq("is_available", true).or(titleFilter).limit(200);
+    const { data } = await supabase.from("storefront_products").select("id").eq("is_available", true).or(titleFilter).limit(80);
     (data ?? []).forEach((product) => {
       if (!candidates.has(product.id)) candidates.set(product.id, {
         product_id: product.id,
@@ -114,23 +114,45 @@ export async function searchCatalog(
     return { intent, products: [], exactCount: 0, substituteCount: 0, candidateCounts: { lexical: 0, semantic: 0, fused: 0 }, latencyMs: 0 };
   }
 
-  const supabase = await createClient();
-  const embeddingPromise = createQueryEmbedding(intent.normalizedQuery, options.semantic !== false);
+  // Search only reads the public storefront view. A cookie-free client keeps
+  // typeahead responses safely shareable at the CDN and avoids auth refreshes.
+  const supabase = createPublicClient();
+  const semanticEnabled = options.semantic !== false;
+  const lexicalCandidateLimit = Math.min(80, Math.max(24, limit * 2));
+  const semanticCandidateLimit = Math.min(60, Math.max(18, limit));
+  // Low-confidence natural-language searches benefit from parallel hybrid
+  // search. Structured/category searches stay lexical unless the catalogue
+  // cannot produce enough strong results.
+  const initialSemanticPlan = semanticSearchPlan(intent, 0, limit, semanticEnabled);
+  const eagerSemantic = initialSemanticPlan.eager;
+  const embeddingPromise = eagerSemantic
+    ? createQueryEmbedding(intent.normalizedQuery, true)
+    : Promise.resolve<number[] | null>(null);
   const lexicalPromise = supabase.rpc("search_catalog_lexical", {
     p_query: intent.normalizedQuery,
-    p_limit: 250,
+    p_limit: lexicalCandidateLimit,
   });
-  const [lexicalResponse, embedding] = await Promise.all([lexicalPromise, embeddingPromise]);
+  const [lexicalResponse, eagerEmbedding] = await Promise.all([lexicalPromise, embeddingPromise]);
   const lexical = lexicalResponse.error
     ? await safeLexicalFallback(supabase, intent)
     : (lexicalResponse.data ?? []) as LexicalCandidate[];
 
   let semantic: SemanticCandidate[] = [];
-  if (embedding && !lexicalResponse.error) {
+  const strongLexicalCount = lexical.filter((candidate) => candidate.relevance_class === "exact").length;
+  const needsSemanticFallback = semanticSearchPlan(
+    intent,
+    strongLexicalCount,
+    limit,
+    semanticEnabled,
+  ).fallback;
+  const embedding = needsSemanticFallback
+    ? eagerEmbedding ?? await createQueryEmbedding(intent.normalizedQuery, true)
+    : null;
+  if (embedding) {
     const vectorLiteral = `[${embedding.join(",")}]`;
     const semanticResponse = await supabase.rpc("search_catalog_semantic", {
       p_embedding: vectorLiteral,
-      p_limit: 200,
+      p_limit: semanticCandidateLimit,
     });
     semantic = (semanticResponse.data ?? []) as SemanticCandidate[];
   }
@@ -154,7 +176,7 @@ export async function searchCatalog(
 
   const ids = [...fusion.entries()]
     .sort((a, b) => b[1].score - a[1].score)
-    .slice(0, 300)
+    .slice(0, Math.min(100, Math.max(limit * 2, 24)))
     .map(([id]) => id);
   if (ids.length === 0) {
     return { intent, products: [], exactCount: 0, substituteCount: 0, candidateCounts: { lexical: lexical.length, semantic: semantic.length, fused: 0 }, latencyMs: Math.round(performance.now() - started) };
@@ -162,7 +184,7 @@ export async function searchCatalog(
 
   const { data } = await supabase
     .from("storefront_products")
-    .select("*, category:categories(name, slug), stores!inner(id, slug, name, is_active, emirate, area, delivery_eta_minutes)")
+    .select(BROWSABLE_PRODUCT_CATALOG_SELECT)
     .in("id", ids)
     .eq("is_available", true)
     .eq("stores.is_active", true);
@@ -187,18 +209,4 @@ export async function searchCatalog(
     candidateCounts: { lexical: lexical.length, semantic: semantic.length, fused: fusion.size },
     latencyMs: Math.round(performance.now() - started),
   };
-}
-
-export async function searchStores(query: string, limit = 4) {
-  const admin = createAdminClient();
-  const normalized = understandSearchQuery(query).normalizedQuery.replace(/[,%().]/g, " ");
-  if (!normalized) return [];
-  const { data } = await admin
-    .from("stores")
-    .select("id, name, slug, area, emirate")
-    .eq("is_active", true)
-    .or(`name.ilike.%${normalized}%,area.ilike.%${normalized}%`)
-    .order("name")
-    .limit(limit);
-  return data ?? [];
 }

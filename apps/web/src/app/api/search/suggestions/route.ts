@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchCatalog, searchStores } from "@/lib/search/catalog-search";
+import { searchCatalog } from "@/lib/search/catalog-search";
+import { normalizeSearchQuery } from "@/lib/search/query-understanding";
+
+const PUBLIC_SUGGESTION_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+  "CDN-Cache-Control": "public, s-maxage=600, stale-while-revalidate=3600",
+  "Vercel-CDN-Cache-Control": "public, s-maxage=600, stale-while-revalidate=3600",
+};
 
 export async function GET(request: NextRequest) {
-  const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
-  if (query.length < 2) return NextResponse.json({ intent: null, suggestions: [] });
+  const query = normalizeSearchQuery(request.nextUrl.searchParams.get("q") ?? "");
+  if (query.length < 2) return NextResponse.json({ intent: null, suggestions: [] }, { headers: PUBLIC_SUGGESTION_CACHE_HEADERS });
 
-  const [catalog, stores] = await Promise.all([
-    searchCatalog(query, { limit: 6, semantic: false }),
-    searchStores(query, 3),
-  ]);
+  const catalog = await searchCatalog(query, { limit: 6, semantic: false });
   const suggestions = [
     ...(catalog.intent.category
       ? [{ type: "query", id: `category-${catalog.intent.category}`, label: catalog.intent.category.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), meta: "Category", href: `/search?q=${encodeURIComponent(query)}` }]
       : []),
-    ...stores.map((store) => ({ type: "store", id: store.id, label: store.name, meta: store.area, href: `/stores/${store.slug}` })),
     ...catalog.products.map((product) => ({
       type: "product",
       id: product.id,
@@ -25,6 +28,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     { intent: catalog.intent, suggestions },
-    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" } },
+    { headers: PUBLIC_SUGGESTION_CACHE_HEADERS },
   );
 }

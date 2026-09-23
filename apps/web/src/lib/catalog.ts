@@ -16,9 +16,18 @@ import { createPublicClient } from "@/lib/supabase/public";
 import type { Product, ProductReview, ProductVariant, RelatedProduct, Store, StoreCampaign } from "@/lib/types";
 import { categoryForProduct } from "@/lib/for-you";
 import { catalogShuffleSeed, merchandiseCatalog } from "@/lib/catalog-random";
+import {
+  BROWSABLE_PRODUCT_CATALOG_SELECT,
+  PRODUCT_CARD_CATALOG_SELECT,
+  STORE_BROWSER_PRODUCT_SELECT,
+} from "@/lib/catalog-projections";
 
-export type ProductWithStore = Product & {
+export type ProductWithStore = Pick<Product,
+  "id" | "store_id" | "category_id" | "title" | "description" | "fabric" |
+  "price_aed" | "compare_at_price_aed" | "image_urls" | "stock" | "is_available"
+> & {
   stores: { slug: string; name: string };
+  category?: { name?: string | null; slug?: string | null } | null;
   created_at?: string | null;
 };
 
@@ -48,7 +57,8 @@ type MerchandisingProduct = {
 // A rail must be selected from a meaningful candidate set before we apply the
 // category/store balancing rules. Keeping this bounded protects the public
 // catalog query while still covering the current storefront inventory.
-const HOME_RAIL_CANDIDATE_LIMIT = 500;
+const HOME_RAIL_CANDIDATE_LIMIT = 80;
+const HOME_DISCOVERY_CANDIDATE_LIMIT = 120;
 
 function merchandiseProducts<T extends MerchandisingProduct>(products: T[], railId: string): T[] {
   return merchandiseCatalog(products, {
@@ -161,7 +171,7 @@ async function fetchHomeProductBand(options: {
   const supabase = createPublicClient();
   let query = supabase
     .from("storefront_products")
-    .select("*, category:categories(name, slug), stores!inner(slug, name, is_active)")
+    .select(PRODUCT_CARD_CATALOG_SELECT)
     .eq("is_available", true)
     .eq("stores.is_active", true)
     .order("created_at", { ascending: false })
@@ -184,7 +194,7 @@ async function fetchHomeProductBand(options: {
     throw new Error(`Home catalog query failed (${options.tag}): ${error.message}`);
   }
 
-  return (data ?? []) as ProductWithStore[];
+  return (data ?? []) as unknown as ProductWithStore[];
 }
 
 export async function getCachedHomeProducts(limit = 48) {
@@ -232,7 +242,7 @@ export async function getCachedHomeCatalog() {
       getCachedFeaturedCategories(),
       // Keep a broad candidate pool so the daily New & Popular shuffle can
       // surface older products instead of only the latest uploads.
-      getCachedHomeProducts(200),
+      getCachedHomeProducts(HOME_DISCOVERY_CANDIDATE_LIMIT),
       getCachedHomePriceBand({ maxPrice: 55, limit: HOME_RAIL_CANDIDATE_LIMIT, tag: "home-price-max:55" }),
       getCachedHomePriceBand({ minPriceExclusive: 55, maxPrice: 99, limit: HOME_RAIL_CANDIDATE_LIMIT, tag: "home-price:55-99" }),
       getCachedHomePriceBand({ minPriceExclusive: 99, maxPrice: 149, limit: HOME_RAIL_CANDIDATE_LIMIT, tag: "home-price:99-149" }),
@@ -270,6 +280,22 @@ export async function getCachedStoreBySlug(slug: string) {
   return (data as Store | null) ?? null;
 }
 
+/** Used only to distinguish a temporarily unlisted store from an unknown URL. */
+export async function getCachedStoreBySlugIncludingInactive(slug: string) {
+  "use cache";
+  cacheLife("minutes");
+  tagCatalog("stores", `store:${slug}`);
+
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from("stores")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  return (data as Store | null) ?? null;
+}
+
 export async function getCachedPublicPickupLocation(storeId: string) {
   "use cache";
   cacheLife("minutes");
@@ -296,8 +322,9 @@ export async function getCachedStoreCatalog(storeId: string, slug: string) {
     await Promise.all([
       supabase
         .from("storefront_products")
-        .select("*, categories(name, slug)")
+        .select(STORE_BROWSER_PRODUCT_SELECT)
         .eq("store_id", storeId)
+        .eq("stores.is_active", true)
         .eq("is_available", true)
         .order("created_at", { ascending: false })
         .limit(200),
@@ -309,7 +336,7 @@ export async function getCachedStoreCatalog(storeId: string, slug: string) {
       supabase.rpc("active_store_campaign", { p_store_id: storeId }),
     ]);
 
-  const list = (products ?? []) as Array<
+  const list = (products ?? []) as unknown as Array<
     Product & {
       created_at?: string | null;
       categories: { name: string; slug: string } | null;
@@ -385,9 +412,7 @@ export async function getCachedPriceRailProducts(options: {
   const supabase = createPublicClient();
   let productsQuery = supabase
     .from("storefront_products")
-    .select(
-      "*, category:categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
-    )
+    .select(BROWSABLE_PRODUCT_CATALOG_SELECT)
     .eq("is_available", true)
     .eq("stores.is_active", true)
     .lte("price_aed", options.maxPrice);
@@ -430,9 +455,7 @@ export async function getCachedClearanceProducts() {
   const [{ data: productsData }, { data: categoryList }] = await Promise.all([
     supabase
       .from("storefront_products")
-      .select(
-        "*, stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)",
-      )
+      .select(BROWSABLE_PRODUCT_CATALOG_SELECT)
       .eq("is_available", true)
       .eq("stores.is_active", true)
       .not("compare_at_price_aed", "is", null)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSearchQuery, productSatisfiesCentralIntent, understandSearchQuery } from "./query-understanding";
+import { normalizeSearchQuery, productSatisfiesCentralIntent, semanticSearchPlan, understandSearchQuery } from "./query-understanding";
 
 describe("search query understanding", () => {
   it.each(["top", "tops", "women tops"])("maps %s to the tops category", (query) => {
@@ -35,5 +35,21 @@ describe("search query understanding", () => {
       title: "The Blush Top",
       category: { slug: "short-kurtis" },
     })).toBe(true);
+  });
+
+  it("routes confident catalogue searches to lexical search first", () => {
+    const intent = understandSearchQuery("black crop tops");
+    expect(semanticSearchPlan(intent, 12, 48)).toEqual({ eager: false, fallback: false });
+    expect(semanticSearchPlan(intent, 0, 48)).toEqual({ eager: false, fallback: true });
+  });
+
+  it("runs ambiguous natural-language searches as hybrid search", () => {
+    const intent = understandSearchQuery("something relaxed for dinner by the sea");
+    expect(semanticSearchPlan(intent, 20, 48)).toEqual({ eager: true, fallback: true });
+  });
+
+  it("can disable semantic search for public suggestions", () => {
+    const intent = understandSearchQuery("something relaxed for dinner by the sea");
+    expect(semanticSearchPlan(intent, 0, 6, false)).toEqual({ eager: false, fallback: false });
   });
 });

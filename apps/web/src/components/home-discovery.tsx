@@ -62,7 +62,6 @@ export function HomeDiscovery({ intents }: { intents: IntentRail[] }) {
                 href={product.href}
                 rating={product.rating}
                 sharp
-                unoptimized
               />
             </div>
           ))}

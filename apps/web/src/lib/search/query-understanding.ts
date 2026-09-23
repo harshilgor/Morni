@@ -11,6 +11,22 @@ export type SearchIntent = {
   tokens: string[];
 };
 
+export function semanticSearchPlan(
+  intent: Pick<SearchIntent, "confidence">,
+  strongLexicalCount: number,
+  requestedLimit: number,
+  enabled = true,
+) {
+  if (!enabled) return { eager: false, fallback: false };
+  const eager = intent.confidence === "low";
+  const fallback = eager || (
+    intent.confidence === "high"
+      ? strongLexicalCount === 0
+      : strongLexicalCount < Math.min(8, requestedLimit)
+  );
+  return { eager, fallback };
+}
+
 type Facet = Exclude<keyof SearchIntent, "normalizedQuery" | "confidence" | "tokens">;
 
 const ALIASES: Record<Facet, Record<string, string>> = {
