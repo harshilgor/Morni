@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import {
@@ -15,6 +15,7 @@ import { ProductGridSkeleton } from "@/components/catalog-skeletons";
 import {
   getCachedPublicPickupLocation,
   getCachedStoreBySlug,
+  getCachedStoreBySlugIncludingInactive,
   getCachedStoreCatalog,
 } from "@/lib/catalog";
 import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
@@ -88,7 +89,11 @@ async function StorePageContent({
 }) {
   const { slug } = await params;
   const store = await getCachedStoreBySlug(slug);
-  if (!store) notFound();
+  if (!store) {
+    const knownStore = await getCachedStoreBySlugIncludingInactive(slug);
+    if (knownStore) redirect("/stores");
+    notFound();
+  }
 
   const { products, browseCategories, campaign, ratings } =
     await getCachedStoreCatalog(store.id, slug);

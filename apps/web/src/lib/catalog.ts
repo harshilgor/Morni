@@ -280,6 +280,22 @@ export async function getCachedStoreBySlug(slug: string) {
   return (data as Store | null) ?? null;
 }
 
+/** Used only to distinguish a temporarily unlisted store from an unknown URL. */
+export async function getCachedStoreBySlugIncludingInactive(slug: string) {
+  "use cache";
+  cacheLife("minutes");
+  tagCatalog("stores", `store:${slug}`);
+
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from("stores")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  return (data as Store | null) ?? null;
+}
+
 export async function getCachedPublicPickupLocation(storeId: string) {
   "use cache";
   cacheLife("minutes");
@@ -308,6 +324,7 @@ export async function getCachedStoreCatalog(storeId: string, slug: string) {
         .from("storefront_products")
         .select(STORE_BROWSER_PRODUCT_SELECT)
         .eq("store_id", storeId)
+        .eq("stores.is_active", true)
         .eq("is_available", true)
         .order("created_at", { ascending: false })
         .limit(200),

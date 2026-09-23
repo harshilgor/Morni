@@ -1,8 +1,8 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ProductDetail } from "@/components/product-detail";
 import { ProductDetailSkeleton } from "@/components/catalog-skeletons";
-import { getCachedProductPage } from "@/lib/catalog";
+import { getCachedProductPage, getCachedStoreBySlug, getCachedStoreBySlugIncludingInactive } from "@/lib/catalog";
 
 async function ProductPageContent({
   params,
@@ -13,6 +13,11 @@ async function ProductPageContent({
 }) {
   const { slug, productId } = await params;
   const recent = (await searchParams)?.recent === "1";
+  const visibleStore = await getCachedStoreBySlug(slug);
+  if (!visibleStore) {
+    const knownStore = await getCachedStoreBySlugIncludingInactive(slug);
+    if (knownStore) redirect("/stores");
+  }
   const data = await getCachedProductPage(slug, productId, recent);
   if (!data) notFound();
 
