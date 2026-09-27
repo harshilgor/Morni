@@ -51,8 +51,8 @@ describe("normalizeVisionGroups", () => {
     expect(result.groups[0]?.title).toBe("Embroidered Pink Sharara Set");
     expect(result.groups[0]?.imageIds).toEqual(["c1", "c2"]);
     expect(result.groups[0]?.aiGenerated).toBe(true);
-    expect(result.groups[0]?.categorySlug).toBe("kurtis");
-    expect(result.groups[1]?.categorySlug).toBe("anarkalis");
+    expect(result.groups[0]?.categorySlug).toBe("");
+    expect(result.groups[1]?.categorySlug).toBe("");
     expect(result.missingInternalIds).toEqual([]);
     expect(result.status).toBe("ok");
   });

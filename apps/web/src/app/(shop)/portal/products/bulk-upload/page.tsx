@@ -773,6 +773,11 @@ export default function BulkUploadPage() {
           draft.photos.map((photo) => [photo.id, photo]),
         ),
       );
+      const categoryByPhoto = new Map(
+        draftsToAnalyze.flatMap((draft) =>
+          draft.photos.map((photo) => [photo.id, draft.categorySlug] as const),
+        ),
+      );
       const batches = Array.from(
         { length: Math.ceil(images.length / AI_ANALYSIS_MAX_PHOTOS) },
         (_, index) =>
@@ -809,43 +814,51 @@ export default function BulkUploadPage() {
           overallStatus = "partial";
         grouped.push(
           ...result.groups
-            .map(
-              (group: {
+            .map((group: {
                 imageIds: string[];
                 title: string;
                 description: string;
-                categorySlug: string | null;
                 colorName: string;
                 confidence: number;
                 needsReview: boolean;
                 aiGenerated?: boolean;
                 generationStatus?: Draft["generationStatus"];
                 failureReason?: string;
-              }) => ({
-                id: uid(),
-                photos: group.imageIds
+              }) => {
+                const photos = group.imageIds
                   .map((imageId) => photoMap.get(imageId))
-                  .filter(Boolean) as Photo[],
-                title: group.title ?? "",
-                description: group.description ?? "",
-                fabric: "",
-                categorySlug: group.categorySlug ?? "",
-                colorName: group.colorName ?? "",
-                productTag: "",
-                priceAed: "",
-                stock: "",
-                sizes: ["S", "M", "L"] as string[],
-                sizeStock: { S: 0, M: 0, L: 0 },
-                customization: defaultCustomizationConfig(),
-                confidence: group.confidence,
-                needsReview: group.needsReview,
-                aiGenerated: Boolean(group.aiGenerated),
-                generationStatus: group.generationStatus ?? "manual",
-                failureReason: group.failureReason,
-                // Colourways are intentionally manual; AI only groups photos into products.
-                colors: [] as ColorGroup[],
-              }),
-            )
+                  .filter(Boolean) as Photo[];
+                const selectedCategories = new Set(
+                  photos
+                    .map((photo) => categoryByPhoto.get(photo.id))
+                    .filter((slug): slug is string => Boolean(slug)),
+                );
+                const hasConsistentSellerCategory = photos.length > 0 &&
+                  photos.every((photo) => Boolean(categoryByPhoto.get(photo.id))) &&
+                  selectedCategories.size === 1;
+                return {
+                  id: uid(),
+                  photos,
+                  title: group.title ?? "",
+                  description: group.description ?? "",
+                  fabric: "",
+                  categorySlug: hasConsistentSellerCategory ? [...selectedCategories][0] ?? "" : "",
+                  colorName: group.colorName ?? "",
+                  productTag: "",
+                  priceAed: "",
+                  stock: "",
+                  sizes: ["S", "M", "L"] as string[],
+                  sizeStock: { S: 0, M: 0, L: 0 },
+                  customization: defaultCustomizationConfig(),
+                  confidence: group.confidence,
+                  needsReview: group.needsReview,
+                  aiGenerated: Boolean(group.aiGenerated),
+                  generationStatus: group.generationStatus ?? "manual",
+                  failureReason: group.failureReason,
+                  // Colourways are intentionally manual; AI only groups photos into products.
+                  colors: [] as ColorGroup[],
+                };
+              })
             .filter((draft: Draft) => draft.photos.length),
         );
       }
@@ -1410,7 +1423,7 @@ export default function BulkUploadPage() {
                   aria-invalid={hasValidationError(draft.id, "category")}
                   className={`min-h-11 rounded-lg border bg-background px-3 py-2.5 text-base sm:text-sm ${hasValidationError(draft.id, "category") ? "border-red-400" : "border-line"}`}
                 >
-                  <option value="">Category</option>
+                  <option value="">Select category</option>
                   {categories.map((category) => (
                     <option key={category.slug} value={category.slug}>
                       {category.name}

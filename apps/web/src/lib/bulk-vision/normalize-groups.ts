@@ -16,7 +16,6 @@ import type {
 export type NormalizeGroupsInput = {
   refs: InternalImageRef[];
   rawGroups: RawVisionGroup[];
-  categorySlugs: Set<string>;
   /** Filenames keyed by internalId — for title rejection only. */
   filenamesByInternalId: Map<string, string>;
 };
@@ -63,37 +62,10 @@ function manualGroup(
   };
 }
 
-function mapCategorySlug(
-  raw: string | undefined,
-  categorySlugs: Set<string>,
-): { slug: string; rejected?: string } {
-  const value = (raw ?? "").trim();
-  if (!value) return { slug: "" };
-  if (categorySlugs.has(value)) return { slug: value };
-  const lower = value.toLowerCase();
-  for (const slug of categorySlugs) {
-    if (slug.toLowerCase() === lower) return { slug };
-  }
-  // Soft match: "Lehenga" → "lehengas"
-  const normalized = lower.replace(/[^a-z0-9]+/g, "");
-  for (const slug of categorySlugs) {
-    const slugNorm = slug.toLowerCase().replace(/[^a-z0-9]+/g, "");
-    if (
-      slugNorm === normalized ||
-      slugNorm === `${normalized}s` ||
-      `${slugNorm}s` === normalized
-    ) {
-      return { slug };
-    }
-  }
-  return { slug: "", rejected: "unknown_category" };
-}
-
 function validateListingFields(
   group: RawVisionGroup,
   internalIds: string[],
   filenames: string[],
-  categorySlugs: Set<string>,
   groupIndex: number,
 ): {
   title: string;
@@ -149,27 +121,13 @@ function validateListingFields(
     }
   }
 
-  const category = mapCategorySlug(group.categorySlug, categorySlugs);
-  if (category.rejected) {
-    rejectedFields.push({ field: "categorySlug", reason: category.rejected });
-    validationFailures.push({
-      field: "categorySlug",
-      reason: category.rejected,
-      groupIndex,
-    });
-  }
-
   const colorName = (group.colorName ?? "").trim().slice(0, 40);
-  const generationStatus: BulkVisionGenerationStatus = title
-    ? category.slug
-      ? "ok"
-      : "partial"
-    : "failed";
+  const generationStatus: BulkVisionGenerationStatus = title ? "ok" : "failed";
 
   return {
     title,
     description: safeDescription,
-    categorySlug: category.slug,
+    categorySlug: "",
     colorName,
     aiGenerated,
     generationStatus,
@@ -215,7 +173,6 @@ export function normalizeVisionGroups(
       rawGroup,
       reconciled.resolved,
       filenames,
-      input.categorySlugs,
       groupIndex,
     );
     validationFailures.push(...listing.validationFailures);

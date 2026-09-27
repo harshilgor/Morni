@@ -28,6 +28,7 @@ export type RawVisionGroup = {
   imageIds: string[];
   title?: string;
   description?: string;
+  /** Ignored if present in a legacy model response; category is seller-selected. */
   categorySlug?: string;
   colorName?: string;
   confidence?: number;

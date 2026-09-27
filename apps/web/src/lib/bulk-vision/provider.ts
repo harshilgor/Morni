@@ -29,7 +29,6 @@ function isRetryable(error: unknown, status?: number) {
 }
 
 export function buildVisionPrompt(options: {
-  categories: Array<{ name: string; slug: string }>;
   internalIds: string[];
 }) {
   return [
@@ -40,8 +39,8 @@ export function buildVisionPrompt(options: {
     "Never invent brand, exact fabric when unclear, measurements, care instructions, price, stock, sizes, or SKU.",
     "Use ONLY these image IDs in imageIds arrays. Every ID must appear exactly once across all groups:",
     options.internalIds.join(", "),
-    `Choose categorySlug only from this list (or empty string if unsure): ${JSON.stringify(options.categories)}`,
-    "Return JSON with shape: { groups: [{ imageIds, title, description, categorySlug, colorName, confidence, needsReview, colorGroups: [{ imageIds, colorName, confidence, needsReview }] }] }.",
+    "Do not choose a product category. The seller will select the category manually.",
+    "Return JSON with shape: { groups: [{ imageIds, title, description, colorName, confidence, needsReview, colorGroups: [{ imageIds, colorName, confidence, needsReview }] }] }.",
     "colorGroups may be a single group with empty colorName when colourways are unclear — sellers add colours manually.",
   ].join("\n");
 }
@@ -72,7 +71,6 @@ export function buildGeminiSchema(internalIds: string[]) {
             imageIds: { type: "ARRAY", minItems: 1, items: imageIdSchema },
             title: { type: "STRING" },
             description: { type: "STRING" },
-            categorySlug: { type: "STRING" },
             colorName: { type: "STRING" },
             confidence: { type: "NUMBER" },
             needsReview: { type: "BOOLEAN" },
@@ -82,7 +80,6 @@ export function buildGeminiSchema(internalIds: string[]) {
             "imageIds",
             "title",
             "description",
-            "categorySlug",
             "colorName",
             "confidence",
             "needsReview",
@@ -116,7 +113,6 @@ export function buildOpenAiSchema(internalIds: string[]) {
             },
             title: { type: "string" as const },
             description: { type: "string" as const },
-            categorySlug: { type: "string" as const },
             colorName: { type: "string" as const },
             confidence: { type: "number" as const, minimum: 0, maximum: 1 },
             needsReview: { type: "boolean" as const },
@@ -143,7 +139,6 @@ export function buildOpenAiSchema(internalIds: string[]) {
             "imageIds",
             "title",
             "description",
-            "categorySlug",
             "colorName",
             "confidence",
             "needsReview",

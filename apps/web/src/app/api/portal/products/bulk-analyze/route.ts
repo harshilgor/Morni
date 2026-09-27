@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { mergeBrowseCategories, type BrowseCategory } from "@/lib/browse-categories";
 import {
   assignInternalImageIds,
   buildVisionPrompt,
@@ -28,7 +27,6 @@ const rawGroupSchema = z
     imageIds: z.array(z.string().max(100)).min(1),
     title: z.string().max(120).optional().default(""),
     description: z.string().max(600).optional().default(""),
-    categorySlug: z.string().max(80).optional().default(""),
     colorName: z.string().max(40).optional().default(""),
     confidence: z.number().min(0).max(1).optional().default(0),
     needsReview: z.boolean().optional().default(true),
@@ -159,7 +157,6 @@ export async function POST(request: Request) {
   const [
     { data: member, error: memberError },
     { data: profile, error: profileError },
-    { data: categories, error: categoriesError },
   ] = await Promise.all([
     supabase
       .from("store_members")
@@ -168,19 +165,13 @@ export async function POST(request: Request) {
       .eq("user_id", userId)
       .maybeSingle(),
     supabase.from("profiles").select("role").eq("id", userId).maybeSingle(),
-    supabase
-      .from("browse_categories")
-      .select("name,slug")
-      .neq("slug", "more")
-      .order("sort_order"),
   ]);
 
-  if (memberError || profileError || categoriesError) {
+  if (memberError || profileError) {
     logBulkVision("error", "supabase_query_failed", {
       requestId,
       member: memberError?.message,
       profile: profileError?.message,
-      categories: categoriesError?.message,
     });
     return NextResponse.json(
       { error: "Supabase could not load the store details. Please try again." },
@@ -208,11 +199,6 @@ export async function POST(request: Request) {
   const model = geminiKey
     ? process.env.GEMINI_VISION_MODEL || "gemini-3.5-flash"
     : process.env.OPENAI_VISION_MODEL || "gpt-4o-mini";
-  const categoryList = mergeBrowseCategories(
-    (categories ?? []) as BrowseCategory[],
-  ).map(({ name, slug }) => ({ name, slug }));
-  const categorySlugs = new Set(categoryList.map((category) => category.slug));
-
   logBulkVision("info", "provider_request_start", {
     requestId,
     provider,
@@ -223,7 +209,6 @@ export async function POST(request: Request) {
   });
 
   const prompt = buildVisionPrompt({
-    categories: categoryList,
     internalIds: refs.map((ref) => ref.internalId),
   });
 
@@ -301,7 +286,6 @@ export async function POST(request: Request) {
   const normalized = normalizeVisionGroups({
     refs,
     rawGroups: output.data.groups as RawVisionGroup[],
-    categorySlugs,
     filenamesByInternalId,
   });
 
