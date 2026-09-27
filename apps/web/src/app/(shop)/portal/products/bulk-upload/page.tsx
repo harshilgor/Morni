@@ -195,11 +195,11 @@ function PhotoStack({
         </span>
       </div>
 
-      <div className="relative h-48 overflow-hidden rounded-xl bg-[#e8f0eb] p-2 sm:h-56">
+      <div className="relative h-60 overflow-hidden rounded-xl bg-[#e8f0eb] p-2 sm:h-64">
         <img
           src={cover.preview}
           alt={`Product ${draftIndex + 1} cover`}
-          className="h-full w-full rounded-lg object-cover shadow-sm transition duration-500"
+          className="h-full w-full rounded-lg object-contain shadow-sm transition duration-500"
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
         <span className="absolute left-4 top-4 rounded-full bg-ink/90 px-2.5 py-1 text-[10px] font-bold text-white">
@@ -219,7 +219,7 @@ function PhotoStack({
             aria-label={`${photoIndex === 0 ? "Current cover" : `Make photo ${photoIndex + 1} the cover`}`}
             className={`group relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 bg-white transition duration-200 hover:-translate-y-0.5 sm:h-16 sm:w-16 ${photoIndex === 0 ? "border-[#245448] ring-2 ring-[#cfe5d8]" : "border-transparent hover:border-[#7ca994]"}`}
           >
-            <img src={photo.preview} alt={`Photo ${photoIndex + 1}`} className="h-full w-full object-cover" />
+            <img src={photo.preview} alt={`Photo ${photoIndex + 1}`} className="h-full w-full bg-[#e8f0eb] object-contain" />
             <span className="absolute inset-x-0 bottom-0 bg-black/55 py-0.5 text-[9px] font-bold text-white">
               {photoIndex === 0 ? "Cover" : photoIndex + 1}
             </span>
@@ -227,8 +227,12 @@ function PhotoStack({
         ))}
       </div>
 
-      <div className="mt-3 space-y-3 md:hidden">
-        <p className="text-xs font-semibold text-[#34594d]">Photo actions</p>
+      <details className="mt-2 rounded-lg border border-[#dfe8e3] bg-white/70 px-3 md:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold text-[#34594d]">
+          <span>Photo actions</span>
+          <span className="font-normal text-muted">Move or split</span>
+        </summary>
+        <div className="space-y-3 border-t border-[#e8efeb] py-3">
         {draft.photos.map((photo, photoIndex) => (
           <div key={photo.id} className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-2">
             <span className="text-xs font-medium text-ink">Photo {photoIndex + 1}</span>
@@ -262,7 +266,8 @@ function PhotoStack({
             <button type="button" onClick={onDismissCoach} className="min-h-11 shrink-0 px-2 font-semibold underline underline-offset-4">Got it</button>
           </div>
         ) : null}
-      </div>
+        </div>
+      </details>
 
       <details className="mt-2 hidden rounded-lg border border-[#dfe8e3] bg-white/70 px-3 py-2 md:block">
         <summary className="cursor-pointer text-xs font-semibold text-[#34594d]">
@@ -1359,11 +1364,10 @@ export default function BulkUploadPage() {
                 <button type="button" onClick={() => openPhotoPicker(draft.id)} className="mt-2 min-h-11 rounded-lg border border-[#245448] px-4 text-sm font-semibold text-[#245448]">Add photos to this product</button>
               </div>
             ) : null}
-            <details className="mt-3 rounded-xl border border-[#dfe8e3] bg-[#fbfcfb] px-3 sm:px-4">
-              <summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold text-[#34594d]">
+            <section className="mt-3 rounded-xl border border-[#dfe8e3] bg-[#fbfcfb] px-3 pb-3 sm:px-4 sm:pb-4" aria-label="Product details, colours and inventory">
+              <h3 className="py-3 text-sm font-semibold text-[#34594d]">
                 Product details, colours & inventory
-              </summary>
-              <div className="border-t border-[#e8efeb] pb-3 pt-1 sm:pb-4">
+              </h3>
             {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onRemove={(colorId) => removeColor(draft.id, colorId)} onUnassign={(photoId) => unassignColor(draft.id, photoId)} onDeletePhoto={(photoId) => deletePhoto(draft.id, photoId)} onStockChange={(colorId, sizes, sizeStock, stock) => updateColorStock(draft.id, colorId, sizes, sizeStock, stock)} colorValidationErrors={colorValidationErrors} /> : null}
             <div className="mt-3 grid gap-3">
               <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[#596760]">
@@ -1498,8 +1502,7 @@ export default function BulkUploadPage() {
                 />
               ) : null}
             </div>
-              </div>
-            </details>
+            </section>
           </article>
         ))}
       </div>
