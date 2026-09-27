@@ -7,8 +7,7 @@ import { RecentlyViewedRail } from "@/components/recently-viewed-rail";
 import { TrendingForYou } from "@/components/trending-for-you";
 import { ShopBySize } from "@/components/shop-by-size";
 import { getCachedHomeCatalog, type ProductWithStore } from "@/lib/catalog";
-import { productMatchesBrowseCategory } from "@/lib/product-browse-category";
-import { catalogShuffleSeed, diversifyByKey, merchandiseCatalog, shuffleCatalog } from "@/lib/catalog-random";
+import { catalogShuffleSeed, merchandiseCatalog } from "@/lib/catalog-random";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import type { UaeEmirate } from "@/lib/types";
 
@@ -118,30 +117,11 @@ export async function HomeCatalog({
 
   const categoryTabs: PopularTab[] = featured
     .filter((category) => category.slug !== "more")
-    .map((category) => {
-      const matches = products.filter((product) =>
-        productMatchesBrowseCategory(category, product),
-      );
-      return {
-        slug: category.slug,
-        label: category.name,
-        href: `/categories/${category.slug}`,
-        products: diversifyByKey(
-          shuffleCatalog(matches, catalogShuffleSeed(`category:${category.slug}`)),
-          (product) => product.stores?.slug ?? product.stores?.name ?? "",
-        // Only the first visible desktop row is hydrated up front; subsequent
-        // products continue through the existing paginated endpoint.
-        ).slice(0, 5).map((p) => ({
-          id: p.id,
-          title: p.title,
-          price_aed: Number(p.price_aed),
-          compare_at_price_aed: p.compare_at_price_aed,
-          image_urls: p.image_urls,
-          href: `/stores/${p.stores.slug}/products/${p.id}`,
-        })),
-      };
-    })
-    .filter((tab) => tab.products.length >= 3);
+    .map((category) => ({
+      slug: category.slug,
+      label: category.name,
+      href: `/categories/${category.slug}`,
+    }));
 
   const popularTabs: PopularTab[] = [
     { slug: "all", label: "All", href: "/search", products: popularPool.slice(0, 10).map((p) => toRailProduct(p)) },
