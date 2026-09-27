@@ -19,11 +19,23 @@ type Slide = {
   href: string;
   image: string;
   imagePosition?: string;
+  imageFit?: "cover" | "contain";
   titleTone?: "light" | "sun";
   visualOnly?: boolean;
 };
 
 const SLIDES: Slide[] = [
+  {
+    id: "navratri-collection",
+    eyebrow: "Navratri collection",
+    title: "Navratri collection",
+    subtitle: "Festive looks starting at AED 80.",
+    cta: "Shop festive looks",
+    href: "/categories/lehengas",
+    image: "/hero/navratri-collection.webp",
+    imageFit: "contain",
+    visualOnly: true,
+  },
   {
     id: "under-99",
     eyebrow: "AED 55 – AED 99",
@@ -224,16 +236,28 @@ export function HeroCarousel() {
             aria-label={`${slide.title}. ${slide.subtitle}`}
             aria-current={index === active ? "true" : undefined}
           >
+            {slide.imageFit === "contain" ? (
+              <Image
+                src={slide.image}
+                alt=""
+                fill
+                aria-hidden="true"
+                loading={index === 0 ? "eager" : "lazy"}
+                quality={75}
+                sizes="(max-width: 639px) 88vw, (max-width: 1023px) 58vw, 46vw"
+                className="object-cover scale-110 blur-2xl"
+              />
+            ) : null}
             <Image
               src={slide.image}
               alt=""
               fill
               preload={index === 0}
-              loading={index === 0 ? undefined : index === 1 ? "eager" : "lazy"}
+              loading={index < 2 ? "eager" : "lazy"}
               fetchPriority={index === 1 ? "low" : undefined}
               quality={75}
               sizes="(max-width: 639px) 88vw, (max-width: 1023px) 58vw, 46vw"
-              className="object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+              className={`transition duration-700 ease-out group-hover:scale-[1.035] ${slide.imageFit === "contain" ? "object-contain" : "object-cover"}`}
               style={{ objectPosition: slide.imagePosition ?? "center" }}
             />
             {!slide.visualOnly ? (

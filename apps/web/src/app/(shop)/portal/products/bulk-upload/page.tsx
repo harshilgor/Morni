@@ -860,7 +860,6 @@ export default function BulkUploadPage() {
     setBusy(true);
     setBusyPhase("publishing");
     setMessage(null);
-    const uploadedUrls: string[] = [];
     const totalPhotoCount = drafts.reduce((total, draft) => total + draft.photos.length, 0);
     let uploadedPhotoCount = 0;
     setPublishProgress({ completed: 0, total: totalPhotoCount, stage: "uploading" });
@@ -872,7 +871,7 @@ export default function BulkUploadPage() {
           !draft.title.trim() ||
           !draft.categorySlug ||
           !draft.priceAed ||
-          draft.stock === ""
+          draft.stock === "" && Object.values(draft.sizeStock).every((quantity) => !quantity) && !draft.colors.length
         )
           throw new Error(
             `Complete the photos, name, category, price, and stock for ${draft.title || "a draft"}.`,
@@ -908,7 +907,6 @@ export default function BulkUploadPage() {
             const detail = error instanceof Error ? error.message : "image upload failed";
             throw new Error(`${draft.title || "Untitled product"} → ${color.colorName}: ${detail}. Check the photos in this colour group and try again.`);
           }
-          uploadedUrls.push(...images);
           const colorStock = noSizes(draft.categorySlug) ? Number(color.stock || 0) : Object.values(color.sizeStock).reduce((sum, quantity) => sum + quantity, 0);
           variants.push({ colorName: color.colorName.trim(), colorHex: color.colorHex ?? null, sizes: noSizes(draft.categorySlug) ? [] : color.sizes, sizeStock: noSizes(draft.categorySlug) ? {} : color.sizeStock, stock: colorStock, images });
         }
@@ -941,14 +939,16 @@ export default function BulkUploadPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error((result.issues ?? [result.error ?? "Bulk publish failed."]).join(" · "));
-      if (result.failed) {
+      if (result.failed || result.created !== drafts.length || result.results?.length !== drafts.length) {
         if (result.created > 0) setUploadCelebrationKey(Date.now());
         const failures = (result.results ?? [])
           .filter((item: { ok: boolean }) => !item.ok)
           .map((item: { title: string; error?: string }) => `${item.title}: ${item.error ?? "could not be published"}`)
           .filter(Boolean);
         setPublishIssues(failures);
-        setMessage(`${result.created} products published, ${result.failed} need attention.`);
+        const publishedIndexes = new Set<number>((result.results ?? []).filter((item: { ok: boolean }) => item.ok).map((item: { index: number }) => item.index));
+        setDrafts((current) => current.filter((_, index) => !publishedIndexes.has(index)));
+        setMessage(`${result.created} of ${drafts.length} products published. Review the remaining products and publish again.`);
         return;
       }
       setMessage(
@@ -959,12 +959,8 @@ export default function BulkUploadPage() {
       if (store) void clearBulkDraft(store.id);
       router.replace("/portal/products");
     } catch (error) {
-      if (uploadedUrls.length && store)
-        void fetch("/api/portal/products/bulk-cleanup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ storeId: store.id, urls: uploadedUrls }),
-        });
+      // Keep uploaded media when the server response is uncertain: a timeout can
+      // happen after products were committed, and deleting their images breaks them.
       const issue = error instanceof Error ? error.message : "Bulk publish failed.";
       setPublishIssues(issue.split(" · "));
       setMessage("Publishing stopped. Fix the issue below and try again.");

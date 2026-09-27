@@ -66,10 +66,6 @@ export async function POST(request: Request) {
       const { data: pending } = await admin.from("bulk_import_items").select("title,product_tag,description,fabric,category_slug,price_aed,stock,sizes,size_stock,customization_enabled,customization_instructions,customization_fields,image_urls,variant_groups").eq("import_id", importId).eq("status", "failed");
       items = (pending ?? []).map((item) => ({ title: item.title, productTag: item.product_tag ?? "", description: item.description ?? "", fabric: ["gifting", "hamper", "hampers"].includes(item.category_slug) ? null : item.fabric ?? null, categorySlug: item.category_slug, priceAed: Number(item.price_aed), stock: item.stock, sizes: item.sizes ?? [], sizeStock: item.size_stock ?? {}, customization: { enabled: item.customization_enabled ?? false, instructions: item.customization_instructions ?? "", fields: item.customization_fields ?? [] }, images: item.image_urls ?? [], variants: item.variant_groups ?? [] }));
     }
-  } else {
-    const { data: createdImport, error: importError } = await admin.from("bulk_imports").insert({ store_id: storeId, created_by: user.id, status: "publishing", total_items: items.length }).select("id").single();
-    if (importError || !createdImport) return NextResponse.json({ error: "Could not start the product import." }, { status: 500 });
-    importId = createdImport.id;
   }
   if (!items.length) return NextResponse.json({ error: "No products are ready to publish." }, { status: 400 });
   items = items.map((item) => ({ ...item, categorySlug: item.categorySlug.trim().toLowerCase() }));
@@ -101,15 +97,30 @@ export async function POST(request: Request) {
       .upsert(missingCategories, { onConflict: "store_id,slug", ignoreDuplicates: true });
     if (categoryInsertError) return NextResponse.json({ error: "Could not prepare product categories." }, { status: 500 });
   }
-  await admin.from("bulk_imports").update({ status: "publishing", total_items: items.length }).eq("id", importId);
-  await admin.from("bulk_import_items").delete().eq("import_id", importId).eq("status", "failed");
+  if (!importId) {
+    const { data: createdImport, error: importError } = await admin.from("bulk_imports").insert({ store_id: storeId, created_by: user.id, status: "publishing", total_items: items.length }).select("id").single();
+    if (importError || !createdImport) return NextResponse.json({ error: "Could not start the product import." }, { status: 500 });
+    importId = createdImport.id;
+  } else {
+    const { error: deleteError } = await admin.from("bulk_import_items").delete().eq("import_id", importId).eq("status", "failed");
+    if (deleteError) return NextResponse.json({ error: `Could not prepare failed products for retry: ${deleteError.message}` }, { status: 500 });
+    const { error: updateError } = await admin.from("bulk_imports").update({ status: "publishing" }).eq("id", importId);
+    if (updateError) return NextResponse.json({ error: `Could not start the retry: ${updateError.message}` }, { status: 500 });
+  }
       const { data: importRows, error: importItemsError } = await admin.from("bulk_import_items").insert(items.map((item) => ({ import_id: importId, title: item.title, product_tag: item.productTag?.trim().toUpperCase() || null, description: item.description || null, fabric: ["gifting", "hamper", "hampers"].includes(item.categorySlug) ? null : item.fabric || null, category_slug: item.categorySlug, price_aed: item.priceAed, stock: item.stock, sizes: item.sizes, size_stock: item.sizeStock, customization_enabled: item.categorySlug !== "gifting" && item.customization.enabled, customization_instructions: item.categorySlug !== "gifting" && item.customization.enabled ? item.customization.instructions || null : null, customization_fields: item.categorySlug !== "gifting" && item.customization.enabled ? item.customization.fields : [], image_urls: item.images, variant_groups: item.variants }))).select("id,title");
-  if (importItemsError) return NextResponse.json({ error: "Could not prepare import items." }, { status: 500 });
+  if (importItemsError || importRows?.length !== items.length) {
+    await admin.from("bulk_imports").update({ status: "failed", failed_items: items.length }).eq("id", importId);
+    return NextResponse.json({ error: `Could not save the products for publishing${importItemsError ? `: ${importItemsError.message}` : "."}`, importId }, { status: 500 });
+  }
   const { data: published, error: publishError } = await admin.rpc("publish_bulk_import", { p_import_id: importId });
-  if (publishError) return NextResponse.json({ error: "Could not publish this import." }, { status: 500 });
-  const titleByItem = new Map((importRows ?? []).map((row) => [row.id, row.title]));
-  const results = ((published ?? []) as Array<{ item_id: string; product_id: string | null; ok: boolean; error_message: string | null }>).map((row) => ({ title: titleByItem.get(row.item_id) ?? "Product", ok: row.ok, id: row.product_id ?? undefined, error: row.error_message ?? undefined }));
+  if (publishError) {
+    await admin.from("bulk_imports").update({ status: "failed", failed_items: items.length }).eq("id", importId);
+    return NextResponse.json({ error: `Could not publish this import: ${publishError.message}`, importId }, { status: 500 });
+  }
+  const itemById = new Map((importRows ?? []).map((row, index) => [row.id, { title: row.title, index }]));
+  const results = ((published ?? []) as Array<{ item_id: string; product_id: string | null; ok: boolean; error_message: string | null }>).map((row) => ({ title: itemById.get(row.item_id)?.title ?? "Product", index: itemById.get(row.item_id)?.index, ok: row.ok, id: row.product_id ?? undefined, error: row.error_message ?? undefined }));
   const created = results.filter((result) => result.ok).length;
+  if (results.length !== items.length) return NextResponse.json({ error: "Publishing returned an incomplete result. Check import history before trying again.", importId, results, created, failed: items.length - created }, { status: 500 });
   if (created > 0) await revalidatePublicCatalog();
   return NextResponse.json({ importId, results, created, failed: results.length - created });
 }

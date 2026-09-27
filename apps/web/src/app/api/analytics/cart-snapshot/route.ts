@@ -72,10 +72,36 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
 
   if (itemCount === 0) {
-    const { error } = await admin
-      .from("cart_snapshots")
-      .delete()
-      .eq("anonymous_id", anonymousId);
+    const existingQuery = user
+      ? admin.from("cart_snapshots").select("id, shopper_id, updated_at").eq("shopper_id", user.id).maybeSingle()
+      : admin.from("cart_snapshots").select("id, shopper_id, updated_at").eq("anonymous_id", anonymousId).maybeSingle();
+    const { data: existingCart, error: lookupError } = await existingQuery;
+    if (lookupError) {
+      console.error("[analytics/cart-snapshot] lookup before clear", lookupError.message);
+      return NextResponse.json({ error: "Unable to clear cart snapshot." }, { status: 500 });
+    }
+    if (existingCart?.shopper_id) {
+      if (user?.id !== existingCart.shopper_id) {
+        return NextResponse.json({ ok: true, cleared: true, reminder_preserved: true });
+      }
+      const { data: recentOrder, error: orderError } = await admin
+        .from("orders")
+        .select("id")
+        .eq("shopper_id", existingCart.shopper_id)
+        .gte("placed_at", existingCart.updated_at)
+        .neq("status", "cancelled")
+        .limit(1)
+        .maybeSingle();
+      if (orderError) {
+        console.error("[analytics/cart-snapshot] check recent order", orderError.message);
+        return NextResponse.json({ error: "Unable to clear cart snapshot." }, { status: 500 });
+      }
+      if (recentOrder) {
+        await admin.from("cart_snapshots").update({ reminder_claimed_at: null }).eq("id", existingCart.id);
+        return NextResponse.json({ ok: true, cleared: true, reminder_preserved: true });
+      }
+    }
+    const { error } = await admin.from("cart_snapshots").delete().eq("anonymous_id", anonymousId);
     if (error) {
       console.error("[analytics/cart-snapshot] delete", error.message);
       return NextResponse.json({ error: "Unable to clear cart snapshot." }, { status: 500 });
@@ -83,13 +109,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, cleared: true });
   }
 
+  let snapshotAnonymousId = anonymousId;
+  if (user) {
+    const { data: shopperCart, error: shopperCartError } = await admin
+      .from("cart_snapshots")
+      .select("anonymous_id")
+      .eq("shopper_id", user.id)
+      .maybeSingle();
+    if (shopperCartError) {
+      console.error("[analytics/cart-snapshot] read shopper snapshot", shopperCartError.message);
+      return NextResponse.json({ error: "Unable to store cart snapshot." }, { status: 500 });
+    }
+    if (shopperCart?.anonymous_id) snapshotAnonymousId = shopperCart.anonymous_id;
+  }
+
+  const { error: previousCartError } = await admin
+    .from("cart_snapshots")
+    .select("id")
+    .eq("anonymous_id", snapshotAnonymousId)
+    .maybeSingle();
+  if (previousCartError) {
+    console.error("[analytics/cart-snapshot] read previous snapshot", previousCartError.message);
+    return NextResponse.json({ error: "Unable to store cart snapshot." }, { status: 500 });
+  }
+
   const row = {
-    anonymous_id: anonymousId,
+    anonymous_id: snapshotAnonymousId,
     shopper_id: user?.id ?? null,
     item_count: itemCount,
     subtotal_aed: subtotal,
     items,
     updated_at: new Date().toISOString(),
+    reminder_claimed_at: null,
+    reminder_sent_at: null,
   };
 
   const { error } = await admin.from("cart_snapshots").upsert(row, {

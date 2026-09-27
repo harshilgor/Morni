@@ -208,8 +208,7 @@ export function MorniEmail({
           </Section>
           <Hr style={styles.divider} />
           <Text style={styles.footer}>
-            Morni brings local UAE fashion to your door. This is a transactional
-            email about your Morni account or order. Visit{" "}
+            Morni brings local UAE fashion to your door. Visit{" "}
             <Link href={siteUrl} style={{ color: "#8f3d58" }}>
               morniuae.com
             </Link>

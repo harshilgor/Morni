@@ -16,7 +16,6 @@ export const RETIRED_BROWSE_CATEGORY_SLUGS = new Set([
   "elegant-fashion",
   "office-wear",
   "casual-wear",
-  "jewelry",
   "accessories",
   "jewelry-accessories",
 ]);
@@ -144,6 +143,13 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
     "/categories/gifting-cover.png",
     ["gift", "gifting", "present", "celebration", "occasion"],
     15,
+  ),
+  featuredCategory(
+    "Jewelry",
+    "jewelry",
+    "/categories/jewelry-accessories.png",
+    ["jewelry", "jewellery", "earring", "necklace", "bracelet", "ring"],
+    16,
   ),
 ];
 

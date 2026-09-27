@@ -10,6 +10,7 @@ import { StoreNewOrderEmail } from "@/emails/store-new-order-email";
 import { DeliveryInviteEmail } from "@/emails/delivery-invite-email";
 import { StoreTeamInviteEmail } from "@/emails/store-team-invite-email";
 import { LifecycleEmail } from "@/emails/lifecycle-email";
+import { CartReminderEmail } from "@/emails/cart-reminder-email";
 import { deliveryPromise, formatAed, orderStatusLabel } from "@/lib/format";
 import { formatDeliverySlotWindow } from "@/lib/delivery-slots";
 import type { OrderStatus } from "@/lib/types";
@@ -28,7 +29,8 @@ type NotificationEvent =
   | "store_payment_failed"
   | "store_order_cancelled"
   | "store_delivery_failed"
-  | "store_order_delivered";
+  | "store_order_delivered"
+  | "cart_reminder";
 
 export type LifecycleEmailKind =
   | "payment_failed"
@@ -518,6 +520,96 @@ export async function sendLifecycleEmail(
     await finishNotification(kind, orderId, null, error instanceof Error ? error.message : "Unknown email error");
     throw error;
   }
+}
+
+type ClaimedCartReminder = {
+  cart_id: string;
+  shopper_id: string;
+  updated_at: string;
+  claimed_at: string;
+  item_count: number;
+  items: Array<{ title?: string; quantity?: number }> | null;
+};
+
+export async function processAbandonedCartReminders(limit = 100) {
+  const admin = createAdminClient();
+  const { data: carts, error } = await admin.rpc("claim_abandoned_cart_reminders", {
+    p_limit: limit,
+  });
+  if (error) throw new Error(`Unable to claim abandoned carts: ${error.message}`);
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  for (const cart of (carts ?? []) as ClaimedCartReminder[]) {
+    const reminderEventId = `${cart.cart_id}:${cart.updated_at}`;
+    try {
+      const { data: authData, error: authError } = await admin.auth.admin.getUserById(cart.shopper_id);
+      const recipientEmail = authData.user?.email;
+      if (authError || !recipientEmail) {
+        throw new Error(authError?.message ?? "Shopper email is unavailable.");
+      }
+      const reserved = await reserveNotification(
+        "cart_reminder",
+        reminderEventId,
+        cart.shopper_id,
+        recipientEmail,
+      );
+      if (!reserved) {
+        skipped += 1;
+        continue;
+      }
+
+      const { data: profile, error: profileError } = await admin
+        .from("profiles")
+        .select("full_name")
+        .eq("id", cart.shopper_id)
+        .maybeSingle();
+      if (profileError) throw new Error(`Unable to load shopper profile: ${profileError.message}`);
+
+      const items = Array.isArray(cart.items) ? cart.items : [];
+      const names = items
+        .map((item) => typeof item.title === "string" ? item.title.trim() : "")
+        .filter(Boolean);
+      const { from } = getMailer();
+      const resendId = await sendWithRetry("cart_reminder", reminderEventId, {
+        from,
+        to: [recipientEmail],
+        subject: "You left something in your Morni bag",
+        react: CartReminderEmail({
+          name: displayName(profile?.full_name, recipientEmail),
+          itemNames: names,
+          itemCount: cart.item_count,
+          cartUrl: `${siteUrl}/cart`,
+        }),
+      });
+
+      await finishNotification("cart_reminder", reminderEventId, resendId);
+      const { error: markSentError } = await admin
+        .from("cart_snapshots")
+        .update({ reminder_sent_at: new Date().toISOString(), reminder_claimed_at: null })
+        .eq("id", cart.cart_id)
+        .eq("reminder_claimed_at", cart.claimed_at);
+      if (markSentError) throw new Error(`Unable to mark cart reminder sent: ${markSentError.message}`);
+      sent += 1;
+    } catch (sendError) {
+      failed += 1;
+      await finishNotification(
+        "cart_reminder",
+        reminderEventId,
+        null,
+        sendError instanceof Error ? sendError.message : "Unknown email error",
+      ).catch((recordError) => console.error("Unable to record cart reminder failure", recordError));
+      await admin
+        .from("cart_snapshots")
+        .update({ reminder_claimed_at: null })
+        .eq("id", cart.cart_id)
+        .eq("reminder_claimed_at", cart.claimed_at)
+        .eq("reminder_sent_at", null);
+      console.error("Abandoned cart reminder failed", { cartId: cart.cart_id, error: sendError });
+    }
+  }
+  return { inspected: (carts ?? []).length, sent, skipped, failed };
 }
 
 export async function processEmailOutbox(limit = 25) {

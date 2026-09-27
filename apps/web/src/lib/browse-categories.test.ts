@@ -23,8 +23,8 @@ describe("active browse categories", () => {
     expect(merged.map((category) => category.slug)).not.toContain("casual-wear");
   });
 
-  it("does not expose jewelry or accessories categories", () => {
-    const retired = ["jewelry", "accessories", "jewelry-accessories"];
+  it("exposes jewelry while keeping accessories categories retired", () => {
+    const retired = ["accessories", "jewelry-accessories"];
     const merged = mergeBrowseCategories(
       retired.map((slug, index) => ({
         id: slug,
@@ -43,6 +43,8 @@ describe("active browse categories", () => {
     for (const slug of retired) {
       expect(getBrowseCategory(slug, [])).toBeNull();
     }
+    expect(merged.map((category) => category.slug)).toContain("jewelry");
+    expect(getBrowseCategory("jewelry", [])?.name).toBe("Jewelry");
   });
 
   it("returns no browse route for retired categories", () => {

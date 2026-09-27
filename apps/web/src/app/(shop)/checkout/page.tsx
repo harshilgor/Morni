@@ -32,6 +32,24 @@ import { getSearchAttribution } from "@/lib/analytics/search-attribution";
 
 const CHECKOUT_DRAFT_KEY = "morni.checkout.delivery.v1";
 
+type CartAvailability = {
+  key: string;
+  status: "ready" | "error";
+  availableIds: string[];
+};
+
+async function fetchAvailableProductIds(productIds: string[]) {
+  const { data, error } = await createClient()
+    .from("storefront_products")
+    .select("id, stores!inner(is_active)")
+    .in("id", productIds)
+    .eq("is_available", true)
+    .gt("stock", 0)
+    .eq("stores.is_active", true);
+  if (error) throw error;
+  return new Set((data ?? []).map((product) => product.id));
+}
+
 function readRememberedAddress(): DeliveryAddressDraft | null {
   if (typeof window === "undefined") return null;
   try {
@@ -65,7 +83,9 @@ function isMobileCheckoutViewport() {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, removeItem, setQuantity, clear } = useCart();
+  const { items, removeItem, setQuantity, clear } = useCart();
+  const [cartAvailability, setCartAvailability] = useState<CartAvailability | null>(null);
+  const [availabilityRetry, setAvailabilityRetry] = useState(0);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<DeliveryAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -83,7 +103,14 @@ export default function CheckoutPage() {
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [paymentMethod, setPaymentMethod] = useState<"card">("card");
   const locationLabel = useLocation((state) => state.label());
-  const orderSubtotal = subtotal();
+  const productIdsKey = [...new Set(items.map((item) => item.productId))].sort().join(",");
+  const availabilityReady = cartAvailability?.key === productIdsKey && cartAvailability.status === "ready";
+  const availabilityFailed = cartAvailability?.key === productIdsKey && cartAvailability.status === "error";
+  const availableIds = new Set(availabilityReady ? cartAvailability.availableIds : []);
+  const availableItems = availabilityReady ? items.filter((item) => availableIds.has(item.productId)) : [];
+  const hasUnavailableItems = availabilityReady && availableItems.length !== items.length;
+  const canCheckoutCart = availabilityReady && !hasUnavailableItems && items.length > 0;
+  const orderSubtotal = availableItems.reduce((sum, item) => sum + item.priceAed * item.quantity, 0);
   const fees = calculateCheckoutFees(orderSubtotal);
   const orderTotal = fees.totalAed;
   const selectedAddress = savedAddresses.find(
@@ -100,6 +127,37 @@ export default function CheckoutPage() {
     ? `${selectedSlot.dateLabel} · ${selectedSlot.label}`
     : "Select a time";
   const checkoutReady = mobileAddressReady && Boolean(selectedSlot);
+  const availabilityNotice = availabilityFailed ? (
+    <div role="alert" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      We could not check your bag right now. <button type="button" onClick={() => setAvailabilityRetry((count) => count + 1)} className="font-semibold underline">Retry</button>
+    </div>
+  ) : !availabilityReady ? (
+    <p role="status" className="rounded-lg bg-surface px-4 py-3 text-sm text-muted">Checking product availability…</p>
+  ) : hasUnavailableItems ? (
+    <p role="alert" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">A product is no longer available. Remove it from your bag to continue.</p>
+  ) : null;
+
+  useEffect(() => {
+    if (!productIdsKey) return;
+    let active = true;
+    const productIds = productIdsKey.split(",");
+
+    async function refreshAvailability() {
+      try {
+        const ids = await fetchAvailableProductIds(productIds);
+        if (active) setCartAvailability({ key: productIdsKey, status: "ready", availableIds: [...ids] });
+      } catch {
+        if (active) setCartAvailability({ key: productIdsKey, status: "error", availableIds: [] });
+      }
+    }
+
+    void refreshAvailability();
+    window.addEventListener("focus", refreshAvailability);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshAvailability);
+    };
+  }, [productIdsKey, availabilityRetry]);
 
   useEffect(() => {
     const onlineHandler = () => setOnline(true);
@@ -192,6 +250,12 @@ export default function CheckoutPage() {
   }
 
   async function placeOrder() {
+    if (!canCheckoutCart) {
+      setPlaceError(hasUnavailableItems
+        ? "Remove the unavailable product from your bag before continuing."
+        : "We could not verify your bag. Retry the availability check before continuing.");
+      return;
+    }
     if (!online) {
       setPlaceError("You are offline. Reconnect before placing your order.");
       return;
@@ -233,6 +297,19 @@ export default function CheckoutPage() {
     setPlacing(true);
     setPlaceError(null);
     try {
+      let freshIds: Set<string>;
+      try {
+        freshIds = await fetchAvailableProductIds(productIdsKey.split(","));
+      } catch {
+        setCartAvailability({ key: productIdsKey, status: "error", availableIds: [] });
+        setPlaceError("We could not check your bag right now. Retry before placing your order.");
+        return;
+      }
+      setCartAvailability({ key: productIdsKey, status: "ready", availableIds: [...freshIds] });
+      if (items.some((item) => !freshIds.has(item.productId))) {
+        setPlaceError("A product is no longer available. Remove it from your bag before continuing.");
+        return;
+      }
       const method = paymentMethod;
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -488,16 +565,22 @@ export default function CheckoutPage() {
               {items.length} {items.length === 1 ? "piece" : "pieces"} from {items[0]?.storeName}
             </p>
           </header>
+          {availabilityNotice ? <div className="mt-4">{availabilityNotice}</div> : null}
 
           <section aria-labelledby="mobile-cart-items" className="py-2">
             <h2 id="mobile-cart-items" className="sr-only">Items in your bag</h2>
             <div className="divide-y divide-line">
               {items.map((item) => {
                 const lineId = item.lineId ?? cartLineId(item.productId, item.size, item.variantId);
+                const unavailable = availabilityReady && !availableIds.has(item.productId);
                 return (
                   <article key={lineId} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 py-4">
-                    <div className="aspect-[4/5] overflow-hidden rounded-xl bg-sand">
-                      {item.imageUrl ? (
+                    <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl bg-sand">
+                      {unavailable ? (
+                        <span className="px-2 text-center text-xs font-medium text-muted">Unavailable</span>
+                      ) : !availabilityReady ? (
+                        <span className="px-2 text-center text-xs text-muted">{availabilityFailed ? "Not verified" : "Checking…"}</span>
+                      ) : item.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
                       ) : null}
@@ -506,6 +589,7 @@ export default function CheckoutPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-ink">{item.title}</h3>
+                          {unavailable ? <p className="mt-1 text-xs font-semibold text-accent-deep">Product no longer available</p> : null}
                           {(item.colorName || item.size || item.customization) ? (
                             <p className="mt-1 text-xs text-muted">
                               {[item.colorName, item.size ? `Size ${item.size}` : null, item.customization ? `Custom: ${formatCustomizationValues(null, item.customization).map((measurement) => `${measurement.label} ${measurement.value}`).join(", ")}` : null].filter(Boolean).join(" · ")}
@@ -521,12 +605,14 @@ export default function CheckoutPage() {
                         </button>
                       </div>
                       <div className="mt-auto flex items-end justify-between gap-3 pt-3">
-                        <div className="inline-flex items-center rounded-lg border border-line bg-surface">
-                          <button type="button" aria-label={`Decrease quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity - 1)} className="flex h-8 w-8 items-center justify-center text-lg">−</button>
-                          <input aria-label={`Quantity of ${item.title}`} inputMode="numeric" type="number" min="1" max="99" value={item.quantity} onChange={(event) => setQuantity(lineId, Math.max(1, Math.min(99, Number(event.target.value) || 1)))} className="h-8 w-10 border-x border-line bg-transparent text-center text-xs font-semibold outline-none" />
-                          <button type="button" aria-label={`Increase quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity + 1)} className="flex h-8 w-8 items-center justify-center text-lg">+</button>
-                        </div>
-                        <p className="text-sm font-semibold text-ink">{formatAed(item.priceAed * item.quantity)}</p>
+                        {unavailable ? <span className="text-xs text-muted">Remove to continue</span> : (
+                          <div className="inline-flex items-center rounded-lg border border-line bg-surface">
+                            <button type="button" disabled={!availabilityReady} aria-label={`Decrease quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity - 1)} className="flex h-8 w-8 items-center justify-center text-lg disabled:opacity-50">−</button>
+                            <input disabled={!availabilityReady} aria-label={`Quantity of ${item.title}`} inputMode="numeric" type="number" min="1" max="99" value={item.quantity} onChange={(event) => setQuantity(lineId, Math.max(1, Math.min(99, Number(event.target.value) || 1)))} className="h-8 w-10 border-x border-line bg-transparent text-center text-xs font-semibold outline-none disabled:opacity-50" />
+                            <button type="button" disabled={!availabilityReady} aria-label={`Increase quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity + 1)} className="flex h-8 w-8 items-center justify-center text-lg disabled:opacity-50">+</button>
+                          </div>
+                        )}
+                        {!unavailable && availabilityReady ? <p className="text-sm font-semibold text-ink">{formatAed(item.priceAed * item.quantity)}</p> : null}
                       </div>
                     </div>
                   </article>
@@ -536,13 +622,12 @@ export default function CheckoutPage() {
           </section>
 
           <section aria-labelledby="mobile-price-details" className="border-t border-line py-6">
-            <FreeDeliveryNudge fees={fees} />
+            {availableItems.length > 0 ? <FreeDeliveryNudge fees={fees} /> : null}
             <div className="flex items-center justify-between gap-4">
               <h2 id="mobile-price-details" className="text-base font-semibold uppercase tracking-[0.08em] text-ink">Price details</h2>
-              <span className="text-sm font-semibold text-ink">{formatAed(orderTotal)}</span>
+              {availableItems.length > 0 ? <span className="text-sm font-semibold text-ink">{formatAed(orderTotal)}</span> : null}
             </div>
-            <div className="mt-4"><OrderFeeLines fees={fees} /></div>
-            <div className="mt-4 flex justify-between border-t border-line pt-4 text-base font-semibold text-ink"><span>Grand total</span><span>{formatAed(orderTotal)}</span></div>
+            {availableItems.length > 0 ? <><div className="mt-4"><OrderFeeLines fees={fees} /></div><div className="mt-4 flex justify-between border-t border-line pt-4 text-base font-semibold text-ink"><span>Grand total</span><span>{formatAed(orderTotal)}</span></div></> : <p className="mt-4 text-sm text-muted">No available items to total.</p>}
           </section>
         </div>
 
@@ -594,9 +679,13 @@ export default function CheckoutPage() {
               </span>
             </label>
             {placeError ? <p className="text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
-            <button type="button" onClick={() => void placeOrder()} disabled={placing || (paymentMethod === "card" && !cardPaymentsEnabled) || !legalAccepted || !online} className="min-h-12 w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void placeOrder()} disabled={!canCheckoutCart || placing || (paymentMethod === "card" && !cardPaymentsEnabled) || !legalAccepted || !online} className="min-h-12 w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
               {placing
                 ? "Starting payment..."
+                : hasUnavailableItems
+                  ? "Remove unavailable item to continue"
+                : !availabilityReady
+                  ? "Checking bag availability"
                 : paymentMethod === "card" && !cardPaymentsEnabled
                   ? "Card payments unavailable"
                 : authed === false
@@ -736,6 +825,7 @@ export default function CheckoutPage() {
             <p className="pb-1 text-sm text-muted">{items[0]?.storeName} · One boutique per order</p>
           </div>
         </header>
+        {availabilityNotice}
 
         <section className="border-y border-line py-5 sm:py-6">
           <div className="flex items-end justify-between gap-3">
@@ -748,10 +838,15 @@ export default function CheckoutPage() {
           <div className="mt-5 divide-y divide-line">
             {items.map((item) => {
               const lineId = item.lineId ?? cartLineId(item.productId, item.size, item.variantId);
+              const unavailable = availabilityReady && !availableIds.has(item.productId);
               return (
                 <div key={lineId} className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-4 py-5 first:pt-0 last:pb-0 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:gap-5">
-                  <div className="aspect-[4/5] overflow-hidden rounded-md bg-sand">
-                    {item.imageUrl ? (
+                  <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-md bg-sand">
+                    {unavailable ? (
+                      <span className="px-2 text-center text-sm font-medium text-muted">Unavailable</span>
+                    ) : !availabilityReady ? (
+                      <span className="px-2 text-center text-sm text-muted">{availabilityFailed ? "Not verified" : "Checking…"}</span>
+                    ) : item.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
                     ) : null}
@@ -760,6 +855,7 @@ export default function CheckoutPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="font-display text-xl leading-tight text-ink sm:text-2xl">{item.title}</h3>
+                        {unavailable ? <p className="mt-2 text-sm font-semibold text-accent-deep">Product no longer available</p> : null}
                         <p className="mt-1.5 text-xs uppercase tracking-[0.12em] text-muted">{item.storeName}</p>
                         {(item.colorName || item.size || item.customization) ? (
                           <p className="mt-3 text-sm text-ink/80">
@@ -772,15 +868,17 @@ export default function CheckoutPage() {
                       </button>
                     </div>
                     <div className="flex items-end justify-between gap-3">
-                      <div className="inline-flex items-center border border-line">
-                        <button type="button" aria-label={`Decrease quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity - 1)} className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-background">−</button>
-                        <input aria-label={`Quantity of ${item.title}`} inputMode="numeric" type="number" min="1" max="99" value={item.quantity} onChange={(event) => setQuantity(lineId, Math.max(1, Math.min(99, Number(event.target.value) || 1)))} className="h-9 w-11 border-x border-line bg-transparent text-center text-sm outline-none" />
-                        <button type="button" aria-label={`Increase quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity + 1)} className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-background">+</button>
-                      </div>
-                      <div className="text-right">
+                      {unavailable ? <span className="text-sm text-muted">Remove to continue</span> : (
+                        <div className="inline-flex items-center border border-line">
+                          <button type="button" disabled={!availabilityReady} aria-label={`Decrease quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity - 1)} className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-background disabled:opacity-50">−</button>
+                          <input disabled={!availabilityReady} aria-label={`Quantity of ${item.title}`} inputMode="numeric" type="number" min="1" max="99" value={item.quantity} onChange={(event) => setQuantity(lineId, Math.max(1, Math.min(99, Number(event.target.value) || 1)))} className="h-9 w-11 border-x border-line bg-transparent text-center text-sm outline-none disabled:opacity-50" />
+                          <button type="button" disabled={!availabilityReady} aria-label={`Increase quantity of ${item.title}`} onClick={() => setQuantity(lineId, item.quantity + 1)} className="flex h-9 w-9 items-center justify-center text-lg transition hover:bg-background disabled:opacity-50">+</button>
+                        </div>
+                      )}
+                      {!unavailable && availabilityReady ? <div className="text-right">
                         <p className="text-xs text-muted">{formatAed(item.priceAed)} each</p>
                         <p className="mt-1 text-lg font-semibold text-ink">{formatAed(item.priceAed * item.quantity)}</p>
-                      </div>
+                      </div> : null}
                     </div>
                   </div>
                 </div>
@@ -917,14 +1015,14 @@ export default function CheckoutPage() {
       </div>
 
       <aside className="h-fit border border-line bg-surface p-5 sm:sticky sm:top-24 sm:p-6">
-        <FreeDeliveryNudge fees={fees} />
+        {availableItems.length > 0 ? <FreeDeliveryNudge fees={fees} /> : null}
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Order total</p>
         <h2 className="mt-1 font-display text-3xl text-ink">Price details</h2>
-        <div className="mt-6 border-y border-line py-5"><OrderFeeLines fees={fees} /></div>
-        <div className="mt-5 flex justify-between gap-4 text-lg font-semibold text-ink">
+        {availableItems.length > 0 ? <div className="mt-6 border-y border-line py-5"><OrderFeeLines fees={fees} /></div> : <p className="mt-6 border-y border-line py-5 text-sm text-muted">No available items to total.</p>}
+        {availableItems.length > 0 ? <div className="mt-5 flex justify-between gap-4 text-lg font-semibold text-ink">
           <span>Total</span>
           <span>{formatAed(orderTotal)}</span>
-        </div>
+        </div> : null}
         <label className="mt-5 flex items-start gap-3 text-xs leading-5 text-muted">
           <input type="checkbox" checked={legalAccepted} onChange={(event) => setLegalAccepted(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 appearance-auto accent-[#21342e]" aria-label="Agree to the Customer Terms and Conditions and Privacy Policy" />
           <span>I have read and agree to the <Link href="/terms" className="font-semibold text-ink underline underline-offset-2">Customer Terms &amp; Conditions</Link> and acknowledge the <Link href="/privacy" className="font-semibold text-ink underline underline-offset-2">Privacy Policy</Link>.</span>
@@ -932,12 +1030,16 @@ export default function CheckoutPage() {
         {placeError ? <p className="mt-4 text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
         <button
           type="button"
-          disabled={placing || (paymentMethod === "card" && !cardPaymentsEnabled) || !legalAccepted || !online || (!checkoutReady && authed !== false)}
+          disabled={!canCheckoutCart || placing || (paymentMethod === "card" && !cardPaymentsEnabled) || !legalAccepted || !online || (!checkoutReady && authed !== false)}
           onClick={() => void placeOrder()}
           className="mt-6 w-full bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
         >
           {placing
             ? "Starting payment..."
+            : hasUnavailableItems
+              ? "Remove unavailable item to continue"
+            : !availabilityReady
+              ? "Checking bag availability"
             : paymentMethod === "card" && !cardPaymentsEnabled
               ? "Card payments unavailable"
             : authed === false
