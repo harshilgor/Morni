@@ -63,6 +63,7 @@ type PublishProgress = {
 const BULK_UPLOAD_MAX_PHOTOS = 1_000;
 const AI_ANALYSIS_MAX_PHOTOS = 30;
 const MAX_PHOTOS_PER_COLOUR = 10;
+const MAX_PRODUCTS_PER_PUBLISH = 100;
 const BULK_UPLOAD_DRAFT_DB = "morni-bulk-upload-drafts";
 const BULK_UPLOAD_DRAFT_STORE = "drafts";
 
@@ -361,6 +362,27 @@ const noSizes = (slug: string) =>
   ["gifting", "hamper", "hampers"].includes(slug);
 const uid = () => crypto.randomUUID();
 
+function publishableStock(draft: Draft) {
+  if (draft.colors.length) {
+    return draft.colors.reduce((total, color) => total + (noSizes(draft.categorySlug)
+      ? Number(color.stock || 0)
+      : color.sizes.reduce((sum, size) => sum + Number(color.sizeStock[size] || 0), 0)), 0);
+  }
+  if (noSizes(draft.categorySlug)) return Number(draft.stock || 0);
+  return draft.sizes.reduce((sum, size) => sum + Number(draft.sizeStock[size] || 0), 0);
+}
+
+function hasValidStockQuantities(draft: Draft) {
+  const quantities = draft.colors.length
+    ? draft.colors.flatMap((color) => noSizes(draft.categorySlug)
+      ? [Number(color.stock || 0)]
+      : color.sizes.map((size) => Number(color.sizeStock[size] || 0)))
+    : noSizes(draft.categorySlug)
+      ? [Number(draft.stock || 0)]
+      : draft.sizes.map((size) => Number(draft.sizeStock[size] || 0));
+  return quantities.every((quantity) => Number.isSafeInteger(quantity) && quantity >= 0);
+}
+
 function emptyDraft(photos: Photo[] = []): Draft {
   return {
     id: uid(),
@@ -573,7 +595,7 @@ export default function BulkUploadPage() {
     setDrafts((current) => current.map((draft) => {
       if (draft.id !== draftId) return draft;
       const colors = draft.colors.map((color) => color.id === colorId ? { ...color, sizes, sizeStock, stock } : color);
-      const total = noSizes(draft.categorySlug) ? colors.reduce((sum, color) => sum + Number(color.stock || 0), 0) : colors.reduce((sum, color) => sum + Object.values(color.sizeStock).reduce((inner, quantity) => inner + quantity, 0), 0);
+      const total = publishableStock({ ...draft, colors });
       const productSizes = [...new Set(colors.flatMap((color) => color.sizes))];
       return { ...draft, colors, sizes: productSizes, stock: String(total), sizeStock: aggregateBulkSizeStock(colors, productSizes) };
     }));
@@ -789,15 +811,23 @@ export default function BulkUploadPage() {
   }
   async function publish() {
     if (!store || !drafts.length) return;
+    if (drafts.length > MAX_PRODUCTS_PER_PUBLISH) {
+      setPublishIssues([`Publish up to ${MAX_PRODUCTS_PER_PUBLISH} products at a time. This batch contains ${drafts.length}.`]);
+      setMessage("Split this batch before publishing.");
+      window.setTimeout(() => document.querySelector("[data-upload-message]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+      return;
+    }
     const missingByDraft = Object.fromEntries(
       drafts
         .map((draft) => {
           const missing = [
             !draft.photos.length ? "photos" : null,
-            !draft.title.trim() ? "product name" : null,
+            draft.title.trim().length < 3 || draft.title.trim().length > 120 ? "product name" : null,
             !draft.categorySlug ? "category" : null,
-            !draft.priceAed ? "price" : null,
-            draft.stock === "" && Object.values(draft.sizeStock).every((quantity) => !quantity) ? "stock" : null,
+            !Number.isFinite(Number(draft.priceAed)) || Number(draft.priceAed) <= 0 ? "price" : null,
+            draft.description.trim().length > 2_000 ? "description" : null,
+            !hasValidStockQuantities(draft) || publishableStock(draft) <= 0 ? "stock" : null,
+            draft.colors.length > 20 ? "colour count" : null,
           ].filter((field): field is string => Boolean(field));
           return [draft.id, missing] as const;
         })
@@ -815,7 +845,7 @@ export default function BulkUploadPage() {
         missingByDraft[draft.id] = [...(missingByDraft[draft.id] ?? []), "choose at least one custom measurement"];
       draft.colors.forEach((color, colorIndex) => {
         const errors = [
-          !color.colorName.trim() ? "colour name" : null,
+          !color.colorName.trim() || color.colorName.trim().length > 80 ? "colour name (1–80 characters)" : null,
           !color.photos.length ? "at least one photo" : null,
           color.photos.length > MAX_PHOTOS_PER_COLOUR ? `maximum ${MAX_PHOTOS_PER_COLOUR} photos (currently ${color.photos.length})` : null,
         ].filter((error): error is string => Boolean(error));
@@ -842,7 +872,18 @@ export default function BulkUploadPage() {
         .map(([draftId, fields]) => {
           const draft = drafts.find((item) => item.id === draftId);
           const title = draft?.title.trim() || `Product ${drafts.findIndex((item) => item.id === draftId) + 1}`;
-          return `${title}: ${fields.join(", ")}`;
+          return `${title}: ${fields.map((field) => {
+            if (field === "stock") return draft && !hasValidStockQuantities(draft)
+              ? "stock quantities must be whole numbers"
+              : noSizes(draft?.categorySlug ?? "") && !draft?.colors.length
+                ? "enter at least 1 unit of stock"
+                : "enter at least 1 unit in a selected size or colour";
+            if (field === "product name") return "product name must be 3–120 characters";
+            if (field === "price") return "enter a price greater than zero";
+            if (field === "description") return "description must be at most 2,000 characters";
+            if (field === "colour count") return "use at most 20 colours";
+            return field;
+          }).join(", ")}`;
         });
       const colorIssues = drafts
         .flatMap((draft, draftIndex) => draft.colors.map((color, colorIndex) => ({ draftIndex, colorIndex, errors: nextColorValidationErrors[color.id] })))
@@ -871,7 +912,7 @@ export default function BulkUploadPage() {
           !draft.title.trim() ||
           !draft.categorySlug ||
           !draft.priceAed ||
-          draft.stock === "" && Object.values(draft.sizeStock).every((quantity) => !quantity) && !draft.colors.length
+          publishableStock(draft) <= 0
         )
           throw new Error(
             `Complete the photos, name, category, price, and stock for ${draft.title || "a draft"}.`,
@@ -907,8 +948,9 @@ export default function BulkUploadPage() {
             const detail = error instanceof Error ? error.message : "image upload failed";
             throw new Error(`${draft.title || "Untitled product"} → ${color.colorName}: ${detail}. Check the photos in this colour group and try again.`);
           }
-          const colorStock = noSizes(draft.categorySlug) ? Number(color.stock || 0) : Object.values(color.sizeStock).reduce((sum, quantity) => sum + quantity, 0);
-          variants.push({ colorName: color.colorName.trim(), colorHex: color.colorHex ?? null, sizes: noSizes(draft.categorySlug) ? [] : color.sizes, sizeStock: noSizes(draft.categorySlug) ? {} : color.sizeStock, stock: colorStock, images });
+          const variantSizeStock = noSizes(draft.categorySlug) ? {} : Object.fromEntries(color.sizes.map((size) => [size, Number(color.sizeStock[size] || 0)]));
+          const colorStock = noSizes(draft.categorySlug) ? Number(color.stock || 0) : Object.values(variantSizeStock).reduce((sum, quantity) => sum + quantity, 0);
+          variants.push({ colorName: color.colorName.trim(), colorHex: color.colorHex ?? null, sizes: noSizes(draft.categorySlug) ? [] : color.sizes, sizeStock: variantSizeStock, stock: colorStock, images });
         }
         items.push({
           title: draft.title,
@@ -917,7 +959,7 @@ export default function BulkUploadPage() {
           fabric: noSizes(draft.categorySlug) ? null : draft.fabric || null,
           categorySlug: draft.categorySlug,
           priceAed: Number(draft.priceAed),
-          stock: Number(draft.stock),
+          stock: publishableStock(draft),
           sizes: noSizes(draft.categorySlug) ? [] : draft.sizes,
           sizeStock: aggregateSizeStock,
           customization: noSizes(draft.categorySlug)
@@ -964,6 +1006,7 @@ export default function BulkUploadPage() {
       const issue = error instanceof Error ? error.message : "Bulk publish failed.";
       setPublishIssues(issue.split(" · "));
       setMessage("Publishing stopped. Fix the issue below and try again.");
+      window.setTimeout(() => document.querySelector("[data-upload-message]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
     } finally {
       setBusy(false);
       setBusyPhase("idle");
@@ -1155,7 +1198,7 @@ export default function BulkUploadPage() {
               event.preventDefault();
               move(event.dataTransfer.getData("photo-id"), draft.id);
             }}
-            className={`rounded-2xl border bg-surface p-3 sm:p-4 ${hasValidationError(draft.id, "photos") ? "border-red-400" : "border-line"}`}
+            className={`rounded-2xl border bg-surface p-3 sm:p-4 ${validationErrors[draft.id]?.length ? "border-red-400" : "border-line"}`}
           >
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep">
@@ -1255,7 +1298,7 @@ export default function BulkUploadPage() {
                 rows={2}
                 placeholder="Description"
               />
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className={`grid grid-cols-1 gap-2 ${noSizes(draft.categorySlug) && !draft.colors.length ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                 <select
                   value={draft.categorySlug}
                   onChange={(event) =>
@@ -1293,19 +1336,28 @@ export default function BulkUploadPage() {
                   className={`rounded-lg border bg-background px-2 py-2 text-sm ${hasValidationError(draft.id, "price") ? "border-red-400" : "border-line"}`}
                   placeholder="Price"
                 />
-                <label className="text-[10px] font-semibold text-muted">
-                  <input
-                    type="number"
-                    min="0"
-                    value={draft.stock}
-                    onChange={(event) => patch(draft.id, { stock: event.target.value })}
-                    readOnly={draft.colors.length > 1}
-                    aria-invalid={hasValidationError(draft.id, "stock")}
-                    className={`mt-1 w-full rounded-lg border bg-background px-2 py-2 text-sm font-normal ${hasValidationError(draft.id, "stock") ? "border-red-400" : "border-line"}`}
-                    placeholder="Stock"
-                  />
-                </label>
+                {noSizes(draft.categorySlug) && !draft.colors.length ? (
+                  <label className="text-[10px] font-semibold text-muted">
+                    Stock
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={draft.stock}
+                      onChange={(event) => patch(draft.id, { stock: event.target.value })}
+                      aria-invalid={hasValidationError(draft.id, "stock")}
+                      className={`mt-1 w-full rounded-lg border bg-background px-2 py-2 text-sm font-normal ${hasValidationError(draft.id, "stock") ? "border-red-400" : "border-line"}`}
+                    />
+                  </label>
+                ) : null}
               </div>
+              {hasValidationError(draft.id, "stock") ? (
+                <p className="text-xs font-medium text-red-700" role="alert">
+                  {noSizes(draft.categorySlug) && !draft.colors.length
+                    ? "Enter at least 1 unit of stock."
+                    : "Enter at least 1 unit in a selected size or colour below."}
+                </p>
+              ) : null}
               {!noSizes(draft.categorySlug) ? (
                 <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
                   Fabric / material
