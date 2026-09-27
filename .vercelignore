@@ -1,0 +1,8 @@
+tmp/
+.edge-temp/
+.agents/
+migration-work/
+deliverables/
+*.docx
+/*.png
+/*.jpg
