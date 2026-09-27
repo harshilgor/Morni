@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadBrowseCategoryOptions } from "@/lib/store-category";
 import { PRODUCT_SIZES } from "@/lib/product-sizes";
@@ -159,6 +159,8 @@ function PhotoStack({
   onSplit,
   onMove,
   otherDrafts,
+  showCoach,
+  onDismissCoach,
 }: {
   draft: Draft;
   draftIndex: number;
@@ -166,6 +168,8 @@ function PhotoStack({
   onSplit: (photoId: string) => void;
   onMove: (photoId: string, targetId: string) => void;
   otherDrafts: Array<{ id: string; label: string }>;
+  showCoach: boolean;
+  onDismissCoach: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const cover = draft.photos[0];
@@ -223,7 +227,44 @@ function PhotoStack({
         ))}
       </div>
 
-      <details className="mt-2 rounded-lg border border-[#dfe8e3] bg-white/70 px-3 py-2">
+      <div className="mt-3 space-y-3 md:hidden">
+        <p className="text-xs font-semibold text-[#34594d]">Photo actions</p>
+        {draft.photos.map((photo, photoIndex) => (
+          <div key={photo.id} className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-2">
+            <span className="text-xs font-medium text-ink">Photo {photoIndex + 1}</span>
+            <div className="flex min-w-0 gap-2">
+              <select
+                aria-label={`Move photo ${photoIndex + 1} to another product`}
+                defaultValue=""
+                onChange={(event) => {
+                  if (event.target.value) onMove(photo.id, event.target.value);
+                  event.currentTarget.value = "";
+                }}
+                disabled={!otherDrafts.length}
+                className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-white px-2 text-xs text-ink disabled:opacity-60"
+              >
+                <option value="">Move to product</option>
+                {otherDrafts.map((otherDraft) => (
+                  <option key={otherDraft.id} value={otherDraft.id}>{otherDraft.label}</option>
+                ))}
+              </select>
+              {photoIndex > 0 ? (
+                <button type="button" onClick={() => onSplit(photo.id)} className="min-h-11 shrink-0 rounded-lg border border-[#e7c7d4] px-3 text-xs font-semibold text-accent-deep">
+                  Split
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ))}
+        {showCoach ? (
+          <div className="flex items-start justify-between gap-3 rounded-lg bg-[#fff7fa] px-3 py-2 text-xs leading-5 text-[#7b3e55]">
+            <p><span className="font-semibold">Tip:</span> use Move to product or Split to fix photo groups.</p>
+            <button type="button" onClick={onDismissCoach} className="min-h-11 shrink-0 px-2 font-semibold underline underline-offset-4">Got it</button>
+          </div>
+        ) : null}
+      </div>
+
+      <details className="mt-2 hidden rounded-lg border border-[#dfe8e3] bg-white/70 px-3 py-2 md:block">
         <summary className="cursor-pointer text-xs font-semibold text-[#34594d]">
           Organize photos
         </summary>
@@ -317,7 +358,7 @@ function ColorGroupingPanel({
                     <button type="button" onClick={() => onUnassign(photo.id)} className="rounded bg-white/95 px-1.5 py-1 text-[10px] font-semibold text-ink shadow" title="Move to unassigned photos">Unassign</button>
                     <button type="button" onClick={() => onDeletePhoto(photo.id)} className="rounded bg-white/95 p-1 text-accent-deep shadow" title="Delete this photo from the upload"><PortalIcon name="trash" className="h-3 w-3" /></button>
                   </div>
-                  <select aria-label={`Assign photo to colour`} value={color.id} onChange={(event) => event.target.value === "__unassigned" ? onUnassign(photo.id) : onAssign(photo.id, event.target.value)} className="absolute inset-x-1 bottom-1 min-w-0 rounded bg-white/95 px-1 py-1 text-[10px] text-ink opacity-100 shadow transition sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100">
+                  <select aria-label={`Assign photo to colour`} value={color.id} onChange={(event) => event.target.value === "__unassigned" ? onUnassign(photo.id) : onAssign(photo.id, event.target.value)} className="absolute inset-x-1 bottom-1 min-h-11 min-w-0 rounded bg-white/95 px-1 py-1 text-xs text-ink opacity-100 shadow transition sm:min-h-0 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100">
                     <option value="__unassigned">Unassigned</option>
                     {colors.map((option) => <option key={option.id} value={option.id}>{option.colorName || "Unnamed"}</option>)}
                   </select>
@@ -383,6 +424,31 @@ function hasValidStockQuantities(draft: Draft) {
   return quantities.every((quantity) => Number.isSafeInteger(quantity) && quantity >= 0);
 }
 
+function getDraftReadinessIssues(draft: Draft) {
+  const issues: string[] = [];
+  if (!draft.photos.length) issues.push("add photos");
+  if (draft.photos.length > MAX_PHOTOS_PER_COLOUR && !draft.colors.length) issues.push(`use at most ${MAX_PHOTOS_PER_COLOUR} photos without colourways`);
+  if (draft.title.trim().length < 3 || draft.title.trim().length > 120) issues.push("add a product name (3–120 characters)");
+  if (!draft.categorySlug) issues.push("choose a category");
+  if (!Number.isFinite(Number(draft.priceAed)) || Number(draft.priceAed) <= 0) issues.push("enter a price");
+  if (draft.description.trim().length > 2_000) issues.push("shorten the description");
+  if (!hasValidStockQuantities(draft) || publishableStock(draft) <= 0) issues.push("add valid stock");
+  if (draft.colors.length > 20) issues.push("use at most 20 colours");
+  const assignedPhotoIds = new Set(draft.colors.flatMap((color) => color.photos.map((photo) => photo.id)));
+  if (draft.colors.length && draft.photos.some((photo) => !assignedPhotoIds.has(photo.id))) issues.push("assign every photo to a colour");
+  if (draft.colors.some((color) => !color.colorName.trim() || color.colorName.trim().length > 80 || !color.photos.length || color.photos.length > MAX_PHOTOS_PER_COLOUR)) issues.push("check colour names and photos");
+  if (!noSizes(draft.categorySlug) && draft.customization.enabled && !draft.customization.fields.length) issues.push("choose custom measurement fields");
+  if (draft.productTag.trim() && !/^[A-Za-z][A-Za-z0-9-]{0,39}$/.test(draft.productTag.trim())) issues.push("fix the product tag");
+  return issues;
+}
+
+function isReadyToPublish(drafts: Draft[], busy: boolean) {
+  if (busy || !drafts.length || drafts.length > MAX_PRODUCTS_PER_PUBLISH) return false;
+  const tags = drafts.map((draft) => draft.productTag.trim().toUpperCase()).filter(Boolean);
+  if (new Set(tags).size !== tags.length) return false;
+  return drafts.every((draft) => getDraftReadinessIssues(draft).length === 0);
+}
+
 function emptyDraft(photos: Photo[] = []): Draft {
   return {
     id: uid(),
@@ -440,6 +506,8 @@ async function imageDataForAnalysis(file: File) {
 
 export default function BulkUploadPage() {
   const router = useRouter();
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoTargetRef = useRef<string | null>(null);
   const { store, loading } = useOwnerStore();
   const [categories, setCategories] = useState<
     Array<{ name: string; slug: string }>
@@ -468,6 +536,10 @@ export default function BulkUploadPage() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   const [colorValidationErrors, setColorValidationErrors] = useState<Record<string, string[]>>({});
   const [draftsRestored, setDraftsRestored] = useState(false);
+  function openPhotoPicker(targetDraftId?: string) {
+    photoTargetRef.current = targetDraftId ?? null;
+    photoInputRef.current?.click();
+  }
   useEffect(() => {
     void loadBrowseCategoryOptions().then(setCategories);
   }, []);
@@ -500,7 +572,9 @@ export default function BulkUploadPage() {
       if (!active) return;
       if (saved?.length) {
         setDrafts(saved);
-        setMessage("Recovered your saved bulk-upload draft. You can continue where you left off.");
+        const recoveryMessage = "Draft restored. You can continue where you left off.";
+        setMessage(recoveryMessage);
+        window.setTimeout(() => setMessage((current) => current === recoveryMessage ? null : current), 5000);
       }
       setDraftsRestored(true);
     });
@@ -510,7 +584,7 @@ export default function BulkUploadPage() {
     if (!store || !draftsRestored) return;
     void saveBulkDraft(store.id, drafts);
   }, [drafts, draftsRestored, store]);
-  function addFiles(list: FileList | File[]) {
+  function addFiles(list: FileList | File[], targetDraftId?: string) {
     const valid = Array.from(list).filter((file) => {
       if (!validateImageFile(file)) return true;
       if (file.size <= 0 || file.size > 8 * 1024 * 1024) return false;
@@ -544,7 +618,9 @@ export default function BulkUploadPage() {
       preview: URL.createObjectURL(file),
     }));
     const stagedDrafts = stagedPhotos.map((photo) => emptyDraft([photo]));
-    const nextDrafts = [...drafts, ...stagedDrafts];
+    const nextDrafts = targetDraftId
+      ? drafts.map((draft) => draft.id === targetDraftId ? { ...draft, photos: [...draft.photos, ...stagedPhotos] } : draft)
+      : [...drafts, ...stagedDrafts];
     setDrafts(nextDrafts);
     setMessage(
       `Uploading ${stagedPhotos.length} photo${stagedPhotos.length === 1 ? "" : "s"}… AI is analysing your photos.`,
@@ -1061,31 +1137,68 @@ export default function BulkUploadPage() {
         : busyPhase === "publishing"
           ? "Publishing products…"
           : "Analyze and group with AI";
+  const canPublish = Boolean(store) && isReadyToPublish(drafts, busy);
+  const photoCount = drafts.reduce((sum, draft) => sum + draft.photos.length, 0);
+  const duplicateProductTags = (() => {
+    const tags = drafts.map((draft) => draft.productTag.trim().toUpperCase()).filter(Boolean);
+    return new Set(tags).size !== tags.length;
+  })();
+  const firstIncompleteDraft = drafts.find((draft) => getDraftReadinessIssues(draft).length > 0);
+  const readinessHint = busy
+    ? busyLabel
+    : !store
+      ? "Choose a store before publishing."
+    : drafts.length > MAX_PRODUCTS_PER_PUBLISH
+      ? `Publish up to ${MAX_PRODUCTS_PER_PUBLISH} products at a time.`
+      : duplicateProductTags
+        ? "Product tags must be unique."
+        : firstIncompleteDraft
+          ? `${firstIncompleteDraft.title.trim() || `Product ${drafts.indexOf(firstIncompleteDraft) + 1}`}: ${getDraftReadinessIssues(firstIncompleteDraft).slice(0, 2).join(" and ")}.`
+          : "Ready to publish";
+
   return (
-    <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 sm:py-12">
+    <div className="mx-auto w-full max-w-7xl px-0 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-0 lg:pb-0">
       <UploadSuccessConfetti celebrationKey={uploadCelebrationKey} />
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">
             Store owner portal
           </p>
-          <h1 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
+          <h1 className="mt-1 font-display text-2xl leading-tight text-ink sm:mt-2 sm:text-4xl">
             Bulk upload studio
           </h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted">
-            AI suggestions are advisory. Drag photos between products, split
-            groups, or create a new row before publishing.
+          <p className="mt-1 max-w-3xl text-sm leading-5 text-muted sm:mt-2 sm:leading-6">
+            Add photos, review AI suggestions, then publish when ready.
           </p>
         </div>
         <button
           type="button"
           onClick={() => router.push("/portal/products")}
-          className="border border-line px-4 py-2 text-sm font-semibold"
+          className="min-h-11 shrink-0 px-2 text-xs font-semibold text-[#245448] underline underline-offset-4 sm:border sm:border-line sm:px-4 sm:text-sm sm:no-underline"
         >
-          Back to products
+          <span className="sm:hidden">Back</span><span className="hidden sm:inline">Back to products</span>
         </button>
+      </header>
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="sr-only"
+        aria-label="Add product photos"
+        onChange={(event) => {
+          if (event.target.files) addFiles(event.target.files, photoTargetRef.current ?? undefined);
+          photoTargetRef.current = null;
+          event.currentTarget.value = "";
+        }}
+      />
+      <div className="mt-4 sm:hidden">
+        <button type="button" onClick={() => openPhotoPicker()} className="min-h-12 w-full rounded-xl bg-[#245448] px-4 text-sm font-semibold text-white shadow-sm">
+          + Add photos
+        </button>
+        <p className="mt-2 text-center text-xs text-muted">JPG, PNG or WebP · up to {BULK_UPLOAD_MAX_PHOTOS.toLocaleString()} photos</p>
       </div>
-      <label
+      <div
         onDragEnter={(event) => {
           event.preventDefault();
           setDragging(true);
@@ -1097,7 +1210,7 @@ export default function BulkUploadPage() {
           setDragging(false);
           addFiles(event.dataTransfer.files);
         }}
-        className={`mt-6 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-4 text-center sm:mt-8 sm:min-h-36 sm:p-6 ${dragging ? "border-accent bg-[#fff0f4]" : "border-line bg-surface"}`}
+        className={`mt-6 hidden min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-4 text-center sm:mt-8 sm:flex sm:min-h-36 sm:p-6 ${dragging ? "border-accent bg-[#fff0f4]" : "border-line bg-surface"}`}
       >
         <span className="text-3xl text-accent-deep">+</span>
         <span className="mt-2 font-semibold text-ink">
@@ -1106,22 +1219,13 @@ export default function BulkUploadPage() {
         <span className="mt-1 text-sm text-muted">
           JPG, PNG or WebP · up to {BULK_UPLOAD_MAX_PHOTOS.toLocaleString()} photos per upload · AI reviews groups of {AI_ANALYSIS_MAX_PHOTOS}
         </span>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          className="sr-only"
-          onChange={(event) => {
-            if (event.target.files) addFiles(event.target.files);
-            event.currentTarget.value = "";
-          }}
-        />
-      </label>
-      <div className="mt-4 flex flex-wrap gap-3">
+        <button type="button" onClick={() => openPhotoPicker()} className="mt-3 min-h-11 rounded-lg bg-[#245448] px-4 text-sm font-semibold text-white">Choose photos</button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 sm:mt-4 sm:gap-3">
         <button
           type="button"
           onClick={addRow}
-          className="border border-line px-4 py-2 text-sm font-semibold"
+          className="min-h-11 rounded-lg border border-line px-4 py-2 text-sm font-semibold"
         >
           + New product row
         </button>
@@ -1130,7 +1234,7 @@ export default function BulkUploadPage() {
             type="button"
             disabled={busy}
             onClick={() => void analyze(drafts)}
-            className="border border-[#245448] bg-[#245448] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="min-h-11 rounded-lg border border-[#245448] bg-[#245448] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             Retry AI analysis
           </button>
@@ -1163,45 +1267,25 @@ export default function BulkUploadPage() {
         </section>
       ) : null}
       {message ? (
-        <p data-upload-message className={`mt-5 rounded-xl px-4 py-3 text-sm ${Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length || publishIssues.length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length || publishIssues.length ? "alert" : "status"}>
+        <p data-upload-message className={`mt-3 rounded-xl px-3 py-2.5 text-sm leading-5 sm:mt-5 sm:px-4 sm:py-3 ${Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length || publishIssues.length ? "bg-[#fff1f1] text-red-700" : "bg-[#eef8f1] text-[#245448]"}`} role={Object.keys(validationErrors).length || Object.keys(colorValidationErrors).length || publishIssues.length ? "alert" : "status"}>
           {message}
         </p>
       ) : null}
-      {showCoach && drafts.length ? (
-        <div className="mt-5 flex items-start justify-between gap-4 rounded-xl border border-[#e7c7d4] bg-[#fff7fa] px-4 py-3 text-sm text-[#7b3e55] shadow-[0_12px_30px_-22px_rgba(123,62,85,0.7)] animate-[rise_0.6s_ease_both]">
-          <p>
-            <span className="font-semibold">Tip:</span> drag a photo onto
-            another product to regroup it. Use Split when an image belongs to a
-            different product.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              window.localStorage.setItem(
-                "morni.bulk-upload-coach-dismissed",
-                "1",
-              );
-              setShowCoach(false);
-            }}
-            className="shrink-0 text-xs font-semibold underline underline-offset-4"
-          >
-            Got it
-          </button>
-        </div>
-      ) : null}
-      <div className={`mt-6 grid gap-4 sm:gap-6 ${drafts.length === 1 ? "grid-cols-1" : "lg:grid-cols-2"}`}>
+      <div className={`mt-4 grid gap-3 sm:mt-6 sm:gap-6 ${drafts.length === 1 ? "grid-cols-1" : "lg:grid-cols-2"}`}>
         {drafts.map((draft, index) => (
           <article
             key={draft.id}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
-              move(event.dataTransfer.getData("photo-id"), draft.id);
+              if (event.dataTransfer.files.length) addFiles(event.dataTransfer.files, draft.id);
+              else move(event.dataTransfer.getData("photo-id"), draft.id);
             }}
-            className={`rounded-2xl border bg-surface p-3 sm:p-4 ${validationErrors[draft.id]?.length ? "border-red-400" : "border-line"}`}
+            className={`rounded-2xl border bg-white p-3 shadow-[0_8px_24px_-22px_rgba(20,35,29,0.45)] sm:p-4 ${validationErrors[draft.id]?.length ? "border-red-400" : "border-line"}`}
           >
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-deep">
+              <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent-deep sm:text-xs sm:tracking-[0.14em]">
                 Product {index + 1}
                 {draft.aiGenerated && draft.confidence != null && draft.confidence > 0
                   ? ` · AI confidence ${Math.round(draft.confidence * 100)}%`
@@ -1212,17 +1296,36 @@ export default function BulkUploadPage() {
                     ? " · Review grouping"
                     : ""}
               </p>
-              <button
-                type="button"
-                onClick={() =>
-                  setDrafts((current) =>
-                    current.filter((item) => item.id !== draft.id),
-                  )
-                }
-                className="text-xs text-accent-deep"
-              >
-                <span className="inline-flex items-center gap-1.5"><PortalIcon name="trash" className="h-3.5 w-3.5" /><span>Delete product</span></span>
-              </button>
+              <label className="mt-1 block">
+                <span className="sr-only">Product name</span>
+                <input
+                  value={draft.title}
+                  onChange={(event) => patch(draft.id, { title: event.target.value, aiGenerated: false, generationStatus: "manual", failureReason: undefined })}
+                  aria-invalid={hasValidationError(draft.id, "product name")}
+                  className={`w-full min-w-0 border-b bg-transparent py-1 font-display text-xl leading-tight text-ink outline-none placeholder:text-[#89938e] ${hasValidationError(draft.id, "product name") ? "border-red-400" : "border-transparent focus:border-[#9cb9aa]"}`}
+                  placeholder="Add product name"
+                />
+              </label>
+              </div>
+              <details className="relative shrink-0">
+                <summary aria-label={`Product ${index + 1} actions`} className="grid min-h-11 min-w-11 cursor-pointer list-none place-items-center rounded-lg text-[#596760] hover:bg-[#f3f6f4]">
+                  <PortalIcon name="more" className="h-5 w-5" />
+                </summary>
+                <div className="absolute right-0 top-full z-20 mt-1 min-w-40 rounded-xl border border-line bg-white p-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Delete Product ${index + 1} and its photos?`)) {
+                        draft.photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
+                        setDrafts((current) => current.filter((item) => item.id !== draft.id));
+                      }
+                    }}
+                    className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-red-700 hover:bg-red-50"
+                  >
+                    <PortalIcon name="trash" className="h-4 w-4" /> Delete product
+                  </button>
+                </div>
+              </details>
             </div>
             {draft.generationStatus === "failed" ||
             (!draft.aiGenerated && !draft.title.trim() && draft.photos.length > 0) ? (
@@ -1240,6 +1343,11 @@ export default function BulkUploadPage() {
                 onMakeCover={(photoId) => makeCover(draft.id, photoId)}
                 onSplit={(photoId) => split(draft.id, photoId)}
                 onMove={move}
+                showCoach={showCoach && index === 0}
+                onDismissCoach={() => {
+                  window.localStorage.setItem("morni.bulk-upload-coach-dismissed", "1");
+                  setShowCoach(false);
+                }}
                 otherDrafts={drafts
                   .filter((item) => item.id !== draft.id)
                   .map((item) => ({ id: item.id, label: `Product ${drafts.indexOf(item) + 1}` }))}
@@ -1247,37 +1355,18 @@ export default function BulkUploadPage() {
             ) : null}
             {!draft.photos.length ? (
               <div className={`mt-3 rounded-xl border border-dashed bg-[#f8fbf9] py-6 text-center text-sm ${hasValidationError(draft.id, "photos") ? "border-red-400 text-red-600" : "border-line text-muted"}`}>
-                Drop a photo here.
+                <span>No photos yet.</span>
+                <button type="button" onClick={() => openPhotoPicker(draft.id)} className="mt-2 min-h-11 rounded-lg border border-[#245448] px-4 text-sm font-semibold text-[#245448]">Add photos to this product</button>
               </div>
             ) : null}
+            <details className="mt-3 rounded-xl border border-[#dfe8e3] bg-[#fbfcfb] px-3 sm:px-4">
+              <summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold text-[#34594d]">
+                Product details, colours & inventory
+              </summary>
+              <div className="border-t border-[#e8efeb] pb-3 pt-1 sm:pb-4">
             {draft.photos.length ? <ColorGroupingPanel draft={draft} noSize={noSizes(draft.categorySlug)} onAssign={(photoId, colorId) => assignColor(draft.id, photoId, colorId)} onRename={(colorId, name, hex) => renameColor(draft.id, colorId, name, hex)} onAdd={() => addColor(draft.id)} onRemove={(colorId) => removeColor(draft.id, colorId)} onUnassign={(photoId) => unassignColor(draft.id, photoId)} onDeletePhoto={(photoId) => deletePhoto(draft.id, photoId)} onStockChange={(colorId, sizes, sizeStock, stock) => updateColorStock(draft.id, colorId, sizes, sizeStock, stock)} colorValidationErrors={colorValidationErrors} /> : null}
-            <div className="mt-4 grid gap-3">
-              <label className={`flex items-center gap-2 border-b py-2 ${hasValidationError(draft.id, "product name") ? "border-red-400" : "border-line"}`}>
-                <input
-                  value={draft.title}
-                  onChange={(event) =>
-                    patch(draft.id, {
-                      title: event.target.value,
-                      aiGenerated: false,
-                      generationStatus: event.target.value.trim()
-                        ? "manual"
-                        : draft.generationStatus === "failed"
-                          ? "failed"
-                          : "manual",
-                      failureReason: undefined,
-                    })
-                  }
-                  aria-invalid={hasValidationError(draft.id, "product name")}
-                  className={`min-w-0 flex-1 bg-transparent font-display text-xl outline-none ${hasValidationError(draft.id, "product name") ? "placeholder:text-red-400" : ""}`}
-                  placeholder="Product name"
-                />
-                <PortalIcon
-                  name="edit"
-                  className="h-4 w-4 text-accent-deep"
-                  aria-hidden="true"
-                />
-              </label>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+            <div className="mt-3 grid gap-3">
+              <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[#596760]">
                 Product tag
                 <input
                   value={draft.productTag}
@@ -1285,7 +1374,7 @@ export default function BulkUploadPage() {
                     patch(draft.id, { productTag: event.target.value })
                   }
                   aria-invalid={hasProductTagError(draft.id)}
-                  className={`mt-1 w-full rounded-lg border bg-background px-2 py-2 text-sm normal-case tracking-normal ${hasProductTagError(draft.id) ? "border-red-400" : "border-line"}`}
+                  className={`mt-1 min-h-11 w-full rounded-lg border bg-background px-3 py-2.5 text-base normal-case tracking-normal sm:text-sm ${hasProductTagError(draft.id) ? "border-red-400" : "border-line"}`}
                   placeholder="e.g. LUME-001"
                 />
               </label>
@@ -1294,7 +1383,7 @@ export default function BulkUploadPage() {
                 onChange={(event) =>
                   patch(draft.id, { description: event.target.value })
                 }
-                className="rounded-lg border border-line bg-background p-2 text-sm"
+                className="min-h-20 rounded-lg border border-line bg-background p-3 text-base sm:text-sm"
                 rows={2}
                 placeholder="Description"
               />
@@ -1315,7 +1404,7 @@ export default function BulkUploadPage() {
                     })
                   }
                   aria-invalid={hasValidationError(draft.id, "category")}
-                  className={`rounded-lg border bg-background px-2 py-2 text-sm ${hasValidationError(draft.id, "category") ? "border-red-400" : "border-line"}`}
+                  className={`min-h-11 rounded-lg border bg-background px-3 py-2.5 text-base sm:text-sm ${hasValidationError(draft.id, "category") ? "border-red-400" : "border-line"}`}
                 >
                   <option value="">Category</option>
                   {categories.map((category) => (
@@ -1333,7 +1422,7 @@ export default function BulkUploadPage() {
                     patch(draft.id, { priceAed: event.target.value })
                   }
                   aria-invalid={hasValidationError(draft.id, "price")}
-                  className={`rounded-lg border bg-background px-2 py-2 text-sm ${hasValidationError(draft.id, "price") ? "border-red-400" : "border-line"}`}
+                  className={`min-h-11 rounded-lg border bg-background px-3 py-2.5 text-base sm:text-sm ${hasValidationError(draft.id, "price") ? "border-red-400" : "border-line"}`}
                   placeholder="Price"
                 />
                 {noSizes(draft.categorySlug) && !draft.colors.length ? (
@@ -1359,7 +1448,7 @@ export default function BulkUploadPage() {
                 </p>
               ) : null}
               {!noSizes(draft.categorySlug) ? (
-                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[#596760]">
                   Fabric / material
                   <select value={draft.fabric} onChange={(event) => patch(draft.id, { fabric: event.target.value })} className="mt-1 w-full rounded-lg border border-line bg-background px-2 py-2 text-sm font-normal normal-case tracking-normal">
                     <option value="">Select material</option>
@@ -1409,26 +1498,30 @@ export default function BulkUploadPage() {
                 />
               ) : null}
             </div>
+              </div>
+            </details>
           </article>
         ))}
       </div>
       {drafts.length ? (
-        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mt-6 flex flex-col items-stretch gap-3 border-t border-line bg-background/95 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-4 lg:bottom-0">
-          <span className="text-center text-xs text-muted sm:text-left sm:text-sm">
-            {drafts.length} products ·{" "}
-            {drafts.reduce((sum, draft) => sum + draft.photos.length, 0)} photos
-          </span>
-          <button
-            type="button"
-            onClick={() => void publish()}
-            disabled={busy}
-            className="w-full bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto sm:px-6"
-          >
-            {busy ? "Publishing…" : "Publish all products"}
-          </button>
+        <div className="fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 border-t border-[#d5dfd9] bg-white/95 px-4 py-2.5 shadow-[0_-8px_24px_-20px_rgba(20,35,29,0.5)] backdrop-blur lg:sticky lg:bottom-0 lg:z-30 lg:mt-6 lg:border lg:border-line lg:px-4 lg:py-3">
+          <div className="mx-auto flex max-w-7xl items-center gap-3">
+            <span className="min-w-0 flex-1 text-xs leading-4 text-muted sm:text-sm">
+              <span className="block font-semibold text-ink">{drafts.length} products · {photoCount} photos</span>
+              <span className="block text-xs leading-4">{readinessHint}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => void publish()}
+              disabled={!canPublish}
+              className="min-h-11 shrink-0 rounded-lg bg-[#173d34] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#245448] disabled:cursor-not-allowed disabled:bg-[#aab7b0] disabled:text-white/90 disabled:shadow-none sm:px-6"
+            >
+              {busy ? "Publishing…" : `Publish ${drafts.length} products`}
+            </button>
+          </div>
         </div>
       ) : null}
-      <section className="mt-12 border-t border-line pt-6">
+      <section className="mt-8 border-t border-line pt-6 lg:mt-12">
         <h2 className="font-display text-2xl text-ink">Import history</h2>
         {history.length ? (
           <div className="mt-3 divide-y divide-line">
@@ -1468,6 +1561,6 @@ export default function BulkUploadPage() {
           uploadProgress={publishProgress}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
