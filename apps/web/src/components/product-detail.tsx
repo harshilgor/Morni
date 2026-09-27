@@ -116,7 +116,7 @@ function RelatedProductCard({ product }: { product: RelatedProduct }) {
         })
       }
     >
-      <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-[#f4f1ed] lg:aspect-[3/4] lg:rounded-lg">
+      <div className="relative aspect-square overflow-hidden bg-[#f4f1ed]">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]" />
@@ -668,7 +668,7 @@ export function ProductDetail({
               View boutique
             </Link>
           </div>
-          <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-4 sm:gap-5 lg:mt-5 lg:grid-cols-6 lg:gap-4">
+          <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:mt-5 lg:grid-cols-5 lg:gap-5">
             {relatedProducts.map((relatedProduct) => (
               <RelatedProductCard key={relatedProduct.id} product={relatedProduct} />
             ))}
