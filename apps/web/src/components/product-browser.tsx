@@ -967,7 +967,7 @@ export function ProductBrowser({
 
       <div>
         {mobileHeading ? (
-          <div className="flex items-center justify-between gap-3 border-b border-line pb-3 lg:hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-line pb-1 lg:hidden">
             <h1 className="min-w-0 font-display text-[1.35rem] leading-tight text-ink">{mobileHeading}</h1>
             <button type="button" onClick={() => setDrawerOpen(true)} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1 rounded-full border border-line bg-white px-3 text-xs font-semibold text-ink" aria-label="Open filters">
               <span aria-hidden="true">&#9881;</span> Filters{activeCount > 0 ? ` (${activeCount})` : ""}
@@ -1063,7 +1063,7 @@ export function ProductBrowser({
         ) : null}
 
         {!isStore ? (
-          <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mt-1 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               type="button"
               onClick={clearAll}
@@ -1158,7 +1158,7 @@ export function ProductBrowser({
           </div>
         ) : (
           <>
-            <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="mt-2.5 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2 sm:mt-5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
               {sorted.slice(0, visible).map((product, index) => (
                 <TrackedProductCard
                   key={product.id}

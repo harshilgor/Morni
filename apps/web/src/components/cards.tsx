@@ -86,7 +86,7 @@ export function ProductCard({
       className={
         sharp
           ? "group relative block min-w-0"
-          : `group relative block min-w-0 overflow-hidden border border-line/70 bg-white/75 p-1.5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5 ${mobileSharp ? "rounded-none" : "rounded-lg"}`
+          : `group relative block min-w-0 overflow-hidden border border-line/70 bg-white/75 p-1 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5 ${mobileSharp ? "rounded-none" : "rounded-lg"}`
       }
     >
       <div
@@ -115,7 +115,7 @@ export function ProductCard({
         }
       >
         <div className="flex items-start gap-0.5">
-          <h3 className={`min-w-0 flex-1 line-clamp-2 font-medium leading-snug text-ink ${mobileSharp ? "text-xs" : "text-[11px]"} sm:text-sm`}>
+          <h3 className={`min-w-0 flex-1 line-clamp-2 font-medium leading-snug text-ink ${mobileSharp ? "text-[13px]" : "text-[11px]"} sm:text-sm`}>
             {product.title}
           </h3>
           {sharp ? (
@@ -137,7 +137,7 @@ export function ProductCard({
           </div>
         ) : null}
         <div
-          className={`flex items-center gap-1 font-medium sm:gap-1.5 sm:text-sm ${mobileSharp ? "text-xs" : "text-[11px]"} ${
+          className={`flex items-center gap-1 font-medium sm:gap-1.5 sm:text-sm ${mobileSharp ? "text-[13px]" : "text-[11px]"} ${
             sharp ? "mt-0.5" : ""
           }`}
         >

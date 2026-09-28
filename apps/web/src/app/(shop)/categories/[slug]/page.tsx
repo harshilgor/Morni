@@ -21,7 +21,7 @@ async function CategoryPageContent({
   const ratings = productPage.ratings;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-7xl px-3 py-3 sm:px-6 sm:py-8">
       <AnalyticsPageView
         event="category_view"
         onceKey={`category_view:${category.slug}`}
