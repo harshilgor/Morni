@@ -33,6 +33,8 @@ export async function POST(request: Request) {
       const [scope, productIndex, field] = issue.path;
       if (scope === "items" && typeof productIndex === "number" && field === "images" && issue.code === "too_big")
         return `${productTitle(productIndex)}: a product can have a maximum of ${MAX_PHOTOS_PER_PRODUCT} photos.`;
+      if (scope === "items" && typeof productIndex === "number" && field === "occasion")
+        return `${productTitle(productIndex)}: choose Best occasion before publishing. If you cannot see that field, refresh this page; your saved draft will return.`;
       return `Review ${issue.path.join(" → ") || "the bulk-upload details"}: ${issue.message}`;
     });
     return NextResponse.json({ error: issues[0] ?? "Review the product fields and try again.", issues }, { status: 400 });
