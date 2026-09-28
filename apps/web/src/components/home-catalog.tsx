@@ -6,6 +6,7 @@ import { ProductRail } from "@/components/product-rail";
 import { RecentlyViewedRail } from "@/components/recently-viewed-rail";
 import { TrendingForYou } from "@/components/trending-for-you";
 import { ShopBySize } from "@/components/shop-by-size";
+import { OccasionCards } from "@/components/occasion-cards";
 import { getCachedHomeCatalog, type ProductWithStore } from "@/lib/catalog";
 import { catalogShuffleSeed, merchandiseCatalog } from "@/lib/catalog-random";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
@@ -131,6 +132,7 @@ export async function HomeCatalog({
   return (
     <>
       <FeaturedCategories categories={featured} />
+      <OccasionCards />
       <ShopBySize />
       <HomeDiscovery intents={intentRails} />
       <TrendingForYou products={popularPool.slice(0, 60)} />

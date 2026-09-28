@@ -45,6 +45,7 @@ import {
   type ProductCustomizationConfig,
 } from "@/lib/product-customization";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
+import { PRODUCT_OCCASIONS } from "@/lib/product-occasions";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { AiProcessingOverlay } from "@/components/ai-processing-overlay";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
@@ -60,6 +61,7 @@ type ProductDraft = {
   description: string;
   price_aed: string;
   categorySlug: string;
+  occasion: string;
   fabric: string;
   customization: ProductCustomizationConfig;
 };
@@ -220,6 +222,7 @@ export default function PortalProductsPage() {
     fabric: "",
     price_aed: "",
     categorySlug: "",
+    occasion: "",
     customization: defaultCustomizationConfig(),
   });
   const [createColors, setCreateColors] = useState<ColorDraft[]>([
@@ -334,6 +337,7 @@ export default function PortalProductsPage() {
       fabric: "",
       price_aed: "",
       categorySlug: "",
+      occasion: "",
       customization: defaultCustomizationConfig(),
     });
     setCreateColors([createColorDraft({ color_name: "Default" })]);
@@ -436,6 +440,7 @@ export default function PortalProductsPage() {
       description: product.description ?? "",
       price_aed: String(product.price_aed),
       categorySlug: product.categories?.slug ?? "",
+      occasion: product.occasion ?? "",
       fabric: product.fabric ?? "",
       customization:
         product.categories?.slug === "gifting"
@@ -468,6 +473,11 @@ export default function PortalProductsPage() {
     }
     if (!form.categorySlug) {
       setMessage("Choose a category for this product.");
+      setCreateStep(1);
+      return;
+    }
+    if (!form.occasion) {
+      setMessage("Choose the best occasion for this product.");
       setCreateStep(1);
       return;
     }
@@ -519,6 +529,7 @@ export default function PortalProductsPage() {
       .insert({
         store_id: store.id,
         category_id: categoryId,
+        occasion: form.occasion,
         title: form.title,
         product_tag: form.product_tag.trim().toUpperCase() || null,
         description: form.description || null,
@@ -568,6 +579,7 @@ export default function PortalProductsPage() {
       fabric: "",
       price_aed: "",
       categorySlug: "",
+      occasion: "",
       customization: defaultCustomizationConfig(),
     });
     setCreateColors([createColorDraft({ color_name: "Default" })]);
@@ -592,6 +604,10 @@ export default function PortalProductsPage() {
     }
     if (!editDraft.categorySlug) {
       setEditMessage("Choose a category for this product.");
+      return;
+    }
+    if (!editDraft.occasion) {
+      setEditMessage("Choose the best occasion for this product.");
       return;
     }
     if (
@@ -643,6 +659,7 @@ export default function PortalProductsPage() {
       .from("products")
       .update({
         category_id: categoryId,
+        occasion: editDraft.occasion,
         fabric: categoryHasSizes(editDraft.categorySlug) ? editDraft.fabric || null : null,
         title: editDraft.title.trim(),
         product_tag: editDraft.product_tag.trim().toUpperCase() || null,
@@ -1219,6 +1236,20 @@ export default function PortalProductsPage() {
                     ))}
                   </select>
                 </label>
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-medium text-[#40534d]">Best occasion *</span>
+                  <select
+                    className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
+                    value={form.occasion}
+                    onChange={(event) => setForm((current) => ({ ...current, occasion: event.target.value }))}
+                    required
+                  >
+                    <option value="">Choose an occasion</option>
+                    {PRODUCT_OCCASIONS.map((occasion) => (
+                      <option key={occasion.value} value={occasion.value}>{occasion.label}</option>
+                    ))}
+                  </select>
+                </label>
                 {categoryHasSizes(form.categorySlug) ? (
                   <label className="block space-y-1.5 text-sm">
                     <span className="font-medium text-[#40534d]">Fabric / material</span>
@@ -1416,6 +1447,20 @@ export default function PortalProductsPage() {
                     <option key={category.slug} value={category.slug}>
                       {category.name}
                     </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-[#40534d]">Best occasion *</span>
+                <select
+                  className="w-full rounded-xl border border-line bg-white px-3 py-3 text-sm"
+                  value={editDraft.occasion}
+                  onChange={(event) => setEditDraft((current) => current ? { ...current, occasion: event.target.value } : current)}
+                  required
+                >
+                  <option value="">Choose an occasion</option>
+                  {PRODUCT_OCCASIONS.map((occasion) => (
+                    <option key={occasion.value} value={occasion.value}>{occasion.label}</option>
                   ))}
                 </select>
               </label>

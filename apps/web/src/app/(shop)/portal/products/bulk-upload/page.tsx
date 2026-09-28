@@ -8,6 +8,7 @@ import { uploadProductImages, validateImageFile } from "@/lib/media-upload";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { PortalIcon } from "@/components/portal-icons";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
+import { PRODUCT_OCCASIONS } from "@/lib/product-occasions";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 import { AiProcessingOverlay as SimpleAiProcessingOverlay } from "@/components/ai-processing-overlay";
@@ -26,6 +27,7 @@ type Draft = {
   description: string;
   fabric: string;
   categorySlug: string;
+  occasion: string;
   priceAed: string;
   stock: string;
   sizes: string[];
@@ -298,6 +300,7 @@ function getDraftReadinessIssues(draft: Draft) {
   if (draft.photos.length > MAX_PHOTOS_PER_PRODUCT) issues.push(`use at most ${MAX_PHOTOS_PER_PRODUCT} photos per product`);
   if (draft.title.trim().length < 3 || draft.title.trim().length > 120) issues.push("add a product name (3–120 characters)");
   if (!draft.categorySlug) issues.push("choose a category");
+  if (!draft.occasion) issues.push("choose the best occasion");
   if (!Number.isFinite(Number(draft.priceAed)) || Number(draft.priceAed) <= 0) issues.push("enter a price");
   if (draft.description.trim().length > 2_000) issues.push("shorten the description");
   if (!hasValidStockQuantities(draft) || publishableStock(draft) <= 0) issues.push("add valid stock");
@@ -322,6 +325,7 @@ function emptyDraft(photos: Photo[] = []): Draft {
     description: "",
     fabric: "",
     categorySlug: "",
+    occasion: "",
     priceAed: "",
     stock: "",
     sizes: ["S", "M", "L"],
@@ -432,7 +436,7 @@ export default function BulkUploadPage() {
     void readBulkDraft(store.id).then((saved) => {
       if (!active) return;
       if (saved?.length) {
-        setDrafts(saved);
+        setDrafts(saved.map((draft) => ({ ...draft, occasion: draft.occasion ?? "" })));
         const recoveryMessage = "Draft restored. You can continue where you left off.";
         setMessage(recoveryMessage);
         window.setTimeout(() => setMessage((current) => current === recoveryMessage ? null : current), 5000);
@@ -496,7 +500,9 @@ export default function BulkUploadPage() {
     );
   }
   function hasValidationError(draftId: string, field: string) {
-    return validationErrors[draftId]?.includes(field) ?? false;
+    return validationErrors[draftId]?.some((issue) =>
+      issue.toLowerCase().includes(field.toLowerCase()),
+    ) ?? false;
   }
   function hasProductTagError(draftId: string) {
     return hasValidationError(draftId, "unique product tag") || hasValidationError(draftId, "product tag format");
@@ -656,6 +662,7 @@ export default function BulkUploadPage() {
                   description: group.description ?? "",
                   fabric: "",
                   categorySlug: hasConsistentSellerCategory ? [...selectedCategories][0] ?? "" : "",
+                  occasion: "",
                   productTag: "",
                   priceAed: "",
                   stock: "",
@@ -762,6 +769,7 @@ export default function BulkUploadPage() {
           !draft.photos.length ||
           !draft.title.trim() ||
           !draft.categorySlug ||
+          !draft.occasion ||
           !draft.priceAed ||
           publishableStock(draft) <= 0
         )
@@ -791,6 +799,7 @@ export default function BulkUploadPage() {
           description: draft.description,
           fabric: noSizes(draft.categorySlug) ? null : draft.fabric || null,
           categorySlug: draft.categorySlug,
+          occasion: draft.occasion,
           priceAed: Number(draft.priceAed),
           stock: publishableStock(draft),
           sizes: noSizes(draft.categorySlug) ? [] : draft.sizes,
@@ -1141,7 +1150,7 @@ export default function BulkUploadPage() {
                 rows={2}
                 placeholder="Description"
               />
-              <div className={`grid grid-cols-1 gap-2 ${noSizes(draft.categorySlug) ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+              <div className={`grid grid-cols-1 gap-2 ${noSizes(draft.categorySlug) ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
                 <select
                   value={draft.categorySlug}
                   onChange={(event) =>
@@ -1167,6 +1176,26 @@ export default function BulkUploadPage() {
                     </option>
                   ))}
                 </select>
+                <label className="block text-[10px] font-semibold text-[#596760]">
+                  Best occasion *
+                  <select
+                    value={draft.occasion ?? ""}
+                    onChange={(event) => patch(draft.id, { occasion: event.target.value })}
+                    aria-invalid={hasValidationError(draft.id, "best occasion")}
+                    required
+                    className={`mt-1 min-h-11 w-full rounded-lg border bg-background px-3 py-2.5 text-base font-normal sm:text-sm ${hasValidationError(draft.id, "best occasion") ? "border-red-400" : "border-line"}`}
+                  >
+                    <option value="">Choose an occasion</option>
+                    {PRODUCT_OCCASIONS.map((occasion) => (
+                      <option key={occasion.value} value={occasion.value}>{occasion.label}</option>
+                    ))}
+                  </select>
+                  {hasValidationError(draft.id, "best occasion") ? (
+                    <span className="mt-1 block text-xs font-medium text-red-700" role="alert">
+                      Choose the best occasion for this product.
+                    </span>
+                  ) : null}
+                </label>
                 <input
                   type="number"
                   min="0"

@@ -40,6 +40,7 @@ export type BrowsableProduct = {
   image_urls: string[] | null;
   sizes: string[] | null;
   fabric?: string | null;
+  occasion?: string | null;
   stock: number;
   created_at?: string | null;
   search_score?: number;

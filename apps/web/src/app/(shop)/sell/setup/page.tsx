@@ -141,6 +141,7 @@ export default function SellSetupPage() {
             description: first.description ?? "",
             fabric: first.fabric ?? "",
             categorySlug: first.category?.slug ?? "",
+            occasion: first.occasion ?? "",
             price_aed: String(first.price_aed ?? ""),
             compare_at_price_aed: first.compare_at_price_aed
               ? String(first.compare_at_price_aed)
@@ -346,6 +347,9 @@ export default function SellSetupPage() {
     if (!productForm.categorySlug) {
       errors.categorySlug = "Choose a category.";
     }
+    if (!productForm.occasion) {
+      errors.occasion = "Choose the best occasion for this product.";
+    }
     const price = Number(productForm.price_aed);
     if (!Number.isFinite(price) || price <= 0) {
       errors.price_aed = "Enter a valid price.";
@@ -405,6 +409,7 @@ export default function SellSetupPage() {
             description: productForm.description.trim(),
             fabric: productForm.categorySlug === "gifting" ? null : productForm.fabric || null,
             category_id: categoryId,
+            occasion: productForm.occasion,
             price_aed: price,
             compare_at_price_aed:
               compareAt && Number.isFinite(compareAt) ? compareAt : null,
@@ -429,6 +434,7 @@ export default function SellSetupPage() {
         const { data: created, error: insertError } = await supabase.from("products").insert({
           store_id: store.id,
           category_id: categoryId,
+          occasion: productForm.occasion,
           title: productForm.title.trim(),
           description: productForm.description.trim(),
           fabric: productForm.categorySlug === "gifting" ? null : productForm.fabric || null,

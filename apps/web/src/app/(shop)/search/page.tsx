@@ -9,6 +9,7 @@ import { fetchProductRatingMap } from "@/lib/product-ratings";
 import { searchCatalog } from "@/lib/search/catalog-search";
 import type { ProductRatingSummary } from "@/lib/product-ratings";
 import type { Product } from "@/lib/types";
+import { isProductOccasion, productOccasionLabel } from "@/lib/product-occasions";
 
 const RELATED_CATEGORY_SLUGS: Record<string, string[]> = {
   shararas: ["salwar-kameez", "party-wear", "lehengas", "anarkalis", "pakistani-suits"],
@@ -42,10 +43,12 @@ export default async function SearchPage({
     size?: string;
     sort?: string;
     instock?: string;
+    occasion?: string;
   }>;
 }) {
-  const { q = "", max, min, size, sort, instock } = await searchParams;
-  const query = q.trim();
+  const { q = "", max, min, size, sort, instock, occasion: rawOccasion } = await searchParams;
+  const occasion = rawOccasion && isProductOccasion(rawOccasion) ? rawOccasion : null;
+  const query = occasion ? "" : q.trim();
   const sizeFilter = size?.trim().slice(0, 40) || null;
   const maxPrice = max ? Number(max) : null;
   const minPrice = min ? Number(min) : null;
@@ -56,6 +59,8 @@ export default async function SearchPage({
     .select("*, category:categories(name, slug), stores!inner(slug, name, is_active, emirate, area, delivery_eta_minutes)")
     .eq("is_available", true)
     .eq("stores.is_active", true);
+
+  if (occasion) productsQuery = productsQuery.eq("occasion", occasion);
 
   if (query) {
     // Product retrieval is handled by the shared hybrid search service below.
@@ -149,7 +154,9 @@ export default async function SearchPage({
     });
   }
 
-  const heading = query
+  const heading = occasion
+    ? `${productOccasionLabel(occasion)} edit`
+    : query
     ? `Results for “${query}”`
     : maxPrice != null
       ? `Products Under AED ${maxPrice}`
@@ -181,6 +188,7 @@ export default async function SearchPage({
           size: sizeFilter,
           sort: sort ?? null,
           instock: instock === "1",
+          occasion,
         }}
       />
       <h1 className="font-display text-3xl text-ink sm:text-4xl">{heading}</h1>
@@ -217,8 +225,23 @@ export default async function SearchPage({
             </h2>
             {browseProducts.length === 0 ? (
               <div className="border-y border-line py-10">
-                <p className="font-medium text-ink">No exact products matched “{query}”.</p>
-                <p className="mt-2 text-sm text-muted">Try removing a colour or style, or check the spelling. We won’t replace your search with unrelated products.</p>
+                <p className="font-medium text-ink">
+                  {occasion
+                    ? `No ${productOccasionLabel(occasion)} products are listed yet.`
+                    : query
+                      ? `No exact products matched “${query}”.`
+                      : "No products match these filters."}
+                </p>
+                <p className="mt-2 text-sm text-muted">
+                  {occasion
+                    ? "Check back as boutiques add more occasion-ready pieces."
+                    : "Try removing a filter or check the spelling. We will not replace your search with unrelated products."}
+                </p>
+                {occasion ? (
+                  <Link href="/search" className="mt-4 inline-block text-sm font-medium text-accent-deep underline">
+                    Browse all products
+                  </Link>
+                ) : null}
               </div>
             ) : (
               <ProductBrowser

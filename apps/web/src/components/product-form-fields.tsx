@@ -15,12 +15,14 @@ import { SizeInventoryEditor } from "@/components/size-inventory-editor";
 import type { SizeStock } from "@/lib/size-inventory";
 import { ColorVariantEditor } from "@/components/color-variant-editor";
 import { createColorDraft, type ColorDraft } from "@/lib/product-variants";
+import { PRODUCT_OCCASIONS } from "@/lib/product-occasions";
 
 export type ProductFormValue = {
   title: string;
   description: string;
   fabric: string;
   categorySlug: string;
+  occasion: string;
   price_aed: string;
   compare_at_price_aed: string;
   stock: string;
@@ -125,6 +127,28 @@ export function ProductFormFields({
         </select>
         {fieldErrors?.categorySlug ? (
           <p className="text-sm text-accent-deep">{fieldErrors.categorySlug}</p>
+        ) : null}
+      </label>
+
+      <label className="block space-y-1.5 text-sm">
+        <span className="text-muted">
+          Best occasion <span className="text-accent-deep">*</span>
+        </span>
+        <select
+          className="w-full rounded-xl border border-line bg-background px-3 py-2.5"
+          value={value.occasion}
+          onChange={(event) => patch({ occasion: event.target.value })}
+          required
+        >
+          <option value="">Choose an occasion</option>
+          {PRODUCT_OCCASIONS.map((occasion) => (
+            <option key={occasion.value} value={occasion.value}>
+              {occasion.label}
+            </option>
+          ))}
+        </select>
+        {fieldErrors?.occasion ? (
+          <p className="text-sm text-accent-deep">{fieldErrors.occasion}</p>
         ) : null}
       </label>
 
@@ -239,6 +263,7 @@ export function emptyProductForm(): ProductFormValue {
     description: "",
     fabric: "",
     categorySlug: "",
+    occasion: "",
     price_aed: "",
     compare_at_price_aed: "",
     stock: "10",
