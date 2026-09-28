@@ -116,10 +116,10 @@ function RelatedProductCard({ product }: { product: RelatedProduct }) {
         })
       }
     >
-      <div className="relative aspect-square overflow-hidden bg-[#f4f1ed]">
+      <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f1ed]">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]" />
+          <img src={image} alt={product.title} className="h-full w-full object-contain" />
         ) : null}
       </div>
       <p className="mt-3 line-clamp-2 text-sm font-medium leading-snug text-ink lg:mt-2">{product.title}</p>
