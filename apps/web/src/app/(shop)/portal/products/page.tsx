@@ -45,7 +45,7 @@ import {
   type ProductCustomizationConfig,
 } from "@/lib/product-customization";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
-import { PRODUCT_OCCASIONS } from "@/lib/product-occasions";
+import { PRODUCT_OCCASIONS, productOccasionLabel } from "@/lib/product-occasions";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { AiProcessingOverlay } from "@/components/ai-processing-overlay";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
@@ -1599,6 +1599,9 @@ function CatalogCards({
                     <p className="mt-1 text-xs text-[#7b8882]">
                       {product.categories?.name ?? "Needs category"}
                     </p>
+                    <p className="mt-1 text-xs text-[#49665b]">
+                      Occasion: {productOccasionLabel(product.occasion) ?? "Not set"}
+                    </p>
                   </div>
                   {product.is_available ? (
                     <StatusBadge status="live" />
@@ -1742,6 +1745,9 @@ function CatalogTable({
                         <span className="mt-1 block max-w-72 truncate text-xs text-[#7b8882]">
                           Category:{" "}
                           {product.categories?.name ?? "Needs category"}
+                        </span>
+                        <span className="mt-1 block max-w-72 truncate text-xs font-medium text-[#49665b]">
+                          Occasion: {productOccasionLabel(product.occasion) ?? "Not set"}
                         </span>
                       </span>
                     </div>
