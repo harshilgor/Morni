@@ -5,11 +5,8 @@ import { PRODUCT_OCCASIONS } from "@/lib/product-occasions";
 const OCCASION_CARDS = [
   {
     ...PRODUCT_OCCASIONS[0],
-    image:
-      "https://images.unsplash.com/photo-1651132176551-0b54d10f5ae7?auto=format&fit=crop&fm=jpg&q=85&w=1200",
+    image: "/images/occasions/diwali-cover.webp",
     imageAlt: "Woman in festive red attire holding a diya for Diwali",
-    photographer: "Manjishtha Mukherjee",
-    photoHref: "https://unsplash.com/photos/a-woman-in-a-red-dress-rS9noOJNyxo",
     tone: "from-[#32140e]/85 via-[#32140e]/25",
   },
   {
@@ -17,19 +14,12 @@ const OCCASION_CARDS = [
     image:
       "https://images.unsplash.com/photo-1774437890297-3e6d440695e8?auto=format&fit=crop&fm=jpg&q=85&w=1200",
     imageAlt: "Woman in a festive red sari with traditional jewelry",
-    photographer: "Tanmay Abhay Mahajan",
-    photoHref:
-      "https://unsplash.com/photos/woman-in-red-sari-with-gold-jewelry-smiles-hOQRUMc6Avc",
     tone: "from-[#321014]/85 via-[#321014]/25",
   },
   {
     ...PRODUCT_OCCASIONS[2],
-    image:
-      "https://images.unsplash.com/photo-1774437897284-b2f7c4638c55?auto=format&fit=crop&fm=jpg&q=85&w=1200",
+    image: "/images/occasions/navratri-cover.webp",
     imageAlt: "Women in colorful traditional clothing celebrating Navratri",
-    photographer: "Tanmay Abhay Mahajan",
-    photoHref:
-      "https://unsplash.com/photos/women-in-colorful-saris-dancing-on-a-street-tJbu0oQTwac",
     tone: "from-[#211238]/85 via-[#211238]/25",
   },
 ] as const;
@@ -76,23 +66,6 @@ export function OccasionCards() {
           ))}
         </div>
 
-        <p className="mt-2 text-[10px] text-muted sm:text-xs">
-          Photos by{" "}
-          {OCCASION_CARDS.map((occasion, index) => (
-            <span key={occasion.value}>
-              {index > 0 ? (index === OCCASION_CARDS.length - 1 ? " and " : ", ") : null}
-              <a
-                href={occasion.photoHref}
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-2 hover:text-ink"
-              >
-                {occasion.photographer}
-              </a>
-            </span>
-          ))}{" "}
-          on Unsplash.
-        </p>
       </div>
     </section>
   );
