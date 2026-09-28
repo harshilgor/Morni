@@ -34,7 +34,6 @@ describe("normalizeVisionGroups", () => {
           categorySlug: "kurtis",
           confidence: 0.9,
           needsReview: false,
-          colorGroups: [],
         },
         {
           imageIds: ["img_003", "img_004"],
@@ -43,7 +42,6 @@ describe("normalizeVisionGroups", () => {
           categorySlug: "anarkalis",
           confidence: 0.85,
           needsReview: false,
-          colorGroups: [],
         },
       ],
     });

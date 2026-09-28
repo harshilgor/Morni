@@ -30,15 +30,8 @@ export type RawVisionGroup = {
   description?: string;
   /** Ignored if present in a legacy model response; category is seller-selected. */
   categorySlug?: string;
-  colorName?: string;
   confidence?: number;
   needsReview?: boolean;
-  colorGroups?: Array<{
-    imageIds: string[];
-    colorName?: string;
-    confidence?: number;
-    needsReview?: boolean;
-  }>;
 };
 
 export type ValidatedBulkGroup = {
@@ -46,19 +39,12 @@ export type ValidatedBulkGroup = {
   title: string;
   description: string;
   categorySlug: string;
-  colorName: string;
   confidence: number;
   needsReview: boolean;
   aiGenerated: boolean;
   generationStatus: BulkVisionGenerationStatus;
   failureReason?: string;
   rejectedFields?: Array<{ field: string; reason: string }>;
-  colorGroups: Array<{
-    imageIds: string[];
-    colorName: string;
-    confidence: number;
-    needsReview: boolean;
-  }>;
 };
 
 export type BulkAnalyzeResult = {

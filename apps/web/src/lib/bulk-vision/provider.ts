@@ -33,15 +33,14 @@ export function buildVisionPrompt(options: {
 }) {
   return [
     "You are analysing fashion product photos for a UAE marketplace (Morni).",
-    "Task 1 — GROUPING: Decide which images show the same sellable product (same garment/design). Different fabrics, prints, or designs are different products. Different angles/close-ups of the same item belong together.",
+    "Task 1 — GROUPING: Decide which images show the same sellable product (same garment/design and colour). Different colours, fabrics, prints, or designs are different products. Different angles/close-ups of the same item belong together.",
     "Task 2 — LISTING: For each product group, write a concise customer-facing title and a natural 2–3 sentence description (about 45–90 words) based ONLY on visually observable characteristics.",
     "Analyze the garment shown in the supplied images and generate a concise customer-facing product title based only on visually observable characteristics. Never derive or copy a product title, category, description, or attribute from the filename, image ID, UUID, metadata, or upload order. Filenames and internal image IDs exist only to identify images and contain no product information.",
     "Never invent brand, exact fabric when unclear, measurements, care instructions, price, stock, sizes, or SKU.",
     "Use ONLY these image IDs in imageIds arrays. Every ID must appear exactly once across all groups:",
     options.internalIds.join(", "),
     "Do not choose a product category. The seller will select the category manually.",
-    "Return JSON with shape: { groups: [{ imageIds, title, description, colorName, confidence, needsReview, colorGroups: [{ imageIds, colorName, confidence, needsReview }] }] }.",
-    "colorGroups may be a single group with empty colorName when colourways are unclear — sellers add colours manually.",
+    "Return JSON with shape: { groups: [{ imageIds, title, description, confidence, needsReview }] }.",
   ].join("\n");
 }
 
@@ -49,16 +48,6 @@ export function buildGeminiSchema(internalIds: string[]) {
   const imageIdSchema = {
     type: "STRING",
     enum: internalIds,
-  };
-  const colorGroupSchema = {
-    type: "OBJECT",
-    properties: {
-      imageIds: { type: "ARRAY", minItems: 1, items: imageIdSchema },
-      colorName: { type: "STRING" },
-      confidence: { type: "NUMBER" },
-      needsReview: { type: "BOOLEAN" },
-    },
-    required: ["imageIds", "colorName", "confidence", "needsReview"],
   };
   return {
     type: "OBJECT",
@@ -71,19 +60,15 @@ export function buildGeminiSchema(internalIds: string[]) {
             imageIds: { type: "ARRAY", minItems: 1, items: imageIdSchema },
             title: { type: "STRING" },
             description: { type: "STRING" },
-            colorName: { type: "STRING" },
             confidence: { type: "NUMBER" },
             needsReview: { type: "BOOLEAN" },
-            colorGroups: { type: "ARRAY", items: colorGroupSchema },
           },
           required: [
             "imageIds",
             "title",
             "description",
-            "colorName",
             "confidence",
             "needsReview",
-            "colorGroups",
           ],
         },
       },
@@ -113,36 +98,15 @@ export function buildOpenAiSchema(internalIds: string[]) {
             },
             title: { type: "string" as const },
             description: { type: "string" as const },
-            colorName: { type: "string" as const },
             confidence: { type: "number" as const, minimum: 0, maximum: 1 },
             needsReview: { type: "boolean" as const },
-            colorGroups: {
-              type: "array" as const,
-              items: {
-                type: "object" as const,
-                additionalProperties: false,
-                properties: {
-                  imageIds: {
-                    type: "array" as const,
-                    minItems: 1,
-                    items: imageIdSchema,
-                  },
-                  colorName: { type: "string" as const },
-                  confidence: { type: "number" as const },
-                  needsReview: { type: "boolean" as const },
-                },
-                required: ["imageIds", "colorName", "confidence", "needsReview"],
-              },
-            },
           },
           required: [
             "imageIds",
             "title",
             "description",
-            "colorName",
             "confidence",
             "needsReview",
-            "colorGroups",
           ],
         },
       },

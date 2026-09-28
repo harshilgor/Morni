@@ -29,6 +29,7 @@ export function TrackedProductCard({
   query,
   storeId,
   sharp,
+  mobileSharp,
   priority,
   unoptimized,
   onWishlistChange,
@@ -47,6 +48,7 @@ export function TrackedProductCard({
   query?: string | null;
   storeId?: string | null;
   sharp?: boolean;
+  mobileSharp?: boolean;
   priority?: boolean;
   unoptimized?: boolean;
   onWishlistChange?: (isWished: boolean) => void;
@@ -120,6 +122,7 @@ export function TrackedProductCard({
         href={href}
         rating={rating}
         sharp={sharp}
+        mobileSharp={mobileSharp}
         priority={priority}
         unoptimized={unoptimized}
         onWishlistChange={onWishlistChange}

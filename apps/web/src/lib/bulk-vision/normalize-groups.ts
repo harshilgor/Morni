@@ -2,7 +2,6 @@ import {
   buildIdAliasMap,
   internalIdsToClientIds,
   reconcileImageIdList,
-  type IdAliasMap,
 } from "./image-ids";
 import { isValidGeneratedTitle, manualProductTitle } from "./title-validation";
 import type {
@@ -30,17 +29,6 @@ export type NormalizeGroupsResult = {
   validationFailures: Array<{ field: string; reason: string; groupIndex: number }>;
 };
 
-function emptyColorGroups(imageIds: string[]): ValidatedBulkGroup["colorGroups"] {
-  return [
-    {
-      imageIds,
-      colorName: "",
-      confidence: 0,
-      needsReview: true,
-    },
-  ];
-}
-
 function manualGroup(
   clientImageIds: string[],
   index: number,
@@ -51,14 +39,12 @@ function manualGroup(
     title: "",
     description: "",
     categorySlug: "",
-    colorName: "",
     confidence: 0,
     needsReview: true,
     aiGenerated: false,
     generationStatus: "failed",
     failureReason: reason,
     rejectedFields: [{ field: "title", reason }],
-    colorGroups: emptyColorGroups(clientImageIds),
   };
 }
 
@@ -71,7 +57,6 @@ function validateListingFields(
   title: string;
   description: string;
   categorySlug: string;
-  colorName: string;
   aiGenerated: boolean;
   generationStatus: BulkVisionGenerationStatus;
   failureReason?: string;
@@ -121,14 +106,12 @@ function validateListingFields(
     }
   }
 
-  const colorName = (group.colorName ?? "").trim().slice(0, 40);
   const generationStatus: BulkVisionGenerationStatus = title ? "ok" : "failed";
 
   return {
     title,
     description: safeDescription,
     categorySlug: "",
-    colorName,
     aiGenerated,
     generationStatus,
     failureReason: title ? undefined : "invalid_or_missing_title",
@@ -177,18 +160,11 @@ export function normalizeVisionGroups(
     );
     validationFailures.push(...listing.validationFailures);
 
-    const colorGroups = normalizeColorGroups(
-      rawGroup.colorGroups,
-      reconciled.resolved,
-      aliasMap,
-    );
-
     groups.push({
       imageIds: clientIds,
       title: listing.title,
       description: listing.description,
       categorySlug: listing.categorySlug,
-      colorName: listing.colorName,
       confidence:
         typeof rawGroup.confidence === "number"
           ? Math.min(1, Math.max(0, rawGroup.confidence))
@@ -205,12 +181,6 @@ export function normalizeVisionGroups(
       rejectedFields: listing.rejectedFields.length
         ? listing.rejectedFields
         : undefined,
-      colorGroups: colorGroups.length
-        ? colorGroups.map((cg) => ({
-            ...cg,
-            imageIds: internalIdsToClientIds(cg.imageIds, aliasMap),
-          }))
-        : emptyColorGroups(clientIds),
     });
   });
 
@@ -272,50 +242,6 @@ export function normalizeVisionGroups(
     duplicateAssignments,
     validationFailures,
   };
-}
-
-function normalizeColorGroups(
-  colorGroups: RawVisionGroup["colorGroups"],
-  allowedInternalIds: string[],
-  aliasMap: IdAliasMap,
-) {
-  if (!colorGroups?.length) return [];
-  const allowed = new Set(allowedInternalIds);
-  const seen = new Set<string>();
-  const result: Array<{
-    imageIds: string[];
-    colorName: string;
-    confidence: number;
-    needsReview: boolean;
-  }> = [];
-
-  for (const colorGroup of colorGroups) {
-    const reconciled = reconcileImageIdList(colorGroup.imageIds ?? [], aliasMap, seen);
-    const imageIds = reconciled.resolved.filter((id) => allowed.has(id));
-    if (!imageIds.length) continue;
-    result.push({
-      imageIds,
-      colorName: (colorGroup.colorName ?? "").trim().slice(0, 40),
-      confidence:
-        typeof colorGroup.confidence === "number"
-          ? Math.min(1, Math.max(0, colorGroup.confidence))
-          : 0,
-      needsReview: Boolean(colorGroup.needsReview) || !colorGroup.colorName?.trim(),
-    });
-  }
-
-  const colourCovered = new Set(result.flatMap((group) => group.imageIds));
-  const missing = allowedInternalIds.filter((id) => !colourCovered.has(id));
-  if (missing.length) {
-    result.push({
-      imageIds: missing,
-      colorName: "",
-      confidence: 0,
-      needsReview: true,
-    });
-  }
-
-  return result;
 }
 
 /** Explicit failure groups — one product per image, no filename titles. */

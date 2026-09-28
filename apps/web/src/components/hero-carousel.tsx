@@ -232,7 +232,7 @@ export function HeroCarousel() {
             key={slide.id}
             href={slide.href}
             data-carousel-slide
-            className="group relative h-[min(64vh,560px)] w-[88vw] shrink-0 snap-center overflow-hidden bg-ink sm:h-[min(76vh,700px)] sm:w-[min(58vw,620px)] lg:w-[min(46vw,720px)]"
+            className="group relative aspect-square w-[88vw] shrink-0 snap-center overflow-hidden bg-ink sm:aspect-auto sm:h-[min(76vh,700px)] sm:w-[min(58vw,620px)] lg:w-[min(46vw,720px)]"
             aria-label={`${slide.title}. ${slide.subtitle}`}
             aria-current={index === active ? "true" : undefined}
           >

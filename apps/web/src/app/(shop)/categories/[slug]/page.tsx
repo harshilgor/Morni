@@ -35,7 +35,7 @@ async function CategoryPageContent({
         <span className="text-ink">{category.name}</span>
       </nav>
 
-      <div className="flex items-baseline justify-between gap-3 border-b border-line pb-3 pt-0.5 sm:mt-3 sm:items-end sm:pb-5">
+      <div className="hidden items-baseline justify-between gap-3 border-b border-line pb-3 pt-0.5 sm:mt-3 sm:flex sm:items-end sm:pb-5">
         <div className="min-w-0">
           <h1 className="font-display text-[1.35rem] leading-tight text-ink sm:text-4xl">
             {category.name}
@@ -88,6 +88,8 @@ async function CategoryPageContent({
             loadMoreUrl={`/api/categories/${category.slug}/products`}
             analyticsSurface="category"
             analyticsCategory={category.slug}
+            mobileSharp
+            mobileHeading={category.name}
           />
         )}
       </div>

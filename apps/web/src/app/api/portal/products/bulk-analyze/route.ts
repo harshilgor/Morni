@@ -27,21 +27,8 @@ const rawGroupSchema = z
     imageIds: z.array(z.string().max(100)).min(1),
     title: z.string().max(120).optional().default(""),
     description: z.string().max(600).optional().default(""),
-    colorName: z.string().max(40).optional().default(""),
     confidence: z.number().min(0).max(1).optional().default(0),
     needsReview: z.boolean().optional().default(true),
-    colorGroups: z
-      .array(
-        z.object({
-          imageIds: z.array(z.string().max(100)).min(1),
-          colorName: z.string().max(40).optional().default(""),
-          confidence: z.number().min(0).max(1).optional().default(0),
-          needsReview: z.boolean().optional().default(true),
-        }),
-      )
-      .max(20)
-      .optional()
-      .default([]),
   })
   .passthrough();
 

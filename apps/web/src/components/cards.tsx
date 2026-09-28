@@ -56,6 +56,7 @@ export function ProductCard({
   rating,
   onWishlistChange,
   sharp = false,
+  mobileSharp = false,
   priority = false,
   unoptimized = false,
 }: {
@@ -71,6 +72,7 @@ export function ProductCard({
   onWishlistChange?: (isWished: boolean) => void;
   /** Squared edges to match featured-category aesthetic */
   sharp?: boolean;
+  mobileSharp?: boolean;
   priority?: boolean;
   /** Preserve the uploaded source instead of routing it through Next image optimization. */
   unoptimized?: boolean;
@@ -84,14 +86,14 @@ export function ProductCard({
       className={
         sharp
           ? "group relative block min-w-0"
-          : "group relative block min-w-0 overflow-hidden rounded-lg border border-line/70 bg-white/75 p-1.5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5"
+          : `group relative block min-w-0 overflow-hidden border border-line/70 bg-white/75 p-1.5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-32px_rgba(28,20,24,0.35)] sm:rounded-2xl sm:p-2.5 ${mobileSharp ? "rounded-none" : "rounded-lg"}`
       }
     >
       <div
         className={
           sharp
             ? "relative aspect-[4/5] overflow-hidden bg-[#f2ece8]"
-            : "relative aspect-[4/5] overflow-hidden rounded-md bg-sand sm:rounded-xl"
+          : `relative aspect-[4/5] overflow-hidden bg-sand sm:rounded-xl ${mobileSharp ? "rounded-none" : "rounded-md"}`
         }
       >
         <ProductCardImage src={image} alt={product.title} priority={priority} unoptimized={unoptimized} />
