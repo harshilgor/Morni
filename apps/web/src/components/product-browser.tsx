@@ -1012,7 +1012,9 @@ export function ProductBrowser({
 
         <div
           className={
-            isStore
+            mobileHeading
+              ? "hidden lg:block"
+              : isStore
               ? "flex flex-wrap items-center justify-between gap-2"
               : "sticky top-[7.35rem] z-20 -mx-4 border-b border-line/80 bg-background/95 px-4 py-2 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0"
           }

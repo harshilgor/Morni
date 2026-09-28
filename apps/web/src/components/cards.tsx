@@ -93,7 +93,7 @@ export function ProductCard({
         className={
           sharp
             ? "relative aspect-[4/5] overflow-hidden bg-[#f2ece8]"
-          : `relative aspect-[4/5] overflow-hidden bg-sand sm:rounded-xl ${mobileSharp ? "rounded-none" : "rounded-md"}`
+          : `relative ${mobileSharp ? "aspect-[3/4] sm:aspect-[4/5]" : "aspect-[4/5]"} overflow-hidden bg-sand sm:rounded-xl ${mobileSharp ? "rounded-none" : "rounded-md"}`
         }
       >
         <ProductCardImage src={image} alt={product.title} priority={priority} unoptimized={unoptimized} />
@@ -115,7 +115,7 @@ export function ProductCard({
         }
       >
         <div className="flex items-start gap-0.5">
-          <h3 className="min-w-0 flex-1 line-clamp-2 text-[11px] font-medium leading-snug text-ink sm:text-sm">
+          <h3 className={`min-w-0 flex-1 line-clamp-2 font-medium leading-snug text-ink ${mobileSharp ? "text-xs" : "text-[11px]"} sm:text-sm`}>
             {product.title}
           </h3>
           {sharp ? (
@@ -137,7 +137,7 @@ export function ProductCard({
           </div>
         ) : null}
         <div
-          className={`flex items-center gap-1 text-[11px] font-medium sm:gap-1.5 sm:text-sm ${
+          className={`flex items-center gap-1 font-medium sm:gap-1.5 sm:text-sm ${mobileSharp ? "text-xs" : "text-[11px]"} ${
             sharp ? "mt-0.5" : ""
           }`}
         >
