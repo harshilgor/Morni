@@ -11,6 +11,12 @@ export const PRODUCT_VIDEO_LIMIT = 2;
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const ALLOWED_VIDEO_TYPES = new Set(["video/mp4", "video/webm"]);
+const IMAGE_TYPES_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
 
 export type MediaBucket = "store-logos" | "product-images" | "product-videos" | "delivery-proofs";
 
@@ -21,6 +27,18 @@ export type ValidatedImage = {
 
 export function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-");
+}
+
+/** Some phone pickers omit the MIME type or report the nonstandard image/jpg. */
+export function normalizeImageFile(file: File): File {
+  if (ALLOWED_TYPES.has(file.type)) return file;
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const inferredType = IMAGE_TYPES_BY_EXTENSION[extension];
+  if (!inferredType || (file.type && file.type !== "image/jpg")) return file;
+  return new File([file], file.name, {
+    type: inferredType,
+    lastModified: file.lastModified,
+  });
 }
 
 export function validateImageFile(file: File | null | undefined): string | null {
@@ -52,9 +70,12 @@ export async function uploadStoreMedia(options: {
   productId?: string;
   mediaType?: "image" | "video";
 }) {
+  const file = options.mediaType === "video"
+    ? options.file
+    : normalizeImageFile(options.file);
   const error = options.mediaType === "video"
-    ? validateVideoFile(options.file)
-    : validateImageFile(options.file);
+    ? validateVideoFile(file)
+    : validateImageFile(file);
   if (error) throw new Error(error);
 
   const supabase = createClient();
@@ -97,7 +118,7 @@ export async function uploadStoreMedia(options: {
     throw new Error("You do not have permission to upload media for this store.");
   }
 
-  const safeName = sanitizeFileName(options.file.name);
+  const safeName = sanitizeFileName(file.name);
   const folder = options.productId
     ? `${options.storeId}/${options.productId}`
     : options.storeId;
@@ -108,7 +129,7 @@ export async function uploadStoreMedia(options: {
   const path = `${folder}/${options.prefix}-${uploadId}-${safeName}`;
 
   const uploadResult = await Promise.race([
-    supabase.storage.from(options.bucket).upload(path, options.file, { upsert: false, contentType: options.file.type }),
+    supabase.storage.from(options.bucket).upload(path, file, { upsert: false, contentType: file.type }),
     new Promise<{ error: Error }>((resolve) => window.setTimeout(() => resolve({ error: new Error("Image upload timed out. Check your connection and try again.") }), 45_000)),
   ]);
   const uploadError = uploadResult.error;

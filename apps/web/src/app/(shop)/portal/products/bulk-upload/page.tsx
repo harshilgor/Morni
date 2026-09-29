@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadBrowseCategoryOptions } from "@/lib/store-category";
 import { PRODUCT_SIZES } from "@/lib/product-sizes";
-import { uploadProductImages, validateImageFile } from "@/lib/media-upload";
+import { uploadProductImages } from "@/lib/media-upload";
+import { BULK_UPLOAD_MAX_PHOTOS, prepareBulkUploadFiles } from "@/lib/bulk-upload-files";
 import { useOwnerStore } from "@/lib/use-owner-store";
 import { PortalIcon } from "@/components/portal-icons";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
@@ -48,7 +49,6 @@ type PublishProgress = {
   stage: "uploading" | "saving";
 };
 
-const BULK_UPLOAD_MAX_PHOTOS = 1_000;
 const AI_ANALYSIS_MAX_PHOTOS = 30;
 const MAX_PHOTOS_PER_PRODUCT = 10;
 const MAX_PRODUCTS_PER_PUBLISH = 100;
@@ -450,27 +450,15 @@ export default function BulkUploadPage() {
     void saveBulkDraft(store.id, drafts);
   }, [drafts, draftsRestored, store]);
   function addFiles(list: FileList | File[], targetDraftId?: string) {
-    const valid = Array.from(list).filter((file) => {
-      if (!validateImageFile(file)) return true;
-      if (file.size <= 0 || file.size > 8 * 1024 * 1024) return false;
-      // Some mobile browsers leave File.type empty or report image/jpg.
-      const extension = file.name.split(".").pop()?.toLowerCase();
-      return Boolean(
-        extension &&
-        ["jpg", "jpeg", "png", "webp"].includes(extension) &&
-        file.size <= 8 * 1024 * 1024,
-      );
-    });
     const queuedPhotoCount = drafts.reduce((total, draft) => total + draft.photos.length, 0);
-    const remainingPhotoSlots = BULK_UPLOAD_MAX_PHOTOS - queuedPhotoCount;
+    const { accepted, remainingPhotoSlots, truncated } = prepareBulkUploadFiles(list, queuedPhotoCount);
     if (remainingPhotoSlots <= 0) {
       setMessage(`This batch already contains ${BULK_UPLOAD_MAX_PHOTOS} photos. Publish it or start a new batch before adding more.`);
       return;
     }
-    if (valid.length > remainingPhotoSlots) {
+    if (truncated) {
       setMessage(`A bulk upload can contain up to ${BULK_UPLOAD_MAX_PHOTOS} photos. The first ${remainingPhotoSlots} valid photo${remainingPhotoSlots === 1 ? "" : "s"} were added; add the remaining photos in a new upload.`);
     }
-    const accepted = valid.slice(0, remainingPhotoSlots);
     if (!accepted.length) {
       setMessage(`Upload up to ${BULK_UPLOAD_MAX_PHOTOS} valid JPG, PNG, or WebP images.`);
       return;
