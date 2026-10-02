@@ -96,7 +96,13 @@ export default function PortalOrdersPage() {
   const selectedOrder = orders.find((order) => order.id === selectedId) ?? null;
 
   const loadOrders = useCallback(async (storeId: string) => {
-    const { data } = await createClient().from("orders").select(PORTAL_ORDER_WITH_DELIVERY_SELECT).eq("store_id", storeId).order("placed_at", { ascending: false });
+    const { data } = await createClient()
+      .from("orders")
+      .select(PORTAL_ORDER_WITH_DELIVERY_SELECT)
+      .eq("store_id", storeId)
+      .eq("payment_status", "paid")
+      .neq("status", "cancelled")
+      .order("placed_at", { ascending: false });
     const rows = (data as OrderWithItems[]) ?? [];
     setOrders(rows);
     setSelectedId((current) => {
