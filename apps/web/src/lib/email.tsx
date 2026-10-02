@@ -30,7 +30,8 @@ type NotificationEvent =
   | "store_order_cancelled"
   | "store_delivery_failed"
   | "store_order_delivered"
-  | "cart_reminder";
+  | "cart_reminder"
+  | "unpaid_order_reminder";
 
 export type LifecycleEmailKind =
   | "payment_failed"
@@ -610,6 +611,89 @@ export async function processAbandonedCartReminders(limit = 100) {
     }
   }
   return { inspected: (carts ?? []).length, sent, skipped, failed };
+}
+
+type ClaimedUnpaidOrderReminder = {
+  order_id: string;
+  shopper_id: string;
+  order_number: string;
+  reminder_number: number;
+  claimed_at: string;
+};
+
+export async function processUnpaidOrderReminders(limit = 100) {
+  const admin = createAdminClient();
+  const { data: orders, error } = await admin.rpc("claim_unpaid_order_reminders", {
+    p_limit: limit,
+  });
+  if (error) throw new Error(`Unable to claim unpaid orders: ${error.message}`);
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  for (const order of (orders ?? []) as ClaimedUnpaidOrderReminder[]) {
+    const reminderEventId = `${order.order_id}:${order.reminder_number}`;
+    try {
+      const recipient = await getRecipient(order.shopper_id);
+      const { data: currentOrder, error: orderError } = await admin
+        .from("orders")
+        .select("payment_status, payment_method, status")
+        .eq("id", order.order_id)
+        .single();
+      if (orderError) throw new Error(`Unable to recheck payment: ${orderError.message}`);
+      if (currentOrder.payment_method !== "card" ||
+          !["pending", "failed"].includes(currentOrder.payment_status) ||
+          currentOrder.status !== "placed") {
+        skipped += 1;
+        continue;
+      }
+
+      const reserved = await reserveNotification(
+        "unpaid_order_reminder",
+        reminderEventId,
+        order.shopper_id,
+        recipient.email,
+      );
+      if (!reserved) {
+        skipped += 1;
+        continue;
+      }
+
+      const { from } = getMailer();
+      const resendId = await sendWithRetry("unpaid_order_reminder", reminderEventId, {
+        from,
+        to: [recipient.email],
+        subject: `Complete payment for Morni order ${order.order_number}`,
+        react: LifecycleEmail({
+          name: recipient.name,
+          orderNumber: order.order_number,
+          preview: `Your order ${order.order_number} is waiting for payment.`,
+          title: "Complete your payment",
+          message: "Your order is still waiting for payment. Return to Morni to complete checkout whenever you are ready.",
+          action: { label: "Complete payment", href: `${siteUrl}/checkout/pay/${order.order_id}` },
+        }),
+      });
+      await finishNotification("unpaid_order_reminder", reminderEventId, resendId);
+      sent += 1;
+    } catch (sendError) {
+      failed += 1;
+      await finishNotification(
+        "unpaid_order_reminder",
+        reminderEventId,
+        null,
+        sendError instanceof Error ? sendError.message : "Unknown email error",
+      ).catch((recordError) => console.error("Unable to record unpaid reminder failure", recordError));
+      console.error("Unpaid order reminder failed", { orderId: order.order_id, error: sendError });
+    } finally {
+      const { error: releaseError } = await admin
+        .from("orders")
+        .update({ payment_reminder_claimed_at: null })
+        .eq("id", order.order_id)
+        .eq("payment_reminder_claimed_at", order.claimed_at);
+      if (releaseError) console.error("Unable to release unpaid reminder claim", { orderId: order.order_id, error: releaseError });
+    }
+  }
+  return { inspected: (orders ?? []).length, sent, skipped, failed };
 }
 
 export async function processEmailOutbox(limit = 25) {
