@@ -16,6 +16,15 @@ type FounderOrderProduct = {
   image_url: string | null;
 };
 
+type FounderOrderAddress = {
+  order_id: string;
+  delivery_street: string;
+  delivery_building: string | null;
+  delivery_apartment: string | null;
+  delivery_area: string;
+  delivery_emirate: string;
+};
+
 type FounderView = "overview" | "demand" | "operations" | "delivery" | "stores" | "customers" | "catalogue" | "finance" | "settlements" | "refunds" | "alerts";
 type FounderDiscoveryData = {
   generated_at: string;
@@ -135,7 +144,7 @@ type FounderData = {
   };
   daily_sales: Array<{ day: string; label: string; revenue: number; orders: number; shoppers: number }>;
   status_breakdown: Partial<Record<OrderStatus, number>>;
-  recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; customer_phone: string | null; delivery_area: string; products?: FounderOrderProduct[] }>;
+  recent_orders: Array<{ id: string; order_number: string; status: OrderStatus; total_aed: number; placed_at: string; store_name: string; shopper_name: string; customer_phone: string | null; delivery_area: string; address?: FounderOrderAddress; products?: FounderOrderProduct[] }>;
   stores: Array<{ id: string; name: string; slug: string; emirate: string; is_active: boolean; created_at: string; live_products: number; low_stock_products: number; period_orders: number; period_revenue: number; today_orders: number; today_revenue: number }>;
   top_products: Array<{ id: string; title: string; store_name: string; units: number; revenue: number; stock: number | null }>;
   customers: Array<{ id: string; full_name: string; phone: string | null; created_at: string; orders: number; revenue: number; last_order_at: string | null }>;
@@ -1205,15 +1214,16 @@ function ProductImageDialog({ product, onClose }: { product: FounderOrderProduct
   );
 }
 
-function OrderTable({ orders, compact = false }: { orders: FounderData["recent_orders"]; compact?: boolean }) {
+function OrderTable({ orders, compact = false, addressError = false }: { orders: FounderData["recent_orders"]; compact?: boolean; addressError?: boolean }) {
   const [preview, setPreview] = useState<FounderOrderProduct | null>(null);
 
   return (
     <div className="overflow-x-auto">
+      {addressError && !compact ? <p role="alert" className="border-b border-[#f0d7b1] bg-[#fff8ec] px-5 py-3 text-sm text-[#805313]">Delivery addresses could not be loaded. Refresh to try again.</p> : null}
       <table className="w-full min-w-[760px] text-left">
         <thead className="border-y border-[#e2e7e4] bg-[#f7faf8]">
           <tr>
-            {["Order", "Boutique", "Shopper", "Phone", "Status", "Value", "Placed"].map((heading) => (
+            {["Order", "Boutique", "Shopper", "Phone", "Status", "Value", compact ? "Placed" : "Placed / delivery"].map((heading) => (
               <th key={heading} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#7b8882]">
                 {heading}
               </th>
@@ -1259,7 +1269,16 @@ function OrderTable({ orders, compact = false }: { orders: FounderData["recent_o
                   <StatusPill status={order.status} />
                 </td>
                 <td className="px-5 py-3.5 text-sm font-semibold tabular-nums text-[#17231f]">{formatAed(order.total_aed)}</td>
-                <td className="px-5 py-3.5 text-xs text-[#687770]">{compact ? dateTime(order.placed_at) : `${dateTime(order.placed_at)} · ${order.delivery_area}`}</td>
+                <td className="min-w-[220px] max-w-[320px] px-5 py-3.5 text-xs text-[#687770]">
+                  <span>{dateTime(order.placed_at)}{compact ? ` · ${order.delivery_area}` : ""}</span>
+                  {!compact && (order.address ? <address className="mt-1 break-words text-sm leading-5 text-[#52615b] not-italic">{[
+                    order.address.delivery_street,
+                    order.address.delivery_building,
+                    order.address.delivery_apartment,
+                    order.address.delivery_area,
+                    order.address.delivery_emirate.replaceAll("_", " "),
+                  ].filter(Boolean).join(", ")}</address> : <span className="mt-1 block text-[#9aa9a2]">Address unavailable</span>)}
+                </td>
               </tr>
             );
           })}
@@ -1920,9 +1939,9 @@ function RefundsView() {
   </div>;
 }
 
-function WorkspaceContent({ data, discovery, searchConversion, deliveryData, activeView, ownerName, onViewChange, onRefresh }: { data: FounderData; discovery: FounderDiscoveryData | null; searchConversion: FounderSearchConversionData | null; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void }) {
+function WorkspaceContent({ data, discovery, searchConversion, deliveryData, activeView, ownerName, onViewChange, onRefresh, addressError }: { data: FounderData; discovery: FounderDiscoveryData | null; searchConversion: FounderSearchConversionData | null; deliveryData: FounderDeliveryData; activeView: FounderView; ownerName?: string; onViewChange: (view: FounderView) => void; onRefresh: () => void; addressError: boolean }) {
   if (activeView === "demand") return <DemandView data={data} discovery={discovery} searchConversion={searchConversion} />;
-  if (activeView === "operations") return <Panel><OrderTable orders={data.recent_orders} /></Panel>;
+  if (activeView === "operations") return <Panel><OrderTable orders={data.recent_orders} addressError={addressError} /></Panel>;
   if (activeView === "delivery") return <DeliveryView data={deliveryData} onRefresh={onRefresh} />;
   if (activeView === "stores") return <StoresView stores={data.stores} />;
   if (activeView === "customers") return <CustomersView customers={data.customers} />;
@@ -1941,6 +1960,7 @@ export function FounderWorkspace() {
   const [discovery, setDiscovery] = useState<FounderDiscoveryData | null>(null);
   const [searchConversion, setSearchConversion] = useState<FounderSearchConversionData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [range, setRange] = useState<7 | 30>(7);
   const [activeView, setActiveView] = useState<FounderView>("overview");
@@ -1956,7 +1976,8 @@ export function FounderWorkspace() {
       client.rpc("founder_delivery_workspace_data"),
       client.rpc("founder_discovery_metrics", { p_range_days: range }),
       client.rpc("founder_search_conversion_metrics", { p_range_days: range }),
-    ]).then(async ([workspaceResponse, deliveryResponse, discoveryResponse, searchConversionResponse]) => {
+      client.rpc("founder_recent_order_addresses"),
+    ]).then(async ([workspaceResponse, deliveryResponse, discoveryResponse, searchConversionResponse, addressResponse]) => {
       if (!active) return;
       if (workspaceResponse.error || deliveryResponse.error) {
         setError(workspaceResponse.error?.message ?? deliveryResponse.error?.message ?? "Unable to load Founder data.");
@@ -1964,22 +1985,28 @@ export function FounderWorkspace() {
         setDeliveryData(null);
         setDiscovery(null);
         setSearchConversion(null);
+        setAddressError(false);
       } else {
         const founderData = workspaceResponse.data as unknown as FounderData;
         const orderIds = founderData.recent_orders.map((order) => order.id);
         const { data: itemRows } = orderIds.length
           ? await client.from("order_items").select("id,order_id,title,quantity,image_url").in("order_id", orderIds)
           : { data: [] };
+        if (!active) return;
         const productsByOrder = new Map<string, FounderOrderProduct[]>();
         for (const item of (itemRows ?? []) as Array<FounderOrderProduct & { order_id: string }>) {
           const products = productsByOrder.get(item.order_id) ?? [];
           products.push({ id: item.id, title: item.title, quantity: item.quantity, image_url: item.image_url });
           productsByOrder.set(item.order_id, products);
         }
-        setData({ ...founderData, recent_orders: founderData.recent_orders.map((order) => ({ ...order, products: productsByOrder.get(order.id) ?? [] })) });
+        const addressesByOrder = new Map<string, FounderOrderAddress>(
+          ((addressResponse.data ?? []) as FounderOrderAddress[]).map((address) => [address.order_id, address]),
+        );
+        setData({ ...founderData, recent_orders: founderData.recent_orders.map((order) => ({ ...order, address: addressesByOrder.get(order.id), products: productsByOrder.get(order.id) ?? [] })) });
         setDeliveryData(deliveryResponse.data as unknown as FounderDeliveryData);
         setDiscovery(discoveryResponse.error ? null : (discoveryResponse.data as unknown as FounderDiscoveryData));
         setSearchConversion(searchConversionResponse.error ? null : (searchConversionResponse.data as unknown as FounderSearchConversionData));
+        setAddressError(Boolean(addressResponse.error));
         setError(null);
       }
       setLoadingData(false);
@@ -2077,7 +2104,7 @@ export function FounderWorkspace() {
           {error ? <FounderError error={error} onRetry={refreshData} /> : null}
           {data && deliveryData ? (
             <div key={activeView}>
-              <WorkspaceContent data={data} discovery={discovery} searchConversion={searchConversion} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} />
+              <WorkspaceContent data={data} discovery={discovery} searchConversion={searchConversion} deliveryData={deliveryData} activeView={activeView} ownerName={auth.firstName} onViewChange={setActiveView} onRefresh={refreshData} addressError={addressError} />
             </div>
           ) : null}
         </main>
