@@ -33,6 +33,7 @@ export function ColorVariantEditor({
   compact = false,
   showSizes = true,
   highlightAddColor = false,
+  availableSizes = PRODUCT_SIZES,
 }: {
   value: ColorDraft[];
   onChange: (next: ColorDraft[]) => void;
@@ -40,6 +41,7 @@ export function ColorVariantEditor({
   compact?: boolean;
   showSizes?: boolean;
   highlightAddColor?: boolean;
+  availableSizes?: readonly string[];
 }) {
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<string, string | null>>(
@@ -565,7 +567,7 @@ export function ColorVariantEditor({
                         Sizes
                       </p>
                       <div className="flex flex-wrap gap-1.5">
-                        {PRODUCT_SIZES.map((size) => {
+                        {availableSizes.map((size) => {
                           const selected = draft.sizes.includes(size);
                           return (
                             <button

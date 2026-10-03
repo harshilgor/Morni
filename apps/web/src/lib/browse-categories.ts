@@ -151,6 +151,13 @@ export const FEATURED_CATEGORY_CATALOG: BrowseCategory[] = [
     ["jewelry", "jewellery", "earring", "necklace", "bracelet", "ring"],
     16,
   ),
+  featuredCategory(
+    "Kids",
+    "kids",
+    "/categories/kids.png",
+    ["kids", "kid", "children", "child", "boys", "girls", "baby", "toddler", "youth"],
+    17,
+  ),
 ];
 
 export function mergeFeaturedCategories(

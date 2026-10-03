@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import {
+  FEATURED_CATEGORY_CATALOG,
   mergeBrowseCategories,
   RETIRED_BROWSE_CATEGORY_SLUGS,
   type BrowseCategory,
@@ -15,6 +16,20 @@ export async function ensureStoreCategory(options: {
   const slug = slugify(options.categorySlug) || "general";
   if (RETIRED_BROWSE_CATEGORY_SLUGS.has(slug)) {
     throw new Error("This category is no longer available.");
+  }
+  const { data: browseRows, error: browseError } = await supabase
+    .from("browse_categories")
+    .select("*")
+    .neq("slug", "more");
+  if (browseError) throw new Error("Could not verify the selected category.");
+  const activeSlugs = new Set(
+    mergeBrowseCategories([
+      ...FEATURED_CATEGORY_CATALOG,
+      ...((browseRows ?? []) as BrowseCategory[]),
+    ]).map((category) => category.slug),
+  );
+  if (!activeSlugs.has(slug)) {
+    throw new Error("Choose an active category before saving this product.");
   }
   const name =
     options.categoryName?.trim() ||

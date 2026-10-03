@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { mergeBrowseCategories, type BrowseCategory } from "@/lib/browse-categories";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,13 +29,8 @@ const requestSchema = z.object({
 const suggestionSchema = z.object({
   title: z.string().trim().min(3).max(90),
   description: z.string().trim().min(20).max(600),
-  categorySlug: z.string().trim().nullable(),
   colorName: z.string().trim().max(40).nullable(),
 });
-
-function getCategories(rows: BrowseCategory[]) {
-  return mergeBrowseCategories(rows).map(({ name, slug }) => ({ name, slug }));
-}
 
 type OpenAIResponse = { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
 
@@ -44,7 +38,6 @@ async function generateWithOpenAI(options: {
   priceAed: number;
   stock: number;
   sizes: string[];
-  categories: Array<{ name: string; slug: string }>;
   images: string[];
 }) {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -55,15 +48,14 @@ async function generateWithOpenAI(options: {
     "Use the product photos as evidence, but never invent a brand, fabric, measurements, care instructions, origin, or designer name.",
     "Write a natural, human-sounding description of 2 to 3 complete sentences and roughly 45 to 90 words. Mention the visible fabric or material and describe the look, feel, silhouette, finish, colour/pattern, styling and likely occasion when the photos support it. Use specific, varied language and avoid generic AI phrases such as 'elevate your wardrobe', 'timeless elegance', or 'perfect for any occasion'.",
     "Never claim a fabric, texture, construction detail, fit, care instruction, origin, or occasion that cannot be reasonably supported by the photos or seller inputs. If fabric is not visually clear, describe the drape or finish cautiously without naming a material.",
-    "Choose categorySlug only from the supplied category list. Return null when the category is genuinely unclear.",
+    "Do not choose or suggest a product category. The store owner will select it.",
     "The owner must review every field, so make conservative suggestions rather than confident guesses.",
-    "Return only valid JSON with exactly these keys: title, description, categorySlug, colorName.",
+    "Return only valid JSON with exactly these keys: title, description, colorName.",
     JSON.stringify({
       task: "Generate a draft product listing from the photos and seller inputs.",
       priceAed: options.priceAed,
       stock: options.stock,
       sizes: options.sizes,
-      categories: options.categories,
     }),
   ].join("\n");
 
@@ -75,7 +67,7 @@ async function generateWithOpenAI(options: {
           model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
           input: [{ role: "user", content: [{ type: "input_text", text: prompt }, ...options.images.map((image) => ({ type: "input_image", image_url: image, detail: "high" }))] }],
           temperature: 0.2,
-          text: { format: { type: "json_schema", name: "product_listing", strict: true, schema: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, description: { type: "string" }, categorySlug: { type: ["string", "null"] }, colorName: { type: ["string", "null"] } }, required: ["title", "description", "categorySlug", "colorName"] } } },
+          text: { format: { type: "json_schema", name: "product_listing", strict: true, schema: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, description: { type: "string" }, colorName: { type: ["string", "null"] } }, required: ["title", "description", "colorName"] } } },
         }),
       });
   if (!response.ok) {
@@ -128,37 +120,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "You do not have access to this store." }, { status: 403 });
   }
 
-  const { data: categoryRows, error: categoryError } = await supabase
-    .from("browse_categories")
-    .select("id, name, slug, image_url, badge, search_terms, sort_order, is_featured")
-    .neq("slug", "more")
-    .order("sort_order", { ascending: true });
-
-  if (categoryError) {
-    return NextResponse.json({ error: "Could not load product categories." }, { status: 500 });
-  }
-
-  const categories = getCategories((categoryRows ?? []) as BrowseCategory[]);
-  const categorySlugs = new Set(categories.map((category) => category.slug));
-
   try {
     const output = await generateWithOpenAI({
       priceAed,
       stock,
       sizes,
-      categories,
       images,
     });
 
-    return NextResponse.json({
-      suggestion: {
-        ...output,
-        categorySlug:
-          output.categorySlug && categorySlugs.has(output.categorySlug)
-            ? output.categorySlug
-            : null,
-      },
-    });
+    return NextResponse.json({ suggestion: output });
   } catch (error) {
     console.error("Product listing generation failed", error);
     const message = error instanceof Error ? error.message : "Could not generate a listing draft right now.";

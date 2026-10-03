@@ -5,6 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePublicCatalog } from "@/lib/revalidate-catalog";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
 import { PRODUCT_OCCASION_VALUES } from "@/lib/product-occasions";
+import {
+  FEATURED_CATEGORY_CATALOG,
+  mergeBrowseCategories,
+  RETIRED_BROWSE_CATEGORY_SLUGS,
+  type BrowseCategory,
+} from "@/lib/browse-categories";
 
 const MAX_PHOTOS_PER_PRODUCT = 10;
 const customizationSchema = z.object({ enabled: z.boolean().default(false), instructions: z.string().trim().max(1_000).default(""), fields: z.array(z.object({ id: z.string().trim().min(1).max(60), label: z.string().trim().min(1).max(80), unit: z.string().trim().max(20), required: z.boolean() })).max(8).default([]) });
@@ -63,6 +69,25 @@ export async function POST(request: Request) {
   const missingOccasion = items.find((item) => !PRODUCT_OCCASION_VALUES.includes(item.occasion as (typeof PRODUCT_OCCASION_VALUES)[number]));
   if (missingOccasion) return NextResponse.json({ error: `Choose the best occasion for “${missingOccasion.title}” before publishing.` }, { status: 400 });
   items = items.map((item) => ({ ...item, categorySlug: item.categorySlug.trim().toLowerCase() }));
+  const { data: browseCategoryRows, error: browseCategoryError } = await admin
+    .from("browse_categories")
+    .select("*")
+    .neq("slug", "more");
+  if (browseCategoryError) {
+    return NextResponse.json({ error: "Could not verify product categories." }, { status: 500 });
+  }
+  const activeCategorySlugs = new Set(
+    mergeBrowseCategories([
+      ...FEATURED_CATEGORY_CATALOG,
+      ...((browseCategoryRows ?? []) as BrowseCategory[]),
+    ]).map((category) => category.slug),
+  );
+  const invalidCategory = items.find(
+    (item) => RETIRED_BROWSE_CATEGORY_SLUGS.has(item.categorySlug) || !activeCategorySlugs.has(item.categorySlug),
+  );
+  if (invalidCategory) {
+    return NextResponse.json({ error: `Choose an active category for “${invalidCategory.title}” before publishing.` }, { status: 400 });
+  }
   const outOfStock = items.find((item) => {
     const sizeTotal = Object.values(item.sizeStock ?? {}).reduce((sum, quantity) => sum + quantity, 0);
     return (Object.keys(item.sizeStock ?? {}).length ? sizeTotal : item.stock) <= 0;

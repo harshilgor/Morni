@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { loadBrowseCategoryOptions } from "@/lib/store-category";
-import { PRODUCT_SIZES } from "@/lib/product-sizes";
+import {
+  defaultProductSizesForCategory,
+  productSizesForCategory,
+} from "@/lib/product-sizes";
 import { uploadProductImages } from "@/lib/media-upload";
 import { BULK_UPLOAD_MAX_PHOTOS, prepareBulkUploadFiles } from "@/lib/bulk-upload-files";
 import { useOwnerStore } from "@/lib/use-owner-store";
@@ -1141,19 +1144,28 @@ export default function BulkUploadPage() {
               <div className={`grid grid-cols-1 gap-2 ${noSizes(draft.categorySlug) ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
                 <select
                   value={draft.categorySlug}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const categorySlug = event.target.value;
+                    const allowedSizes = new Set<string>(productSizesForCategory(categorySlug));
+                    const retainedSizes = draft.sizes.filter((size) => allowedSizes.has(size));
+                    const sizes = noSizes(categorySlug)
+                      ? []
+                      : retainedSizes.length
+                        ? retainedSizes
+                        : defaultProductSizesForCategory(categorySlug);
+                    const sizeStock = Object.fromEntries(
+                      sizes.map((size) => [size, draft.sizeStock[size] ?? 0]),
+                    );
                     patch(draft.id, {
-                      categorySlug: event.target.value,
-                      sizes: noSizes(event.target.value)
-                        ? []
-                        : draft.sizes.length
-                          ? draft.sizes
-                          : ["S", "M", "L"],
-                      ...(noSizes(event.target.value)
+                      categorySlug,
+                      sizes,
+                      sizeStock,
+                      stock: String(Object.values(sizeStock).reduce((sum, quantity) => sum + quantity, 0)),
+                      ...(noSizes(categorySlug)
                         ? { customization: { ...draft.customization, enabled: false, fields: [] } }
                         : {}),
-                    })
-                  }
+                    });
+                  }}
                   aria-invalid={hasValidationError(draft.id, "category")}
                   className={`min-h-11 rounded-lg border bg-background px-3 py-2.5 text-base sm:text-sm ${hasValidationError(draft.id, "category") ? "border-red-400" : "border-line"}`}
                 >
@@ -1234,9 +1246,10 @@ export default function BulkUploadPage() {
                   sizeStock={draft.sizeStock}
                   onChange={(sizes, sizeStock) => patch(draft.id, { sizes, sizeStock, stock: String(Object.values(sizeStock).reduce((sum, quantity) => sum + quantity, 0)) })}
                   disabled={busy}
+                  availableSizes={productSizesForCategory(draft.categorySlug)}
                 />
                 <div className="hidden flex-wrap gap-2">
-                  {PRODUCT_SIZES.map((size) => (
+                  {productSizesForCategory(draft.categorySlug).map((size) => (
                     <button
                       type="button"
                       key={size}
