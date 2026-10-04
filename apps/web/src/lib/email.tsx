@@ -319,7 +319,7 @@ export async function sendOrderConfirmationEmail(orderId: string) {
         deliveryArea: order.delivery_area,
         deliveryEta:
           formatDeliverySlotWindow(order.delivery_slot_start, order.delivery_slot_end)
-          ?? deliveryPromise(order.delivery_eta_minutes),
+          ?? `${deliveryPromise()} · our team will contact you about your preferred time`,
         items,
         orderUrl: `${siteUrl}/orders/${order.id}`,
       }),

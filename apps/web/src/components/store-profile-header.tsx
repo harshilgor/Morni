@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { emirateLabel } from "@/lib/format";
+import { deliveryPromise, emirateLabel } from "@/lib/format";
 import { formatRatingLabel } from "@/lib/product-ratings";
 import type { Store } from "@/lib/types";
 
@@ -14,12 +14,6 @@ export type StorePromo = {
   cta?: string;
   href?: string;
 };
-
-function deliveryEtaLabel(minutes: number) {
-  const max = Math.max(15, Math.round(minutes / 5) * 5);
-  const min = Math.max(10, Math.round((max * 0.7) / 5) * 5);
-  return `${min}–${max} mins`;
-}
 
 function RatingCircles({ value }: { value: number }) {
   const clamped = Math.max(0, Math.min(5, value));
@@ -70,7 +64,7 @@ export function StoreProfileHeader({
     emirate: Store["emirate"];
   } | null;
 }) {
-  const eta = deliveryEtaLabel(store.delivery_eta_minutes || 60);
+  const eta = deliveryPromise();
   const location = `${store.area}, ${emirateLabel(store.emirate)}`;
   const showRating = rating != null && reviewCount > 0;
 

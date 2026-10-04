@@ -121,7 +121,7 @@ export const DELIVERY_BUCKETS: {
   label: string;
   max: number | null;
 }[] = [
-  { id: "same-day", label: "Same-day delivery", max: null },
+  { id: "next-day", label: "Next-day delivery", max: null },
 ];
 
 const SIZE_ORDER = [
@@ -180,6 +180,6 @@ export function priceBucketId(price: number): string | null {
   return bucket?.id ?? null;
 }
 
-export function deliveryBucketId(_etaMinutes: number): string {
-  return "same-day";
+export function deliveryBucketId(): string {
+  return "next-day";
 }

@@ -29,7 +29,7 @@ export function StorefrontPreview({
   data: StorefrontPreviewData;
   mode?: "store" | "product" | "launch";
 }) {
-  const eta = deliveryPromise(data.deliveryEtaMinutes || 60);
+  const eta = deliveryPromise();
 
   return (
     <div className="overflow-hidden rounded-[1.5rem] border border-line bg-white shadow-sm">

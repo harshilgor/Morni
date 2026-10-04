@@ -1,50 +1,5 @@
 import { formatAed } from "@/lib/format";
-import {
-  FREE_DELIVERY_THRESHOLD_AED,
-  type CheckoutFees,
-} from "@/lib/fees";
-
-export function FreeDeliveryNudge({ fees }: { fees: CheckoutFees }) {
-  const unlocked = fees.amountUntilFreeDeliveryAed <= 0;
-  const progressPercent = Math.round(fees.freeDeliveryProgress * 100);
-
-  return (
-    <div className="mb-5 rounded-xl bg-[#fff0f4] px-4 py-3 text-sm leading-relaxed text-accent-deep">
-      {unlocked ? (
-        <p>
-          You’ve unlocked <strong>free delivery</strong>
-        </p>
-      ) : (
-        <p>
-          Add <strong>{formatAed(fees.amountUntilFreeDeliveryAed)}</strong> more
-          for free delivery
-        </p>
-      )}
-      <div
-        className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/80"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={progressPercent}
-        aria-label={
-          unlocked
-            ? "Free delivery unlocked"
-            : `Progress toward free delivery at ${formatAed(FREE_DELIVERY_THRESHOLD_AED)}`
-        }
-      >
-        <div
-          className="h-full rounded-full bg-accent-deep transition-[width] duration-300 ease-out"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
-      {!unlocked ? (
-        <p className="mt-1.5 text-xs text-accent-deep/75">
-          {`Free delivery on orders of ${formatAed(FREE_DELIVERY_THRESHOLD_AED)}+`}
-        </p>
-      ) : null}
-    </div>
-  );
-}
+import type { CheckoutFees } from "@/lib/fees";
 
 export function OrderFeeLines({ fees }: { fees: CheckoutFees }) {
   return (
@@ -54,9 +9,9 @@ export function OrderFeeLines({ fees }: { fees: CheckoutFees }) {
         <span>{formatAed(fees.itemSubtotalAed)}</span>
       </div>
       <div className="flex justify-between gap-4">
-        <span className="text-muted">Delivery fee</span>
+        <span className="text-muted">Delivery fee{fees.deliveryDistanceKm === null ? "" : ` · ${fees.deliveryDistanceKm} km`}</span>
         <span>
-          {fees.deliveryFeeAed > 0 ? formatAed(fees.deliveryFeeAed) : "Free"}
+          {fees.deliveryDistanceKm === null ? "Confirm location" : formatAed(fees.deliveryFeeAed)}
         </span>
       </div>
       {fees.smallOrderFeeAed > 0 ? (

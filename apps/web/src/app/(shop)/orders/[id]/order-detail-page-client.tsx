@@ -491,6 +491,8 @@ function OrderDetailPageContent({ orderId }: { orderId: string }) {
           <p className="mt-3 font-medium text-ink">
             Scheduled: {formatDeliverySlotWindow(order.delivery_slot_start, order.delivery_slot_end)}
           </p>
+        ) : order.delivery_date ? (
+          <p className="mt-3 font-medium text-ink">Next day delivery. Our team will contact you to confirm your preferred time.</p>
         ) : null}
         {deliveryCode ? (
           <div className="mt-5 rounded-2xl border border-[#b9d9c7] bg-[#f0faf3] p-4 text-center">
