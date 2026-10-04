@@ -47,6 +47,13 @@ describe("active browse categories", () => {
     expect(getBrowseCategory("jewelry", [])?.name).toBe("Jewelry");
   });
 
+  it("exposes the Kids category in browse surfaces", () => {
+    const kids = getBrowseCategory("kids", []);
+    expect(kids?.name).toBe("Kids");
+    expect(kids?.search_terms).toContain("children");
+    expect(mergeBrowseCategories([]).map((category) => category.slug)).toContain("kids");
+  });
+
   it("returns no browse route for retired categories", () => {
     expect(getBrowseCategory("office-wear", [])).toBeNull();
     expect(getBrowseCategory("casual-wear", [])).toBeNull();

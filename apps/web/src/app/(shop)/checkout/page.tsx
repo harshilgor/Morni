@@ -17,15 +17,7 @@ import { ProductRail, type RailProduct } from "@/components/product-rail";
 import { useLocation, DELIVERY_EMIRATE, DELIVERY_ONLY_MESSAGE, isDeliverableEmirate } from "@/lib/location";
 import { calculateCheckoutFees } from "@/lib/fees";
 import { formatCustomizationValues } from "@/lib/product-customization";
-import {
-  FreeDeliveryNudge,
-  OrderFeeLines,
-} from "@/components/order-fee-summary";
-import { DeliverySlotPicker } from "@/components/delivery-slot-picker";
-import {
-  listBookableDeliverySlots,
-  type BookableDeliverySlot,
-} from "@/lib/delivery-slots";
+import { OrderFeeLines } from "@/components/order-fee-summary";
 import { navigateToPaymentPage } from "@/lib/payment-navigation";
 import { track, trackOnce } from "@/lib/analytics/track";
 import { getSearchAttribution } from "@/lib/analytics/search-attribution";
@@ -36,6 +28,16 @@ type CartAvailability = {
   key: string;
   status: "ready" | "error";
   availableIds: string[];
+};
+
+type DeliveryQuote = {
+  key: string;
+  status: "loading" | "ready" | "error";
+  distanceMeters?: number;
+  distanceKm?: number;
+  deliveryFeeAed?: number;
+  destination?: { lat: number; lng: number; label?: string | null };
+  error?: string;
 };
 
 async function fetchAvailableProductIds(productIds: string[]) {
@@ -98,8 +100,8 @@ export default function CheckoutPage() {
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
-  const [deliverySlots, setDeliverySlots] = useState<BookableDeliverySlot[]>([]);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
+  const [confirmingLocation, setConfirmingLocation] = useState(false);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [paymentMethod, setPaymentMethod] = useState<"card">("card");
   const locationLabel = useLocation((state) => state.label());
@@ -111,8 +113,6 @@ export default function CheckoutPage() {
   const hasUnavailableItems = availabilityReady && availableItems.length !== items.length;
   const canCheckoutCart = availabilityReady && !hasUnavailableItems && items.length > 0;
   const orderSubtotal = availableItems.reduce((sum, item) => sum + item.priceAed * item.quantity, 0);
-  const fees = calculateCheckoutFees(orderSubtotal);
-  const orderTotal = fees.totalAed;
   const selectedAddress = savedAddresses.find(
     (address) => address.id === selectedAddressId,
   );
@@ -122,11 +122,16 @@ export default function CheckoutPage() {
   const mobileAddressReady = Boolean(
     selectedAddressId || (form.area.trim() && form.street.trim()),
   );
-  const selectedSlot = deliverySlots.find((slot) => slot.id === selectedSlotId) ?? null;
-  const slotSummary = selectedSlot
-    ? `${selectedSlot.dateLabel} · ${selectedSlot.label}`
-    : "Select a time";
-  const checkoutReady = mobileAddressReady && Boolean(selectedSlot);
+  const quoteAddress = selectedAddress ? addressToDraft(selectedAddress) : form;
+  const quoteKey = JSON.stringify([
+    productIdsKey,
+    quoteAddress.area.trim(), quoteAddress.street.trim(), quoteAddress.building.trim(),
+    quoteAddress.apartment.trim(), quoteAddress.emirate,
+  ]);
+  const currentQuote = deliveryQuote?.key === quoteKey && deliveryQuote.status === "ready" ? deliveryQuote : null;
+  const fees = calculateCheckoutFees(orderSubtotal, currentQuote?.distanceMeters ?? null);
+  const orderTotal = fees.totalAed;
+  const checkoutReady = mobileAddressReady && Boolean(currentQuote);
   const availabilityNotice = availabilityFailed ? (
     <div role="alert" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
       We could not check your bag right now. <button type="button" onClick={() => setAvailabilityRetry((count) => count + 1)} className="font-semibold underline">Retry</button>
@@ -195,16 +200,6 @@ export default function CheckoutPage() {
   }, [mobileAddressReady, selectedAddressId]);
 
   useEffect(() => {
-    if (!selectedSlot) return;
-    trackOnce(`checkout_slot:${selectedSlot.id}`, "checkout_slot_selected", {
-      metadata: {
-        slot_id: selectedSlot.id,
-        date_label: selectedSlot.dateLabel.slice(0, 80),
-      },
-    });
-  }, [selectedSlot]);
-
-  useEffect(() => {
     if (typeof window === "undefined") return;
     if (form.area.trim() || form.street.trim() || form.phone.trim()) {
       window.localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ ...form, emirate: DELIVERY_EMIRATE }));
@@ -220,6 +215,115 @@ export default function CheckoutPage() {
     }
     return null;
   }
+
+  async function fetchDeliveryQuote(address: DeliveryAddressDraft, coordinates?: { lat: number; lng: number }) {
+    setDeliveryQuote({ key: quoteKey, status: "loading" });
+    const response = await fetch("/api/checkout/delivery-quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        productIds: productIdsKey.split(",").filter(Boolean),
+        address: {
+          area: address.area,
+          street: address.street,
+          building: address.building,
+          apartment: address.apartment,
+          emirate: address.emirate,
+          ...(coordinates ?? {}),
+        },
+      }),
+    });
+    const result = await response.json().catch(() => null) as {
+      distanceMeters?: number;
+      distanceKm?: number;
+      deliveryFeeAed?: number;
+      destination?: DeliveryQuote["destination"];
+      error?: string;
+    } | null;
+    if (!response.ok || !Number.isFinite(result?.distanceMeters) || !Number.isFinite(result?.deliveryFeeAed)) {
+      setDeliveryQuote({ key: quoteKey, status: "error", error: result?.error ?? "Confirm your delivery location to calculate the fee." });
+      return false;
+    }
+    setDeliveryQuote({ key: quoteKey, status: "ready", ...result });
+    return true;
+  }
+
+  useEffect(() => {
+    const address = resolveAddress();
+    if (!mobileAddressReady || !productIdsKey || !address || !authed) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setDeliveryQuote((current) => current?.key === quoteKey && current.status === "ready" ? current : { key: quoteKey, status: "loading" });
+      void fetch("/api/checkout/delivery-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productIds: productIdsKey.split(",").filter(Boolean),
+          address: {
+            area: address.area, street: address.street, building: address.building,
+            apartment: address.apartment, emirate: address.emirate,
+          },
+        }),
+      }).then(async (response) => {
+        const result = await response.json().catch(() => null) as {
+          distanceMeters?: number; distanceKm?: number; deliveryFeeAed?: number;
+          destination?: DeliveryQuote["destination"]; error?: string;
+        } | null;
+        if (!active) return;
+        if (!response.ok || !Number.isFinite(result?.distanceMeters) || !Number.isFinite(result?.deliveryFeeAed)) {
+          setDeliveryQuote({ key: quoteKey, status: "error", error: result?.error ?? "Confirm your delivery location to calculate the fee." });
+          return;
+        }
+        setDeliveryQuote({ key: quoteKey, status: "ready", ...result });
+      }).catch(() => {
+        if (active) setDeliveryQuote({ key: quoteKey, status: "error", error: "We couldn’t calculate the driving distance. Confirm your delivery location to continue." });
+      });
+    }, 350);
+    return () => { active = false; window.clearTimeout(timer); };
+  // resolveAddress reads current address fields already represented by quoteKey.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, mobileAddressReady, productIdsKey, quoteKey]);
+
+  async function confirmCurrentLocation() {
+    const address = resolveAddress();
+    if (!address || !navigator.geolocation) {
+      setPlaceError("Location access is unavailable. Add a more precise delivery address and try again.");
+      return;
+    }
+    setConfirmingLocation(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 }),
+      );
+      await fetchDeliveryQuote(address, { lat: position.coords.latitude, lng: position.coords.longitude });
+    } catch {
+      setPlaceError("We couldn’t access your location. Check location permission or add a more precise address.");
+    } finally {
+      setConfirmingLocation(false);
+    }
+  }
+
+  const deliveryQuoteInfo = (
+    <div className="mt-3 rounded-xl border border-line bg-background px-4 py-3 text-sm">
+      {currentQuote ? (
+        <>
+          <p className="font-semibold text-ink">Driving distance: {currentQuote.distanceKm} km · Delivery {formatAed(currentQuote.deliveryFeeAed ?? fees.deliveryFeeAed)}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">Route to {currentQuote.destination?.label ?? "your confirmed location"}. Next day delivery. A team member will contact you to confirm your preferred time.</p>
+        </>
+      ) : deliveryQuote?.key === quoteKey && deliveryQuote.status === "loading" ? (
+        <p role="status" className="text-muted">Calculating the road distance and delivery fee…</p>
+      ) : deliveryQuote?.key === quoteKey && deliveryQuote.status === "error" ? (
+        <>
+          <p role="alert" className="text-accent-deep">{deliveryQuote.error}</p>
+          <button type="button" onClick={() => void confirmCurrentLocation()} disabled={confirmingLocation} className="mt-2 min-h-10 rounded-lg border border-line px-3 text-sm font-semibold text-ink disabled:opacity-50">
+            {confirmingLocation ? "Confirming location…" : "Confirm my current location"}
+          </button>
+        </>
+      ) : (
+        <p className="text-muted">Enter your delivery address to calculate the driving distance and fee.</p>
+      )}
+    </div>
+  );
 
   function promptForAddress(message?: string) {
     if (message) setPlaceError(message);
@@ -241,8 +345,8 @@ export default function CheckoutPage() {
       promptForAddress();
       return;
     }
-    if (!selectedSlot) {
-      setPlaceError("Choose a delivery time slot.");
+    if (!currentQuote) {
+      setPlaceError("Confirm your delivery location so we can calculate the driving distance and fee.");
       return;
     }
     setPlaceError(null);
@@ -282,15 +386,9 @@ export default function CheckoutPage() {
       promptForAddress("Add a contact number so the boutique and driver can reach you.");
       return;
     }
-    if (!selectedSlot) {
-      setPlaceError("Choose a delivery time slot before placing this order.");
+    if (!currentQuote) {
+      setPlaceError("Confirm your delivery location so we can calculate the driving distance and fee.");
       if (isMobileCheckoutViewport()) setMobileAddressOpen(true);
-      else {
-        document.getElementById("checkout-delivery-slot-section")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }
       return;
     }
 
@@ -326,24 +424,36 @@ export default function CheckoutPage() {
             size: item.size ?? null,
             customization: item.customization ?? null,
           })),
-          address,
+          address: {
+            ...address,
+            lat: currentQuote.destination?.lat,
+            lng: currentQuote.destination?.lng,
+          },
           saveAddress: Boolean(authed && saveAddress && !selectedAddressId),
           makeDefault,
           paymentMethod: method,
-          deliverySlot: {
-            start: selectedSlot.startIso,
-            end: selectedSlot.endIso,
-          },
+          quotedDeliveryDistanceMeters: currentQuote.distanceMeters,
+          quotedDeliveryFeeAed: currentQuote.deliveryFeeAed,
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { order?: { id?: string }; next?: string; error?: string }
+        | { order?: { id?: string }; next?: string; error?: string; quoteChanged?: boolean; distanceMeters?: number; distanceKm?: number; deliveryFeeAed?: number; destination?: DeliveryQuote["destination"] }
         | null;
       if (response.status === 401) {
         router.push("/auth?next=/checkout");
         return;
       }
       if (!response.ok || !payload?.order?.id) {
+        if (payload?.quoteChanged && Number.isFinite(payload.distanceMeters) && Number.isFinite(payload.deliveryFeeAed)) {
+          setDeliveryQuote({
+            key: quoteKey,
+            status: "ready",
+            distanceMeters: payload.distanceMeters,
+            distanceKm: payload.distanceKm,
+            deliveryFeeAed: payload.deliveryFeeAed,
+            destination: payload.destination,
+          });
+        }
         setPlaceError(payload?.error ?? "Unable to place this order.");
         track("error", {
           metadata: {
@@ -496,21 +606,6 @@ export default function CheckoutPage() {
   }, [mobileAddressOpen]);
 
   useEffect(() => {
-    function refreshSlots() {
-      const nextSlots = listBookableDeliverySlots();
-      setDeliverySlots(nextSlots);
-      setSelectedSlotId((current) => {
-        if (current && nextSlots.some((slot) => slot.id === current)) return current;
-        return nextSlots[0]?.id ?? null;
-      });
-    }
-
-    refreshSlots();
-    const interval = window.setInterval(refreshSlots, 60_000);
-    return () => window.clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data }) => {
       const user = data.user;
@@ -622,11 +717,11 @@ export default function CheckoutPage() {
           </section>
 
           <section aria-labelledby="mobile-price-details" className="border-t border-line py-6">
-            {availableItems.length > 0 ? <FreeDeliveryNudge fees={fees} /> : null}
             <div className="flex items-center justify-between gap-4">
               <h2 id="mobile-price-details" className="text-base font-semibold uppercase tracking-[0.08em] text-ink">Price details</h2>
               {availableItems.length > 0 ? <span className="text-sm font-semibold text-ink">{formatAed(orderTotal)}</span> : null}
             </div>
+            {deliveryQuoteInfo}
             {availableItems.length > 0 ? <><div className="mt-4"><OrderFeeLines fees={fees} /></div><div className="mt-4 flex justify-between border-t border-line pt-4 text-base font-semibold text-ink"><span>Grand total</span><span>{formatAed(orderTotal)}</span></div></> : <p className="mt-4 text-sm text-muted">No available items to total.</p>}
           </section>
         </div>
@@ -659,7 +754,7 @@ export default function CheckoutPage() {
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-deep">Deliver to</span>
                 <span className="mt-0.5 block truncate text-sm font-semibold text-ink">{selectedAddress?.label ?? locationLabel}</span>
                 <span className="mt-0.5 block truncate text-xs text-muted">{deliverySummary}</span>
-                <span className="mt-1 block truncate text-xs font-medium text-ink">{slotSummary}</span>
+                <span className="mt-1 block truncate text-xs font-medium text-ink">Next day delivery · team will contact you about timing</span>
               </span>
               <span className="shrink-0 border-b border-ink text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">Change</span>
             </button>
@@ -679,7 +774,7 @@ export default function CheckoutPage() {
               </span>
             </label>
             {placeError ? <p className="text-center text-xs leading-relaxed text-accent-deep">{placeError}</p> : null}
-            <button type="button" onClick={() => void placeOrder()} disabled={!canCheckoutCart || placing || (paymentMethod === "card" && !cardPaymentsEnabled) || !legalAccepted || !online} className="min-h-12 w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void placeOrder()} disabled={!canCheckoutCart || !checkoutReady || placing || (paymentMethod === "card" && !cardPaymentsEnabled) || !legalAccepted || !online} className="min-h-12 w-full rounded-lg bg-ink px-4 py-4 text-sm font-semibold uppercase tracking-[0.1em] text-white transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50">
               {placing
                 ? "Starting payment..."
                 : hasUnavailableItems
@@ -694,7 +789,9 @@ export default function CheckoutPage() {
                     ? "Continue to payment"
                     : !mobileAddressReady
                       ? "Select address to continue"
-                      : "Select delivery time"}
+                    : !currentQuote
+                      ? "Confirm location for delivery fee"
+                      : "Continue to payment"}
             </button>
           </div>
         </div>
@@ -784,14 +881,9 @@ export default function CheckoutPage() {
                 ) : null}
 
                 <div className="mt-6 border-t border-line pt-5">
-                  <p className="mb-1 text-sm font-semibold text-ink">Delivery time</p>
-                  <p className="mb-4 text-xs text-muted">Same-day slots until 6:30 PM. Later bookings move to tomorrow.</p>
-                  <DeliverySlotPicker
-                    slots={deliverySlots}
-                    selectedId={selectedSlotId}
-                    onSelect={(slot) => setSelectedSlotId(slot.id)}
-                    idPrefix="checkout-mobile-delivery-slot"
-                  />
+                  <p className="text-sm font-semibold text-ink">Delivery</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">Next day delivery. A team member will contact you for your preferred time.</p>
+                  {deliveryQuoteInfo}
                 </div>
               </div>
 
@@ -804,8 +896,8 @@ export default function CheckoutPage() {
                 >
                   {!mobileAddressReady
                     ? "Select address"
-                    : !selectedSlot
-                      ? "Select delivery time"
+                    : !currentQuote
+                      ? "Confirm location"
                       : "Deliver here"}
                 </button>
               </footer>
@@ -955,7 +1047,10 @@ export default function CheckoutPage() {
 
         <DeliveryAddressFields
           value={form}
-          onChange={setForm}
+          onChange={(next) => {
+            setSelectedAddressId(null);
+            setForm(next);
+          }}
           idPrefix="checkout-delivery-address"
           requireLabel={saveAddress}
         />
@@ -987,20 +1082,15 @@ export default function CheckoutPage() {
           </div>
         ) : null}
 
-        <section id="checkout-delivery-slot-section" className="space-y-3 border-t border-line pt-6">
+        <section id="checkout-delivery-timing" className="space-y-3 border-t border-line pt-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">When</p>
-            <h2 className="mt-1 font-display text-3xl text-ink">Choose a delivery window</h2>
+            <h2 className="mt-1 font-display text-3xl text-ink">Delivery timing</h2>
             <p className="mt-1 text-sm text-muted">
-              Same-day booking closes at 6:30 PM. After that, tomorrow&apos;s slots open.
+              Next day delivery. A team member will contact you to confirm your preferred time.
             </p>
           </div>
-          <DeliverySlotPicker
-            slots={deliverySlots}
-            selectedId={selectedSlotId}
-            onSelect={(slot) => setSelectedSlotId(slot.id)}
-            idPrefix="checkout-desktop-delivery-slot"
-          />
+          {deliveryQuoteInfo}
         </section>
 
         <section aria-labelledby="payment-heading" className="border-t border-line pt-6">
@@ -1015,9 +1105,9 @@ export default function CheckoutPage() {
       </div>
 
       <aside className="h-fit border border-line bg-surface p-5 sm:sticky sm:top-24 sm:p-6">
-        {availableItems.length > 0 ? <FreeDeliveryNudge fees={fees} /> : null}
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-deep">Order total</p>
         <h2 className="mt-1 font-display text-3xl text-ink">Price details</h2>
+        {deliveryQuoteInfo}
         {availableItems.length > 0 ? <div className="mt-6 border-y border-line py-5"><OrderFeeLines fees={fees} /></div> : <p className="mt-6 border-y border-line py-5 text-sm text-muted">No available items to total.</p>}
         {availableItems.length > 0 ? <div className="mt-5 flex justify-between gap-4 text-lg font-semibold text-ink">
           <span>Total</span>
@@ -1048,7 +1138,9 @@ export default function CheckoutPage() {
                 ? "Continue to payment"
                 : !mobileAddressReady
                   ? "Select address to continue"
-                  : "Select delivery time"}
+                  : !currentQuote
+                    ? "Confirm location for delivery fee"
+                    : "Continue to payment"}
         </button>
         <p className="mt-3 text-center text-xs leading-relaxed text-muted">
           You will enter card details on AFS’s secure form next.

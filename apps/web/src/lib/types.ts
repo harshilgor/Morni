@@ -146,6 +146,8 @@ export type Order = {
   delivery_eta_minutes: number;
   delivery_slot_start: string | null;
   delivery_slot_end: string | null;
+  delivery_distance_km: number | null;
+  delivery_date: string | null;
   placed_at: string;
 };
 

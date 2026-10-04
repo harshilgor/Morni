@@ -26,8 +26,8 @@ export function emirateLabel(emirate: UaeEmirate) {
   return EMIRATES.find((e) => e.value === emirate)?.label ?? emirate;
 }
 
-export function deliveryPromise(_minutes = 60) {
-  return "Same-day delivery";
+export function deliveryPromise() {
+  return "Next day delivery";
 }
 
 export function orderStatusLabel(status: string) {

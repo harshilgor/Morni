@@ -45,6 +45,10 @@ import {
   type ProductCustomizationConfig,
 } from "@/lib/product-customization";
 import { PRODUCT_FABRICS } from "@/lib/product-fabrics";
+import {
+  defaultProductSizesForCategory,
+  productSizesForCategory,
+} from "@/lib/product-sizes";
 import { PRODUCT_OCCASIONS, productOccasionLabel } from "@/lib/product-occasions";
 import { UploadSuccessConfetti } from "@/components/upload-success-confetti";
 import { AiProcessingOverlay } from "@/components/ai-processing-overlay";
@@ -68,15 +72,31 @@ type ProductDraft = {
 
 type CreateStep = 1 | 2;
 
-type ProductListingSuggestion = {
-  title: string;
-  description: string;
-  categorySlug: string | null;
-  colorName: string | null;
-};
-
 function categoryHasSizes(categorySlug: string) {
   return categorySlug !== "gifting";
+}
+
+function colorDraftsForCategory(drafts: ColorDraft[], categorySlug: string) {
+  const availableSizes = new Set<string>(productSizesForCategory(categorySlug));
+  return drafts.map((draft) => {
+    if (!categoryHasSizes(categorySlug)) {
+      return { ...draft, sizes: [], size_stock: {} };
+    }
+    const retainedSizes = draft.sizes.filter((size) => availableSizes.has(size));
+    const sizes = retainedSizes.length
+      ? retainedSizes
+      : defaultProductSizesForCategory(categorySlug);
+    const size_stock = Object.fromEntries(
+      sizes.map((size) => [size, draft.size_stock[size] ?? 0]),
+    );
+    return {
+      ...draft,
+      sizes,
+      size_stock,
+      inventory_mode: "exact" as const,
+      stock: String(Object.values(size_stock).reduce((sum, quantity) => sum + quantity, 0)),
+    };
+  });
 }
 
 async function compressImageForListing(file: File) {
@@ -1220,11 +1240,7 @@ export default function PortalProductsPage() {
                           ? { customization: defaultCustomizationConfig() }
                           : {}),
                       }));
-                      if (!categoryHasSizes(categorySlug)) {
-                        setCreateColors((current) =>
-                          current.map((draft) => ({ ...draft, sizes: [] })),
-                        );
-                      }
+                      setCreateColors((current) => colorDraftsForCategory(current, categorySlug));
                     }}
                     required
                   >
@@ -1284,6 +1300,7 @@ export default function PortalProductsPage() {
                   highlightAddColor={colorTourStep === 1}
                   disabled={saving || generating || organizing}
                   showSizes={categoryHasSizes(form.categorySlug)}
+                  availableSizes={productSizesForCategory(form.categorySlug)}
                 />
 
                 {categoryHasSizes(form.categorySlug) ? <CustomizationEditor value={form.customization} onChange={(customization) => setForm((current) => ({ ...current, customization }))} /> : null}
@@ -1434,11 +1451,7 @@ export default function PortalProductsPage() {
                           }
                         : current,
                     );
-                    if (!categoryHasSizes(categorySlug)) {
-                      setEditColors((current) =>
-                        current.map((draft) => ({ ...draft, sizes: [] })),
-                      );
-                    }
+                    setEditColors((current) => colorDraftsForCategory(current, categorySlug));
                   }}
                   required
                 >
@@ -1478,6 +1491,7 @@ export default function PortalProductsPage() {
                 onChange={setEditColors}
                 disabled={savingEdits}
                 showSizes={categoryHasSizes(editDraft.categorySlug)}
+                availableSizes={productSizesForCategory(editDraft.categorySlug)}
               />
               {categoryHasSizes(editDraft.categorySlug) ? <CustomizationEditor compact value={editDraft.customization} onChange={(customization) => setEditDraft((current) => current ? { ...current, customization } : current)} /> : null}
             </div>

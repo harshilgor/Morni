@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Morni",
     short_name: "Morni",
     description:
-      "Browse UAE boutique offerings and get fashion delivered the same day.",
+      "Browse UAE boutique offerings and get fashion delivered the next day.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

@@ -93,7 +93,7 @@ export default function OrdersPage() {
               >
                 <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-accent-deep">{order.order_number}</p><p className="mt-1 font-semibold text-ink">{storeName(order)}</p></div><span className="text-lg text-accent-deep transition group-hover:translate-x-0.5">→</span></div>
                 <p className="mt-4 text-sm font-medium text-ink">{statusCopy(order)}</p>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted"><span>{order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} item{(order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0) === 1 ? "" : "s"}</span><span>{formatDeliverySlotShort(order.delivery_slot_start, order.delivery_slot_end) ?? `ETA ${order.delivery_eta_minutes} min`}</span><span className="font-semibold text-ink">{formatAed(order.total_aed)}</span></div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted"><span>{order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} item{(order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0) === 1 ? "" : "s"}</span><span>{formatDeliverySlotShort(order.delivery_slot_start, order.delivery_slot_end) ?? "Next day · team will contact you about timing"}</span><span className="font-semibold text-ink">{formatAed(order.total_aed)}</span></div>
               </Link>
             </li>
           ))}

@@ -41,13 +41,13 @@ export const instant = false;
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "Morni",
-  title: "Morni — Local retail, same-day delivery",
+  title: "Morni — Local retail, next-day delivery",
   description:
-    "Browse UAE boutique offerings and get fashion delivered the same day.",
+    "Browse UAE boutique offerings and get fashion delivered the next day.",
   openGraph: {
-    title: "Morni — Local retail, same-day delivery",
+    title: "Morni — Local retail, next-day delivery",
     description:
-      "Browse UAE boutique offerings and get fashion delivered the same day.",
+      "Browse UAE boutique offerings and get fashion delivered the next day.",
     siteName: "Morni",
     type: "website",
   },

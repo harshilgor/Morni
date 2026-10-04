@@ -16,7 +16,7 @@ export type PortalOrderWithDelivery = PortalOrderWithItems & {
 };
 
 export const PORTAL_ORDER_COLUMNS =
-  "id, order_number, shopper_id, store_id, status, payment_method, payment_status, subtotal_aed, small_order_fee_aed, delivery_fee_aed, service_fee_aed, total_aed, delivery_emirate, delivery_area, delivery_street, delivery_building, delivery_apartment, delivery_notes, delivery_eta_minutes, delivery_slot_start, delivery_slot_end, placed_at, updated_at";
+  "id, order_number, shopper_id, store_id, status, payment_method, payment_status, subtotal_aed, small_order_fee_aed, delivery_fee_aed, service_fee_aed, total_aed, delivery_emirate, delivery_area, delivery_street, delivery_building, delivery_apartment, delivery_notes, delivery_eta_minutes, delivery_slot_start, delivery_slot_end, delivery_distance_km, delivery_date, placed_at, updated_at";
 
 export const PORTAL_ORDER_SELECT = `${PORTAL_ORDER_COLUMNS}, order_items(*)`;
 

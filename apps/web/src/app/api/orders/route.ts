@@ -10,7 +10,8 @@ import {
   validateCustomizationValues,
   type ProductCustomizationValues,
 } from "@/lib/product-customization";
-import { findBookableDeliverySlot } from "@/lib/delivery-slots";
+import { calculateDrivingDistance, DeliveryLocationError } from "@/lib/server/delivery-pricing";
+import { deliveryFeeForDistanceMeters } from "@/lib/fees";
 
 type CheckoutItem = {
   productId?: string;
@@ -29,6 +30,8 @@ type CheckoutAddress = {
   building?: string;
   apartment?: string;
   notes?: string;
+  lat?: number;
+  lng?: number;
 };
 
 type CheckoutBody = {
@@ -37,10 +40,8 @@ type CheckoutBody = {
   saveAddress?: boolean;
   makeDefault?: boolean;
   paymentMethod?: "card";
-  deliverySlot?: {
-    start?: string;
-    end?: string;
-  };
+  quotedDeliveryDistanceMeters?: number;
+  quotedDeliveryFeeAed?: number;
 };
 
 type VerifiedProduct = {
@@ -247,14 +248,39 @@ export async function POST(request: Request) {
   }
   const paymentMethod = requestedMethod;
 
-  const slotStart = typeof body?.deliverySlot?.start === "string" ? body.deliverySlot.start : "";
-  const slotEnd = typeof body?.deliverySlot?.end === "string" ? body.deliverySlot.end : "";
-  const bookableSlot = findBookableDeliverySlot(slotStart, slotEnd);
-  if (!bookableSlot) {
-    return NextResponse.json(
-      { error: "Choose a valid delivery time slot before placing this order." },
-      { status: 400 },
-    );
+  const hasCoordinates = Number.isFinite(address?.lat) && Number.isFinite(address?.lng);
+  if ((address?.lat !== undefined || address?.lng !== undefined) && !hasCoordinates) {
+    return NextResponse.json({ error: "Confirm a valid delivery location." }, { status: 400 });
+  }
+  let deliveryDistanceKm: number;
+  try {
+    const distance = await calculateDrivingDistance(storeId, {
+      area,
+      street,
+      building: trimTo(address?.building, 120),
+      apartment: trimTo(address?.apartment, 80),
+      emirate,
+      ...(hasCoordinates ? { lat: address!.lat, lng: address!.lng } : {}),
+    });
+    deliveryDistanceKm = distance.distanceMeters / 1000;
+    const actualDeliveryFee = deliveryFeeForDistanceMeters(distance.distanceMeters);
+    const quotedDistance = body?.quotedDeliveryDistanceMeters;
+    const quotedFee = body?.quotedDeliveryFeeAed;
+    if (!Number.isInteger(quotedDistance) || !Number.isFinite(quotedFee) || actualDeliveryFee !== quotedFee) {
+      return NextResponse.json({
+        error: "The pickup point or delivery route changed. Review the updated distance and delivery fee before continuing.",
+        quoteChanged: true,
+        distanceMeters: distance.distanceMeters,
+        distanceKm: Number((distance.distanceMeters / 1000).toFixed(3)),
+        deliveryFeeAed: actualDeliveryFee,
+        destination: { lat: distance.destinationLat, lng: distance.destinationLng, label: distance.confirmedLabel ?? null },
+      }, { status: 409 });
+    }
+  } catch (error) {
+    const message = error instanceof DeliveryLocationError
+      ? error.message
+      : "We couldn’t calculate the driving distance. Confirm your delivery location to continue.";
+    return NextResponse.json({ error: message, requiresLocationConfirmation: true }, { status: 422 });
   }
 
   const { data, error } = await admin.rpc("place_order_with_items", {
@@ -270,11 +296,10 @@ export async function POST(request: Request) {
     p_delivery_apartment: trimTo(address?.apartment, 80),
     p_delivery_notes: trimTo(address?.notes, 1000),
     p_delivery_phone: phone,
-    p_delivery_eta_minutes: 0,
+    p_delivery_eta_minutes: 1440,
     p_items: rpcItems,
+    p_delivery_distance_km: deliveryDistanceKm,
     p_shopper_id: user.id,
-    p_delivery_slot_start: bookableSlot.startIso,
-    p_delivery_slot_end: bookableSlot.endIso,
   });
 
   if (error || !data) {

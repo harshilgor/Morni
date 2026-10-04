@@ -63,6 +63,7 @@ function dueText(order: PortalOrder) {
     if (minutes < 0) return `${slotLabel} · overdue`;
     return slotLabel;
   }
+  if (order.delivery_date) return "Next day · contact shopper about preferred time";
   if (minutes < 0) return `${Math.abs(minutes)} min overdue`;
   if (minutes < 60) return `Due in ${minutes} min`;
   return `Due by ${clock}`;
